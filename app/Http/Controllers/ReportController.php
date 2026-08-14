@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\ReservationItem;
 use App\Models\StockMovement;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -95,7 +96,7 @@ class ReportController extends Controller
             ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
             ->whereIn('type', ['stock_out', 'sale', 'order_reserved'])
             ->sum('quantity');
-        $products = Product::query()->orderBy('stock')->get();
+        $products = Product::query()->menuOrder()->get();
 
         return view('reports.index', [
             'period' => $period,
@@ -198,6 +199,15 @@ class ReportController extends Controller
     public function receipt(Order $order): View
     {
         abort_unless($order->payment_status === 'paid', 404);
+        $user = request()->user();
+        $userId = $user?->id;
+
+        abort_unless(
+            $user?->hasRole(User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_CASHIER)
+            || $order->customer_id === $userId
+            || ($order->customer_id === null && $order->user_id === $userId),
+            403,
+        );
 
         return view('receipts.show', [
             'order' => $order->load(['user', 'customer', 'items.product']),

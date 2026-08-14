@@ -17,11 +17,14 @@ use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
 
 Route::middleware('guest')->controller(AuthController::class)->group(function (): void {
     Route::get('/login', 'create')->name('login');
     Route::post('/login', 'store')->middleware('throttle:5,1')->name('login.store');
     Route::get('/register', 'register')->name('register');
+    Route::post('/register/email', 'sendRegistrationCode')->middleware('throttle:3,1')->name('register.email');
+    Route::post('/register/email/verify', 'verifyRegistrationCode')->middleware('throttle:6,1')->name('register.email.verify');
     Route::post('/register', 'storeRegistration')->middleware('throttle:3,1')->name('register.store');
 });
 
@@ -41,6 +44,12 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/reservations/{reservation}/payment-proof', [ReservationController::class, 'proof'])
         ->middleware('role:customer,super_admin,admin')
         ->name('reservations.payment-proof');
+    Route::get('/reservations/{reservation}/details', [ReservationController::class, 'show'])
+        ->middleware('role:customer,super_admin,admin')
+        ->name('reservations.show');
+    Route::get('/reservations/{reservation}/receipt', [ReservationController::class, 'receipt'])
+        ->middleware('role:customer,super_admin,admin')
+        ->name('reservations.receipt');
 
     Route::middleware('role:customer')->group(function (): void {
         Route::get('/shop', [CustomerOrderController::class, 'index'])->name('shop');
@@ -68,6 +77,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/inventory/{product}', [InventoryController::class, 'update'])->name('inventory.update');
         Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
         Route::patch('/reservations/{reservation}/status', [ReservationController::class, 'updateStatus'])->name('reservations.status');
+        Route::get('/crud', [ProductController::class, 'index'])->name('crud.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
     });
@@ -103,6 +113,6 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::get('/receipts/{order}', [ReportController::class, 'receipt'])
-        ->middleware('role:super_admin,admin,cashier')
+        ->middleware('role:super_admin,admin,cashier,customer')
         ->name('receipts.show');
 });

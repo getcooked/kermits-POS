@@ -8,6 +8,8 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class AuthController extends Controller
@@ -19,16 +21,83 @@ class AuthController extends Controller
 
     public function register(): View
     {
-        return view('auth.register');
+        return view('auth.register', [
+            'pendingVerification' => session('registration_email_verification.email'),
+            'verifiedEmail' => session('registration_email_verification.verified') === true
+                ? session('registration_email_verification.email')
+                : null,
+        ]);
+    }
+
+    public function sendRegistrationCode(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
+        ], [
+            'email.regex' => 'Please use a Gmail address.',
+        ]);
+
+        $code = (string) random_int(100000, 999999);
+
+        session([
+            'registration_email_verification' => [
+                'email' => strtolower($validated['email']),
+                'code_hash' => Hash::make($code),
+                'expires_at' => now()->addMinutes(10)->timestamp,
+                'verified' => false,
+            ],
+        ]);
+
+        Mail::raw("Your Kermit's verification code is {$code}. This code expires in 10 minutes.", function ($message) use ($validated): void {
+            $message->to($validated['email'])
+                ->subject("Kermit's account verification code");
+        });
+
+        return back()->with('status', 'We sent a 6-digit verification code to your Gmail.');
+    }
+
+    public function verifyRegistrationCode(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'digits:6'],
+        ]);
+
+        $verification = session('registration_email_verification');
+
+        if (! $verification || ($verification['expires_at'] ?? 0) < now()->timestamp) {
+            session()->forget('registration_email_verification');
+
+            return back()->withErrors(['code' => 'The verification code expired. Please request a new code.']);
+        }
+
+        if (! Hash::check($validated['code'], $verification['code_hash'] ?? '')) {
+            return back()->withErrors(['code' => 'The verification code is incorrect.']);
+        }
+
+        $verification['verified'] = true;
+        session(['registration_email_verification' => $verification]);
+
+        return back()->with('status', 'Gmail verified. You can now create your account.');
     }
 
     public function storeRegistration(RegisterCustomerRequest $request): RedirectResponse
     {
+        $verification = session('registration_email_verification');
+        $email = strtolower($request->validated('email'));
+
+        if (($verification['verified'] ?? false) !== true || ($verification['email'] ?? null) !== $email) {
+            return back()
+                ->withInput($request->except('password', 'password_confirmation'))
+                ->withErrors(['email' => 'Please verify this Gmail address before creating your account.']);
+        }
+
         $user = User::query()->create([
             ...$request->validated(),
             'role' => User::ROLE_CUSTOMER,
+            'email_verified_at' => now(),
         ]);
 
+        $request->session()->forget('registration_email_verification');
         Auth::login($user);
         $request->session()->regenerate();
 

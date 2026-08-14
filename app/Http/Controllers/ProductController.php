@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProductRequest;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\StockMovement;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -14,7 +15,7 @@ class ProductController extends Controller
     public function index(): View
     {
         return view('products.index', [
-            'products' => Product::query()->orderBy('category_order')->orderBy('category')->orderBy('name')->get(),
+            'products' => Product::query()->menuOrder()->get(),
         ]);
     }
 
@@ -55,10 +56,12 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
-        if (OrderItem::query()->whereBelongsTo($product)->exists() || $product->reservationItems()->exists()) {
-            $product->update(['active' => false]);
-
-            return back()->with('status', 'Products with sales history are hidden instead of deleted.');
+        if (
+            OrderItem::query()->whereBelongsTo($product)->exists()
+            || $product->reservationItems()->exists()
+            || StockMovement::query()->whereBelongsTo($product)->exists()
+        ) {
+            return back()->withErrors('This product cannot be deleted because it already has order, reservation, or inventory history.');
         }
 
         $image = $product->image_path;

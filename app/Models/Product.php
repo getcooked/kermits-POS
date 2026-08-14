@@ -44,6 +44,11 @@ class Product extends Model
         return $query->where('active', true);
     }
 
+    public function scopeMenuOrder(Builder $query): Builder
+    {
+        return $query->orderBy('category_order')->orderBy('category')->orderBy('name');
+    }
+
     public function scopeLowStock(Builder $query, int $threshold = 5): Builder
     {
         return $query->where('stock', '<=', $threshold);

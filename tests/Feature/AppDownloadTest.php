@@ -1,0 +1,51 @@
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
+use Tests\TestCase;
+
+class AppDownloadTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private string $releasePath;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->releasePath = storage_path('app/releases/kermits.apk');
+        File::delete($this->releasePath);
+    }
+
+    protected function tearDown(): void
+    {
+        File::delete($this->releasePath);
+        parent::tearDown();
+    }
+
+    public function test_landing_page_shows_app_as_coming_soon_without_a_release(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('App coming soon')
+            ->assertDontSee('Download app');
+
+        $this->get('/download-app')->assertNotFound();
+    }
+
+    public function test_android_release_can_be_downloaded_from_the_landing_page(): void
+    {
+        File::put($this->releasePath, 'test apk');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Download app')
+            ->assertSee(route('app.download'));
+
+        $this->get('/download-app')
+            ->assertOk()
+            ->assertDownload('Kermits-Restaurant.apk');
+    }
+}

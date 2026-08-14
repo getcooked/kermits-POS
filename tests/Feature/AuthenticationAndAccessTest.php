@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AuthenticationAndAccessTest extends TestCase
@@ -35,7 +36,14 @@ class AuthenticationAndAccessTest extends TestCase
 
     public function test_customer_registration_cannot_choose_a_staff_role(): void
     {
-        $this->post('/register', [
+        $this->withSession([
+            'registration_email_verification' => [
+                'email' => 'buyer@gmail.com',
+                'code_hash' => Hash::make('123456'),
+                'expires_at' => now()->addMinutes(10)->timestamp,
+                'verified' => true,
+            ],
+        ])->post('/register', [
             'name' => 'Customer Account',
             'username' => 'buyer.account',
             'email' => 'buyer@gmail.com',

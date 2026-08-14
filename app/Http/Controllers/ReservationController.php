@@ -26,7 +26,7 @@ class ReservationController extends Controller
     public function create(): View
     {
         return view('reservations.create', [
-            'products' => Product::query()->available()->where('stock', '>', 0)->orderBy('category_order')->orderBy('name')->get(),
+            'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'tableFees' => self::TABLE_FEES,
             'exclusiveFee' => self::EXCLUSIVE_FEE,
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
@@ -118,6 +118,32 @@ class ReservationController extends Controller
         return view('reservations.success', [
             'reservation' => $reservation,
         ]);
+    }
+
+    public function show(Request $request, Reservation $reservation): View
+    {
+        $this->authorizeViewer($request, $reservation);
+
+        return view('reservations.show', [
+            'reservation' => $reservation->load(['user', 'handler', 'items.product', 'statusHistories.changedBy']),
+        ]);
+    }
+
+    public function receipt(Request $request, Reservation $reservation): View
+    {
+        $this->authorizeViewer($request, $reservation);
+
+        return view('reservations.receipt', [
+            'reservation' => $reservation->load(['user', 'items.product']),
+        ]);
+    }
+
+    private function authorizeViewer(Request $request, Reservation $reservation): void
+    {
+        $canView = $request->user()->hasRole('super_admin', 'admin')
+            || $reservation->user_id === $request->user()->id;
+
+        abort_unless($canView, 403);
     }
 
     public function index(Request $request): View

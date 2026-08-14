@@ -15,7 +15,7 @@ class CustomerOrderController extends Controller
     public function index(): View
     {
         return view('shop.index', [
-            'products' => Product::query()->available()->where('stock', '>', 0)->orderBy('category_order')->orderBy('name')->get(),
+            'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
         ]);
     }

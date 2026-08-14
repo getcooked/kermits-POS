@@ -20,7 +20,7 @@ class CashierController extends Controller
     public function index(): View
     {
         return view('roles.cashier', [
-            'products' => Product::query()->available()->orderBy('category_order')->orderBy('name')->get(),
+            'products' => Product::query()->available()->menuOrder()->get(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
             'customers' => User::query()->where('role', User::ROLE_CUSTOMER)->orderBy('name')->get(['id', 'name', 'email']),
         ]);

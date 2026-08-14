@@ -75,4 +75,23 @@ class CustomerHistoryTest extends TestCase
         $this->actingAs($customer)->get('/customers/'.$customer->id.'/history')->assertForbidden();
         $this->actingAs($cashier)->get('/customers/'.$customer->id.'/history')->assertForbidden();
     }
+
+    public function test_customer_can_view_and_print_only_their_reservation_receipt(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $other = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $reservation = Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-RECEIPT', 'type' => 'table', 'table_size' => 4, 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 4, 'payment_method' => 'cash', 'status' => 'confirmed']);
+
+        $this->actingAs($customer)->get('/history')
+            ->assertOk()
+            ->assertSee('View reservation')
+            ->assertSee('Print receipt');
+
+        $this->actingAs($customer)->get('/reservations/'.$reservation->id.'/receipt')
+            ->assertOk()
+            ->assertSee('RESERVATION RECEIPT')
+            ->assertSee('KRM-RECEIPT');
+
+        $this->actingAs($other)->get('/reservations/'.$reservation->id.'/receipt')->assertForbidden();
+    }
 }

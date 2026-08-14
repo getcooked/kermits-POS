@@ -7,7 +7,7 @@
     <link rel="icon" type="image/jpeg" href="{{ asset('kermits-logo.jpg') }}">
     <title>@yield('title', 'Simple Login')</title>
     <style>
-        :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
         * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; background: #f5f7fb; color: #172033; }
         button, input, textarea { font: inherit; }
@@ -55,8 +55,6 @@
         }
         @media(max-height:650px) and (min-width:781px){.admin-brand img{width:38px;height:38px}.admin-brand{margin-bottom:12px}.admin-sidebar nav{gap:3px}.admin-sidebar nav a{padding:7px 11px}.admin-user{padding:8px 4px}.admin-workspace{padding:18px}}
         .global-back{height:42px;border:1px solid #daddd1;border-radius:10px;background:#fff;color:#171817;display:flex;align-items:center;gap:8px;padding:0 13px 0 7px;cursor:pointer;font-size:13px;font-weight:750;transition:background .18s ease,color .18s ease,transform .18s ease}.global-back-icon{width:28px;height:28px;border-radius:8px;background:#e9ecd4;color:#667000;display:grid;place-items:center;transition:transform .18s ease}.global-back svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.global-back:hover{background:#f4f5ef;transform:translateX(-2px)}.global-back:hover .global-back-icon{transform:translateX(-2px)}.global-back:focus-visible{outline:3px solid rgba(170,181,20,.35);outline-offset:2px}.page .card>.global-back,.booking-inner>.global-back{margin-bottom:20px}.admin-sidebar nav>.global-back{width:100%;height:auto;border:0;border-radius:10px;background:#222420;color:#d8d9d5;justify-content:flex-start;padding:9px 11px;margin-bottom:5px}.admin-sidebar nav>.global-back:hover{background:#292b27;color:#fff}.admin-sidebar nav>.global-back .global-back-icon{background:#aab514;color:#171817}.customer-shop nav .global-back,.history-page nav .global-back{height:38px;padding-right:10px}.customer-shop nav .global-back-icon,.history-page nav .global-back-icon{width:25px;height:25px}@media(max-width:580px){.customer-shop nav .global-back-label,.history-page nav .global-back-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.customer-shop nav .global-back,.history-page nav .global-back{width:36px;padding:5px}.booking-inner>.global-back{margin-bottom:14px}}
-    </style>
-<style>
 /* Kermit's responsive interface */
 :root{--ink:#171817;--ink-2:#292b27;--paper:#f4f3ec;--surface:#fffefa;--line:#d8d9cf;--muted:#6c7068;--accent:#aebb19;--accent-soft:#edf0cf;--danger:#b42318;--radius:18px;--shadow:0 16px 44px rgba(24,25,22,.08)}
 body{background:radial-gradient(circle at 85% 0,#eef0d8 0,transparent 30%),#e6e8e2;color:var(--ink);overflow-x:hidden}
@@ -73,18 +71,12 @@ button,a,input,select,textarea{transition:border-color .18s,background .18s,colo
 @media(max-width:1100px){.admin-shell,.app-shell{grid-template-columns:205px minmax(0,1fr)!important}.admin-workspace,.workspace{padding:22px!important}.sell-layout{grid-template-columns:1fr!important}.payment-card{position:relative!important;max-height:none;order:-1}.product-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 @media(max-width:780px){body{background:var(--paper)}.admin-shell,.app-shell{width:100%!important;height:auto!important;min-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important;grid-template-columns:1fr!important;overflow:visible!important}.admin-sidebar,.sidebar{position:sticky!important;top:0;z-index:50;padding:10px 12px!important;box-shadow:0 7px 24px rgba(0,0,0,.2)}.admin-brand,.side-brand{margin:0 0 8px!important}.admin-sidebar nav,.side-nav{display:flex!important;gap:6px;overflow-x:auto;padding-bottom:2px}.admin-sidebar nav a,.side-nav a{min-height:40px;white-space:nowrap;padding:8px 11px!important;font-size:13px}.admin-sidebar nav a span,.side-nav a span{display:none}.admin-user,.side-user{display:none!important}.admin-workspace,.workspace{height:auto!important;overflow:visible!important;padding:18px 14px 90px!important}.topbar,.dash-head{align-items:flex-start!important;min-height:auto}.topbar>a,.topbar>.logout{flex:0 0 auto}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.payment-card{order:-1}.customer-shop nav,.history-page nav{padding:0 12px}.customer-shop header,.customer-shop>form,.shop-error,.history-page>header,.history-grid{width:calc(100% - 24px)!important}.history-grid{grid-template-columns:1fr!important}.booking-page{padding:0!important}.booking-shell{width:100%!important;height:auto!important;min-height:100dvh!important;border:0!important;border-radius:0!important}.booking-form{overflow:visible!important}.booking-button{bottom:10px}.admin-workspace [style*="grid-template-columns"]{grid-template-columns:1fr!important}.admin-workspace [style*="display:flex"]{align-items:stretch}.admin-workspace .button,.admin-workspace .logout{width:100%;justify-content:center}}
 @media(max-width:520px){.admin-workspace,.workspace{padding:14px 10px 86px!important}.topbar{display:grid!important;grid-template-columns:1fr auto;gap:12px}.topbar .logout{width:auto!important}.welcome{padding:17px!important;border-radius:14px!important}.product-grid,.shop-grid{grid-template-columns:1fr!important}.product-photo,.product-placeholder{height:190px!important}.payment-options{grid-template-columns:1fr}.sell-head h1{font-size:27px!important}.customer-actions{gap:5px!important}.customer-actions a,.customer-actions button{padding:8px!important;font-size:12px}.customer-shop header h1,.history-page>header h1{font-size:34px!important}.order-bar{bottom:8px!important;width:calc(100% - 16px)!important;padding:10px!important}.booking-form{padding:22px 14px!important}.booking-types{grid-template-columns:1fr!important}.reservation-menu-item{grid-template-columns:52px minmax(0,1fr) 58px!important}.admin-workspace table{min-width:680px}.global-back{flex:0 0 auto}}
-</style>
-<style>
 /* Uniform Admin and Super Admin sidebar */
 @media(min-width:781px){.admin-shell{grid-template-columns:250px minmax(0,1fr)!important}.admin-sidebar{box-sizing:border-box!important;width:250px!important;min-width:250px!important;max-width:250px!important;height:100dvh!important;padding:30px 20px!important;background:linear-gradient(160deg,#151615,#21231f)!important}.admin-sidebar>.admin-brand{box-sizing:border-box!important;width:100%;min-height:87px;display:flex!important;align-items:center!important;gap:10px!important;margin:0 0 28px!important;padding:4px 8px 28px!important;border-bottom:1px solid #343630!important;color:#fff!important;text-decoration:none!important}.admin-sidebar>.admin-brand img{box-sizing:border-box!important;width:58px!important;height:58px!important;min-width:58px!important;max-width:58px!important;padding:0!important;border-radius:50%!important;object-fit:contain!important;background:#fff!important}.admin-sidebar>.admin-brand strong{color:#fff!important;letter-spacing:.1em!important;white-space:nowrap}.admin-sidebar>nav{display:grid!important;align-content:start!important;gap:8px!important;min-height:0;overflow-y:auto!important;flex:1}.admin-sidebar>nav>a{box-sizing:border-box!important;width:100%;height:46px!important;min-height:46px!important;padding:12px 14px!important;border-radius:11px!important;background:#292b27!important;color:#eee!important;gap:12px!important}.admin-sidebar>nav>a:hover{background:#363933!important}.admin-sidebar>nav>a.active{background:#34372f!important;box-shadow:inset 4px 0 #b5c019!important;color:#fff!important}.admin-sidebar>nav>a span{width:22px!important}.admin-sidebar>.admin-user{box-sizing:border-box!important;min-height:73px;margin:14px 0 0!important;padding:15px 0 0 12px!important;border-top:1px solid #343630!important;display:grid!important;grid-template-columns:minmax(0,1fr) 42px;align-items:center;gap:8px}.admin-sidebar>.admin-user>div{min-width:0;display:grid}.admin-sidebar>.admin-user strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.admin-sidebar>.admin-user small{color:#969991;font-size:11px;margin-top:3px}.admin-sidebar>.admin-user form{width:42px;margin:0!important}.admin-sidebar>.admin-user .logout-icon{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}}
 @media(max-width:780px){.admin-sidebar{box-sizing:border-box!important;width:100%!important;min-height:68px!important;padding:8px 14px!important}.admin-sidebar>.admin-brand{display:flex!important;align-items:center;gap:8px;margin:0 0 7px!important;color:#fff;text-decoration:none}.admin-sidebar>.admin-brand img{box-sizing:border-box!important;width:42px!important;height:42px!important;padding:0!important}.admin-sidebar>.admin-brand strong{font-size:13px}.admin-sidebar>nav>a{height:42px!important;min-height:42px!important}.admin-sidebar>.admin-user{display:none!important}}
-</style>
-<style>
 input[type="number"]{appearance:textfield;-moz-appearance:textfield}
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-</style>
-<style>
 /* Kermit's mark on every menu image without hiding the food photo. */
 .menu-card,.shop-grid article,.product-card,.reservation-menu-item,.inventory-item{position:relative}
 .menu-card:after,.shop-grid article:after,.product-card:after,.reservation-menu-item:after,.inventory-item:after{
@@ -102,37 +94,164 @@ input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0
     pointer-events:none;
 }
 .reservation-menu-item:after,.inventory-item:after{width:28px;height:28px;top:5px;left:5px}
-</style>
-<style>
 .nav-icon{width:21px!important;height:21px!important;min-width:21px;flex:0 0 21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;color:inherit}
 .admin-sidebar nav a .nav-icon,.side-nav a .nav-icon{display:block}
 @media(max-width:780px){.admin-sidebar nav a .nav-icon,.side-nav a .nav-icon{display:none}}
-</style>
-</head>
-<body>
-@yield('content')
-<style>
 /* Full-page role workspaces and correctly placed navigation */
 .admin-shell,.app-shell,.sell-shell{width:100%!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}.admin-sidebar,.sidebar{border-radius:0!important}.admin-workspace,.workspace{position:relative}.admin-workspace>.global-back,.workspace>.global-back{margin:0 0 18px}.customer-shop>header>.global-back,.history-page>header>.global-back{margin-bottom:22px}.booking-shell{width:100%!important;height:100dvh!important;min-height:100dvh!important;border:0!important;border-radius:0!important}.booking-page{padding:0!important}.global-back{flex:0 0 auto;box-shadow:0 7px 18px rgba(24,25,22,.07)}
 @media(min-width:781px){.admin-shell{grid-template-columns:250px minmax(0,1fr)!important}.app-shell{grid-template-columns:clamp(220px,17vw,260px) minmax(0,1fr)!important}.admin-sidebar,.sidebar{height:100dvh!important}.admin-workspace,.workspace{height:100dvh!important}.booking-shell{grid-template-columns:250px minmax(0,1fr)!important}}
 @media(max-width:780px){.admin-shell,.app-shell,.sell-shell,.booking-shell{height:auto!important;min-height:100dvh!important}.admin-workspace>.global-back,.workspace>.global-back{margin-bottom:14px}.customer-shop>header>.global-back,.history-page>header>.global-back{margin-bottom:16px}}
-</style>
-<style>
 /* Full-page detail, confirmation, and customer-history screens */
 .page{position:relative;min-height:100dvh;padding:0;display:grid;grid-template-columns:minmax(300px,36%) minmax(0,64%);place-items:stretch;background:radial-gradient(circle at 12% 15%,#33372e 0,transparent 25%),linear-gradient(145deg,#131413,#20221e)}.page:before{content:"KERMIT'S\A Time-honored recipes\A since 2000";white-space:pre;align-self:end;grid-column:1;grid-row:1;padding:clamp(36px,6vw,86px);color:#f6f6f0;font:800 clamp(24px,3vw,44px)/1.25 Georgia,serif;letter-spacing:-.02em}.page>.card{grid-column:2;grid-row:1;width:100%;height:100dvh;max-width:none!important;border:0;border-radius:0;padding:clamp(32px,7vw,100px);box-shadow:none;overflow-y:auto;background:radial-gradient(circle at 100% 0,#f0f1d8 0,transparent 32%),#f8f7f1;display:flex;flex-direction:column;justify-content:center}.page>.card>.global-back{width:max-content;align-self:flex-start;margin-bottom:clamp(24px,5vh,48px)}.page>.card .logo{flex:0 0 auto}.reservation-result{padding-inline:clamp(32px,10vw,150px)!important}.reservation-result .button{min-height:48px;display:flex!important;align-items:center;justify-content:center}
 @media(min-width:901px){.history-page{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100dvh;padding:0!important}.history-page>nav{position:fixed!important;inset:0 auto 0 0;width:250px!important;height:100dvh!important;padding:30px 20px!important;background:linear-gradient(160deg,#151615,#21231f)!important;border:0!important;display:flex!important;flex-direction:column;align-items:stretch!important;justify-content:flex-start!important;color:#fff;backdrop-filter:none!important}.history-page>nav>a{padding:4px 8px 28px;border-bottom:1px solid #343630}.history-page>nav img{width:58px;height:58px}.history-page>nav>div{display:grid!important;gap:8px!important;margin-top:28px}.history-page>nav>div>a{min-height:46px;display:flex;align-items:center;padding:12px 14px;border-radius:11px;background:#292b27;color:#eee}.history-page>nav>div form{margin-top:14px}.history-page>nav>div button{width:100%;min-height:44px;background:transparent;color:#fff;border-color:#464941}.history-page>header,.history-page>.history-grid{grid-column:2;width:auto!important;margin:0!important}.history-page>header{padding:38px clamp(26px,4vw,58px) 26px!important}.history-page>.history-grid{padding:0 clamp(26px,4vw,58px) 50px}}
 @media(max-width:760px){.page{grid-template-columns:1fr}.page:before{display:none}.page>.card{grid-column:1;height:auto;min-height:100dvh;padding:26px 18px;justify-content:flex-start}.reservation-result{padding:26px 18px!important}.page>.card>.global-back{margin-bottom:24px}}
-</style>
-<style>
 /* Stable interaction states: controls never shift position when clicked */
 button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-button,.global-back,.global-back-icon,.product-card,.menu-card,.history-card{transform:none!important;transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease,opacity .14s ease!important}button:hover,a:hover,[role="button"]:hover,.button:hover,.logout:hover,.checkout-button:hover,.booking-button:hover,.book-button:hover,.global-back:hover,.global-back:hover .global-back-icon,.product-card:hover,.menu-card:hover,.history-card:hover{transform:none!important}button:active,a:active,[role="button"]:active{transform:none!important;filter:none!important}.is-submitting{pointer-events:none;opacity:.68!important}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
-</style>
-<style>
 .logout-icon{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;padding:0!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:11px!important;background:rgba(255,255,255,.06)!important;color:#fff!important;display:inline-grid!important;place-items:center!important;cursor:pointer}.logout-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.logout-icon:hover{background:rgba(174,187,25,.18)!important;border-color:rgba(174,187,25,.5)!important}.customer-shop .logout-icon,.history-page .logout-icon{color:#fff!important}.customer-actions form,.history-page nav form{display:flex;justify-content:flex-end}
 @media(max-width:900px){.customer-shop .logout-icon,.history-page .logout-icon{color:#171817!important;background:#fff!important;border-color:#ccd0c5!important}}
-</style>
-<style>
+/* Uniform customer sidebar typography and active state */
+@media(min-width:901px){
+    .customer-shop>nav .customer-actions,
+    .history-page>nav>.history-actions{
+        font-family:Arial, Helvetica, sans-serif!important;
+    }
+    .customer-shop>nav .customer-actions>a,
+    .history-page>nav>.history-actions>a{
+        box-sizing:border-box!important;
+        width:100%!important;
+        height:46px!important;
+        min-height:46px!important;
+        display:flex!important;
+        align-items:center!important;
+        justify-content:flex-start!important;
+        padding:12px 14px!important;
+        border-radius:11px!important;
+        background:#292b27!important;
+        color:#f2f2ee!important;
+        font-family:Arial, Helvetica, sans-serif!important;
+        font-size:16px!important;
+        font-weight:700!important;
+        line-height:1!important;
+        letter-spacing:0!important;
+        text-decoration:none!important;
+        box-shadow:none!important;
+    }
+    .customer-shop>nav .customer-actions>a.active,
+    .history-page>nav>.history-actions>a.active,
+    .customer-shop>nav .customer-actions>a[aria-current="page"],
+    .history-page>nav>.history-actions>a[aria-current="page"]{
+        background:#34372f!important;
+        color:#fff!important;
+        font-family:Arial, Helvetica, sans-serif!important;
+        font-size:16px!important;
+        font-weight:700!important;
+        line-height:1!important;
+        letter-spacing:0!important;
+        box-shadow:inset 4px 0 #b5c019!important;
+    }
+    .customer-shop>nav .customer-actions>a:hover,
+    .history-page>nav>.history-actions>a:hover{
+        background:#34372f!important;
+        color:#fff!important;
+        font-size:16px!important;
+        font-weight:700!important;
+    }
+    .customer-shop>nav>a strong,
+    .history-page>nav>a strong{
+        font-family:Arial, Helvetica, sans-serif!important;
+        font-size:20px!important;
+        font-weight:800!important;
+        line-height:1!important;
+        letter-spacing:.1em!important;
+    }
+    .customer-shop>nav .customer-actions>span,
+    .history-page>nav>.history-actions>span{
+        font-family:Arial, Helvetica, sans-serif!important;
+        font-size:14px!important;
+        font-weight:400!important;
+        line-height:1.2!important;
+        letter-spacing:0!important;
+    }
+}
+@media(max-width:900px){
+    .customer-shop .customer-actions>a,
+    .history-page .history-actions>a{
+        font-family:Arial, Helvetica, sans-serif!important;
+        font-size:13px!important;
+        font-weight:700!important;
+        line-height:1!important;
+        letter-spacing:0!important;
+    }
+}
+/* Stop sidebar link flicker while clicking between customer pages */
+.customer-shop>nav .customer-actions>a,
+.history-page>nav>.history-actions>a,
+.customer-shop>nav .customer-actions>a:link,
+.history-page>nav>.history-actions>a:link,
+.customer-shop>nav .customer-actions>a:visited,
+.history-page>nav>.history-actions>a:visited,
+.customer-shop>nav .customer-actions>a:hover,
+.history-page>nav>.history-actions>a:hover,
+.customer-shop>nav .customer-actions>a:focus,
+.history-page>nav>.history-actions>a:focus,
+.customer-shop>nav .customer-actions>a:active,
+.history-page>nav>.history-actions>a:active{
+    font-family:Arial, Helvetica, sans-serif!important;
+    font-size:16px!important;
+    font-weight:700!important;
+    line-height:1!important;
+    letter-spacing:0!important;
+    text-decoration:none!important;
+    transform:none!important;
+    filter:none!important;
+    outline:0!important;
+    transition:none!important;
+}
+@media(min-width:901px){
+    .customer-shop>nav .customer-actions>a,
+    .history-page>nav>.history-actions>a{
+        height:46px!important;
+        min-height:46px!important;
+        max-height:46px!important;
+        background:#292b27!important;
+        color:#f2f2ee!important;
+        border-left:4px solid transparent!important;
+        box-shadow:none!important;
+    }
+    .customer-shop>nav .customer-actions>a:hover,
+    .history-page>nav>.history-actions>a:hover,
+    .customer-shop>nav .customer-actions>a:focus,
+    .history-page>nav>.history-actions>a:focus,
+    .customer-shop>nav .customer-actions>a:active,
+    .history-page>nav>.history-actions>a:active{
+        background:#292b27!important;
+        color:#f2f2ee!important;
+        border-left-color:transparent!important;
+        box-shadow:none!important;
+    }
+    .customer-shop>nav .customer-actions>a.active,
+    .history-page>nav>.history-actions>a.active,
+    .customer-shop>nav .customer-actions>a[aria-current="page"],
+    .history-page>nav>.history-actions>a[aria-current="page"],
+    .customer-shop>nav .customer-actions>a.active:hover,
+    .history-page>nav>.history-actions>a.active:hover,
+    .customer-shop>nav .customer-actions>a[aria-current="page"]:hover,
+    .history-page>nav>.history-actions>a[aria-current="page"]:hover,
+    .customer-shop>nav .customer-actions>a.active:focus,
+    .history-page>nav>.history-actions>a.active:focus,
+    .customer-shop>nav .customer-actions>a[aria-current="page"]:focus,
+    .history-page>nav>.history-actions>a[aria-current="page"]:focus,
+    .customer-shop>nav .customer-actions>a.active:active,
+    .history-page>nav>.history-actions>a.active:active,
+    .customer-shop>nav .customer-actions>a[aria-current="page"]:active,
+    .history-page>nav>.history-actions>a[aria-current="page"]:active{
+        background:#34372f!important;
+        color:#fff!important;
+        border-left-color:#b5c019!important;
+        box-shadow:none!important;
+    }
+}
 /* Keep Super Admin pages scrollable without displaying browser scrollbars. */
 .admin-shell,.admin-workspace,.admin-sidebar>nav{
     scrollbar-width:none!important;
@@ -146,6 +265,21 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
     height:0!important;
 }
 </style>
+
+
+
+
+
+</head>
+<body>
+@yield('content')
+
+
+
+
+
+
+
 <script>
 document.addEventListener('submit', event => {
     queueMicrotask(() => {

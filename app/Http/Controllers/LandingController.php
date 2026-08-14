@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\View\View;
 
 class LandingController extends Controller
@@ -39,6 +40,25 @@ class LandingController extends Controller
                 ->values();
         }
 
-        return view('landing', ['products' => $bestSellers]);
+        return view('landing', [
+            'products' => $bestSellers,
+            'appDownloadAvailable' => file_exists($this->appReleasePath()),
+        ]);
+    }
+
+    public function downloadApp(): BinaryFileResponse
+    {
+        abort_unless(file_exists($this->appReleasePath()), 404);
+
+        return response()->download(
+            $this->appReleasePath(),
+            'Kermits-Restaurant.apk',
+            ['Content-Type' => 'application/vnd.android.package-archive'],
+        );
+    }
+
+    private function appReleasePath(): string
+    {
+        return storage_path('app/releases/kermits.apk');
     }
 }
