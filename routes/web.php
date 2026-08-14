@@ -1,23 +1,28 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CashierController;
 use App\Http\Controllers\CashierAccountController;
+use App\Http\Controllers\CashierController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerHistoryController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
-use App\Http\Controllers\PaymentSettingsController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PaymentSettingsController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
+Route::get('/seeder', [WebSeederController::class, 'show'])->name('web-seeder.show');
+Route::post('/seeder', [WebSeederController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('web-seeder.store');
 
 Route::middleware('guest')->controller(AuthController::class)->group(function (): void {
     Route::get('/login', 'create')->name('login');
