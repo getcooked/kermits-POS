@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        View::composer(
+            ['landing', 'shop.index', 'customer.history', 'reservations.create'],
+            fn ($view) => $view->with(
+                'appDownloadAvailable',
+                file_exists(storage_path('app/releases/kermits.apk')),
+            ),
+        );
     }
 }

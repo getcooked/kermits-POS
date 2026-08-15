@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -47,5 +48,26 @@ class AppDownloadTest extends TestCase
         $this->get('/download-app')
             ->assertOk()
             ->assertDownload('Kermits-Restaurant.apk');
+    }
+
+    public function test_customer_pages_show_the_current_app_download_state(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $pages = [route('shop'), route('customer.history'), route('reservations.create')];
+
+        foreach ($pages as $page) {
+            $this->actingAs($customer)->get($page)
+                ->assertOk()
+                ->assertSee('App coming soon');
+        }
+
+        File::put($this->releasePath, 'test apk');
+
+        foreach ($pages as $page) {
+            $this->actingAs($customer)->get($page)
+                ->assertOk()
+                ->assertSee('Download app')
+                ->assertSee(route('app.download'));
+        }
     }
 }

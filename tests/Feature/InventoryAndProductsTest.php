@@ -77,6 +77,24 @@ class InventoryAndProductsTest extends TestCase
         $this->actingAs($admin)->delete('/products/'.$product->id)->assertForbidden();
     }
 
+    public function test_product_picture_is_served_through_laravel(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('products/menu-picture.png', $this->fakePng('menu-picture.png')->getContent());
+        $product = Product::query()->create([
+            'name' => 'Visible Menu Picture',
+            'price' => 120,
+            'stock' => 10,
+            'active' => true,
+            'image_path' => 'products/menu-picture.png',
+        ]);
+
+        $this->get('/menu-images/'.$product->id)->assertOk();
+
+        $product->update(['image_path' => 'products/missing.png']);
+        $this->get('/menu-images/'.$product->id)->assertNotFound();
+    }
+
     private function fakePng(string $name): UploadedFile
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);

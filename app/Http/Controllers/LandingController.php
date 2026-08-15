@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LandingController extends Controller
 {
@@ -40,10 +40,7 @@ class LandingController extends Controller
                 ->values();
         }
 
-        return view('landing', [
-            'products' => $bestSellers,
-            'appDownloadAvailable' => file_exists($this->appReleasePath()),
-        ]);
+        return view('landing', ['products' => $bestSellers]);
     }
 
     public function downloadApp(): BinaryFileResponse

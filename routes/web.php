@@ -12,6 +12,7 @@ use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PaymentSettingsController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\WebSeederController;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
+Route::get('/menu-images/{product}', ProductImageController::class)->name('products.image');
 Route::get('/seeder', [WebSeederController::class, 'show'])->name('web-seeder.show');
 Route::post('/seeder', [WebSeederController::class, 'store'])
     ->middleware('throttle:5,1')

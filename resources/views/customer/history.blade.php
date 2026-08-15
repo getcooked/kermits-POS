@@ -18,6 +18,11 @@
             <a href="{{ route('shop') }}">Shop</a>
             <a class="active" href="{{ route('customer.history') }}" aria-current="page">History</a>
             <a href="{{ route('reservations.create') }}">Reserve</a>
+            @if($appDownloadAvailable)
+                <a class="history-app-link" href="{{ route('app.download') }}" download><span>Download app</span><b>App</b></a>
+            @else
+                <a class="history-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>
+            @endif
             <span>Hi, {{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
@@ -177,6 +182,7 @@
 @media(max-width:520px){.history-page>nav{gap:8px}.history-page>nav>.history-brand{flex:0 0 48px;gap:0}.history-page>nav>.history-brand strong{display:none}.history-page>nav>.history-actions{min-width:0;gap:3px}.history-page>nav>.history-actions>a{padding:8px 5px!important;font-size:13px!important}.history-page>nav>.history-actions .logout-icon{width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important}}
 @media(min-width:901px){.history-page>nav>.history-actions{grid-template-columns:minmax(0,1fr) 42px!important;grid-template-rows:auto auto auto 1fr auto!important;align-items:stretch!important;min-height:0;flex:1}.history-page>nav>.history-actions>a{grid-column:1/-1}.history-page>nav>.history-actions>a.active{background:#34372f!important;box-shadow:inset 4px 0 #b5c019;color:#fff}.history-page>nav>.history-actions>span{grid-row:5!important;grid-column:1;padding:15px 8px 0 12px!important;border-top:1px solid #343630;color:#aeb2a9;font-size:13px;display:flex;align-items:center;min-height:58px}.history-page>nav>.history-actions>form{grid-row:5!important;grid-column:2;margin:0!important;padding-top:15px;border-top:1px solid #343630;display:flex!important;align-items:center;justify-content:flex-end!important}.history-page>nav>.history-actions .logout-icon{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}.history-page>nav>.history-brand{box-sizing:border-box!important;width:100%;min-height:87px;display:flex!important;align-items:center!important;gap:10px!important;padding:4px 8px 28px!important;border-bottom:1px solid #343630!important;color:#fff!important;text-decoration:none!important}.history-page>nav>.history-brand img{width:58px!important;height:58px!important;min-width:58px;object-fit:contain!important;border-radius:50%!important;background:#fff!important}.history-page>nav>.history-brand strong{color:#fff!important;letter-spacing:.1em!important;white-space:nowrap}.history-page>.history-header,.history-page>.history-summary,.history-page>.history-content{grid-column:2}}
 @media(max-width:900px){.history-actions>span{display:none}}
+.history-app-link b{display:none}.history-app-link.disabled{opacity:.55;cursor:default;pointer-events:none}@media(max-width:900px){.history-app-link span{display:none}.history-app-link b{display:inline;font:inherit}}
 </style>
 
 

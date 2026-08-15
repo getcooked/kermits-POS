@@ -39,6 +39,11 @@ class Product extends Model
         return $this->hasMany(ReservationItem::class);
     }
 
+    public function imageUrl(): ?string
+    {
+        return $this->image_path ? route('products.image', $this) : null;
+    }
+
     public function scopeAvailable(Builder $query): Builder
     {
         return $query->where('active', true);
