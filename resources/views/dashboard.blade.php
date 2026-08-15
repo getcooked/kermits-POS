@@ -5,7 +5,7 @@
 <aside class="sidebar">
     <div class="side-brand"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT’S</strong></div>
     <nav class="side-nav">
-        <a class="active" href="{{ route('dashboard') }}">@include('partials.nav-icon',['name'=>'home']) Home</a>
+        <a class="active" href="{{ route('dashboard') }}">@include('partials.nav-icon',['name'=>'home']) Dashboard</a>
         @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>@endif
         @if(auth()->user()->hasRole('super_admin','admin'))<a href="{{ route('reports') }}">@include('partials.nav-icon',['name'=>'reports']) Reporting</a>@endif
         @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Catalog</a><a href="{{ route('inventory.index') }}">@include('partials.nav-icon',['name'=>'inventory']) Inventory</a>@endif
