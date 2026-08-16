@@ -26,8 +26,8 @@
         @foreach($items as $product)
         <article class="welcome" style="padding:22px">
             <form method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data">@csrf @method('PUT')
-                @if($product->image_path)
-                    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" style="width:86px;height:86px;object-fit:cover;border-radius:12px"><label class="check" style="margin:0"><input name="remove_image" type="checkbox" value="1"> Remove current picture</label></div>
+                @if($imageUrl = $product->imageUrl())
+                    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><img src="{{ $imageUrl }}" alt="{{ $product->name }}" style="width:86px;height:86px;object-fit:cover;border-radius:12px"><label class="check" style="margin:0"><input name="remove_image" type="checkbox" value="1"> Remove current picture</label></div>
                 @endif
                 <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr auto;gap:12px;align-items:end">
                     <div><label>Name</label><input class="control" name="name" value="{{ $product->name }}" required></div>

@@ -14,7 +14,7 @@
                 <h2 class="menu-category" data-shop-heading="{{ $category }}">{{ $category }}</h2>
                 @foreach($items as $product)
                     <article data-shop-card data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}">
-                        @if($product->image_path)<img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}">@else<div class="shop-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
+                        @if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="shop-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
                         <div><h3>{{ $product->name }}</h3><p>{{ $product->description }}</p><div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span>{{ $product->stock }} available</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}">+</button></div>
                     </article>
                 @endforeach
