@@ -142,9 +142,9 @@ class InventoryAndProductsTest extends TestCase
             ->get('/products?search=Drinks+Seasonal+Cold')
             ->assertOk()
             ->assertSee('Seasonal Cooler')
-            ->assertSee('list="product-search-options"', false)
-            ->assertSee('<option value="Seasonal Cold Drinks" label="Category"></option>', false)
-            ->assertSee('<option value="Seasonal Cooler" label="Product"></option>', false);
+            ->assertSee('role="combobox"', false)
+            ->assertSee('data-search-value="Seasonal Cold Drinks"', false)
+            ->assertSee('data-search-value="Seasonal Cooler"', false);
 
         $this->actingAs($superAdmin)
             ->get('/cashier')
