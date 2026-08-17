@@ -42,7 +42,15 @@ class Product extends Model
 
     public function imageUrl(): ?string
     {
-        if (! $this->image_path || ! Storage::disk('public')->exists($this->image_path)) {
+        if (! $this->image_path) {
+            return null;
+        }
+
+        if (filter_var($this->image_path, FILTER_VALIDATE_URL)) {
+            return $this->image_path;
+        }
+
+        if (! Storage::disk('public')->exists($this->image_path)) {
             return null;
         }
 

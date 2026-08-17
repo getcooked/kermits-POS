@@ -240,4 +240,5 @@ class AuthenticationAndAccessTest extends TestCase
 
         $this->assertGuest();
     }
+
 }

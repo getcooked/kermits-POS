@@ -25,7 +25,13 @@ class PasswordResetController extends Controller
             'email' => ['required', 'email', 'max:160'],
         ]);
 
-        Password::sendResetLink(['email' => $validated['email']]);
+        $user = User::query()
+            ->whereRaw('LOWER(email) = ?', [Str::lower($validated['email'])])
+            ->first();
+
+        if ($user) {
+            Password::sendResetLink(['email' => $user->email]);
+        }
 
         return back()->with(
             'status',

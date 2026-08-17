@@ -47,7 +47,7 @@ class ProductController extends Controller
 
         $product->update($data);
 
-        if ($oldImage && $oldImage !== $product->image_path) {
+        if ($this->isStoredImage($oldImage) && $oldImage !== $product->image_path) {
             Storage::disk('public')->delete($oldImage);
         }
 
@@ -67,10 +67,15 @@ class ProductController extends Controller
         $image = $product->image_path;
         $product->delete();
 
-        if ($image) {
+        if ($this->isStoredImage($image)) {
             Storage::disk('public')->delete($image);
         }
 
         return back()->with('status', 'Product deleted.');
+    }
+
+    private function isStoredImage(?string $image): bool
+    {
+        return filled($image) && ! filter_var($image, FILTER_VALIDATE_URL);
     }
 }

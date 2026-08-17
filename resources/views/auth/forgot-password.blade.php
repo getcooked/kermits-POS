@@ -10,7 +10,7 @@
     <section class="reset-form"><div class="reset-inner">
         <p class="reset-eyebrow">FORGOT PASSWORD</p>
         <h2>Reset your password</h2>
-        <p class="muted">We’ll email instructions to the address registered with Kermit’s.</p>
+        <p class="muted">Only active Kermit’s accounts can receive a reset link. We’ll send instructions to the registered email address.</p>
         @if(session('status'))<div class="reset-success">{{ session('status') }}</div>@endif
         <form method="POST" action="{{ route('password.email') }}">
             @csrf

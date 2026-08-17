@@ -95,6 +95,40 @@ class InventoryAndProductsTest extends TestCase
         $this->get('/menu-images/'.$product->id)->assertNotFound();
     }
 
+    public function test_customer_shop_uses_the_uploaded_product_picture_route(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('products/customer-menu.png', $this->fakePng('customer-menu.png')->getContent());
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $product = Product::query()->create([
+            'name' => 'Customer Menu Picture',
+            'category' => 'Drinks',
+            'price' => 120,
+            'stock' => 10,
+            'active' => true,
+            'image_path' => 'products/customer-menu.png',
+        ]);
+
+        $this->actingAs($customer)
+            ->get('/shop')
+            ->assertOk()
+            ->assertSee('/menu-images/'.$product->id, false)
+            ->assertDontSee('/storage/products/customer-menu.png', false);
+    }
+
+    public function test_external_product_picture_url_is_not_prefixed_with_storage(): void
+    {
+        $product = Product::query()->create([
+            'name' => 'External Menu Picture',
+            'price' => 120,
+            'stock' => 10,
+            'active' => true,
+            'image_path' => 'https://images.example.com/menu-picture.jpg',
+        ]);
+
+        $this->assertSame('https://images.example.com/menu-picture.jpg', $product->imageUrl());
+    }
+
     private function fakePng(string $name): UploadedFile
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);

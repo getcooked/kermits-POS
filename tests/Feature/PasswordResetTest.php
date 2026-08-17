@@ -31,6 +31,24 @@ class PasswordResetTest extends TestCase
         Notification::assertSentTo($user, ResetPassword::class);
     }
 
+    public function test_reset_link_is_not_created_for_an_unknown_or_deleted_account(): void
+    {
+        Notification::fake();
+        $deletedUser = User::factory()->create();
+        $deletedUser->delete();
+
+        $this->post(route('password.email'), ['email' => 'not-a-kermits-account@example.com'])
+            ->assertSessionHas('status')
+            ->assertSessionDoesntHaveErrors();
+
+        $this->post(route('password.email'), ['email' => $deletedUser->email])
+            ->assertSessionHas('status')
+            ->assertSessionDoesntHaveErrors();
+
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('password_reset_tokens', 0);
+    }
+
     public function test_password_can_be_reset_with_a_valid_token(): void
     {
         Notification::fake();
