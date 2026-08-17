@@ -45,6 +45,7 @@ class ProductController extends Controller
     public function store(ProductRequest $request): RedirectResponse
     {
         $data = $request->productData();
+        $data['category_order'] = $this->categoryOrder($data['category']);
 
         if ($request->hasFile('image')) {
             $data['image_path'] = $request->file('image')->store('products', 'public');
@@ -58,6 +59,7 @@ class ProductController extends Controller
     public function update(ProductRequest $request, Product $product): RedirectResponse
     {
         $data = $request->productData();
+        $data['category_order'] = $this->categoryOrder($data['category'], $product);
         $oldImage = $product->image_path;
 
         if ($request->boolean('remove_image')) {
@@ -74,7 +76,25 @@ class ProductController extends Controller
             Storage::disk('public')->delete($oldImage);
         }
 
-        return back()->with('status', 'Product updated successfully.');
+        return redirect()->route('products.index')->with('status', 'Product updated and moved to '.$product->category.'.');
+    }
+
+    private function categoryOrder(string $category, ?Product $except = null): int
+    {
+        $existingOrder = Product::query()
+            ->where('category', $category)
+            ->when($except, fn ($query) => $query->whereKeyNot($except->getKey()))
+            ->min('category_order');
+
+        if ($existingOrder !== null) {
+            return (int) $existingOrder;
+        }
+
+        if ($except?->category === $category) {
+            return (int) $except->category_order;
+        }
+
+        return min(65535, ((int) Product::query()->max('category_order')) + 1);
     }
 
     public function destroy(Product $product): RedirectResponse

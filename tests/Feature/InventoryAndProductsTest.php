@@ -162,6 +162,73 @@ class InventoryAndProductsTest extends TestCase
             ->assertSee('data-shop-category="Seasonal Cold Drinks"', false);
     }
 
+    public function test_editing_a_product_category_moves_it_across_all_catalogs(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        Product::query()->create([
+            'name' => 'Target Category Item',
+            'category' => 'Pasta',
+            'category_order' => 8,
+            'price' => 250,
+            'stock' => 10,
+            'active' => true,
+        ]);
+        $product = Product::query()->create([
+            'name' => 'Beef Stroganoff',
+            'category' => 'Old Specials',
+            'category_order' => 2,
+            'description' => 'Tender beef strips.',
+            'price' => 310,
+            'stock' => 50,
+            'active' => true,
+        ]);
+
+        $this->actingAs($admin)->put('/products/'.$product->id, [
+            'name' => $product->name,
+            'category' => 'Pasta',
+            'description' => $product->description,
+            'price' => $product->price,
+            'stock' => $product->stock,
+            'active' => 1,
+        ])->assertRedirect('/products');
+
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'category' => 'Pasta',
+            'category_order' => 8,
+            'active' => true,
+        ]);
+
+        $this->actingAs($admin)->get('/products')
+            ->assertOk()
+            ->assertSee('data-search-value="Pasta"', false)
+            ->assertDontSee('data-search-value="Old Specials"', false);
+
+        foreach ([$superAdmin, $cashier] as $staff) {
+            $this->actingAs($staff)->get('/cashier')
+                ->assertOk()
+                ->assertSee('data-category-filter="Pasta"', false)
+                ->assertSee('Beef Stroganoff')
+                ->assertDontSee('data-category-filter="Old Specials"', false);
+        }
+
+        $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('data-shop-category="Pasta"', false)
+            ->assertSee('Beef Stroganoff')
+            ->assertDontSee('data-shop-category="Old Specials"', false);
+
+        $this->actingAs($customer)->get('/book')
+            ->assertOk()
+            ->assertSee('Pasta')
+            ->assertSee('Beef Stroganoff')
+            ->assertDontSee('Old Specials');
+    }
+
     public function test_add_product_form_is_collapsed_until_needed_and_reopens_after_validation_errors(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
