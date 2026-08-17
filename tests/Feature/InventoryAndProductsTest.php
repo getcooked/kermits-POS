@@ -143,6 +143,7 @@ class InventoryAndProductsTest extends TestCase
             ->assertOk()
             ->assertSee('Seasonal Cooler')
             ->assertSee('role="combobox"', false)
+            ->assertSee('aria-label="Show products and categories"', false)
             ->assertSee('data-search-value="Seasonal Cold Drinks"', false)
             ->assertSee('data-search-value="Seasonal Cooler"', false);
 

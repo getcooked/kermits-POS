@@ -74,13 +74,13 @@
 .product-header-actions{min-width:0;flex:1;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .product-search-form{width:min(650px,100%);display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .product-search-control{position:relative;min-width:0;flex:1}
-.product-search-field{min-width:0;flex:1;height:50px;display:flex;align-items:center;gap:11px;padding:0 16px;border:1px solid #d2d5cb;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.product-search-field{position:relative;min-width:0;flex:1;height:50px;display:flex;align-items:center;gap:11px;padding:0 56px 0 16px;border:1px solid #d2d5cb;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
 .product-search-field:focus-within{border-color:#737d00;box-shadow:0 0 0 3px rgba(175,185,26,.17)}
 .product-search-field svg{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
-.product-search-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#171817;font-family:inherit;font-size:15px;font-weight:500}
+.product-search-field input{min-width:0;flex:1;width:auto;border:0;outline:0;background:transparent;color:#171817;font-family:inherit;font-size:15px;font-weight:500}
 .product-search-field input::placeholder{color:#858a82}
-.product-search-dropdown{width:32px;height:32px;flex:0 0 32px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:#62675f;cursor:pointer}
-.product-search-dropdown:hover{background:#eff0ea;color:#171817}
+.product-search-dropdown{position:absolute;z-index:2;top:7px;right:7px;width:36px;height:36px;display:grid!important;place-items:center;border:1px solid #e0e2da!important;border-radius:7px;background:#f5f6f1!important;color:#3f443d!important;cursor:pointer}
+.product-search-dropdown:hover{border-color:#c8cbc0!important;background:#e9ebe3!important;color:#171817!important}
 .product-search-dropdown svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .product-search-dropdown[aria-expanded="true"] svg{transform:rotate(180deg)}
 .product-search-options{position:absolute;z-index:30;top:calc(100% + 7px);left:0;right:0;max-height:310px;overflow-y:auto;padding:7px;border:1px solid #dfe1da;border-radius:8px;background:#fff;box-shadow:0 12px 28px rgba(23,24,23,.14)}
