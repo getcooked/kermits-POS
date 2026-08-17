@@ -77,6 +77,27 @@ class InventoryAndProductsTest extends TestCase
         $this->actingAs($admin)->delete('/products/'.$product->id)->assertForbidden();
     }
 
+    public function test_admin_and_super_admin_can_search_products_by_name_or_category(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        Product::query()->create(['name' => 'Iced Spanish Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
+        Product::query()->create(['name' => 'Almond Roca', 'category' => 'Starters', 'price' => 260, 'stock' => 10]);
+
+        $this->actingAs($admin)
+            ->get('/products?search=Spanish')
+            ->assertOk()
+            ->assertSee('Iced Spanish Latte')
+            ->assertDontSee('Almond Roca');
+
+        $this->actingAs($superAdmin)
+            ->get('/products?search=Starters')
+            ->assertOk()
+            ->assertSee('Almond Roca')
+            ->assertDontSee('Iced Spanish Latte');
+    }
+
     public function test_product_picture_is_served_through_laravel(): void
     {
         Storage::fake('public');

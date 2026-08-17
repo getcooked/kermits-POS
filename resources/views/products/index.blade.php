@@ -20,6 +20,18 @@
             <button class="button" style="width:auto;padding-inline:26px" type="submit">Add product</button>
         </form>
     </section>@endif
+    <section class="product-search-panel" aria-label="Search products">
+        <form method="GET" action="{{ route('products.index') }}" class="product-search-form">
+            <div class="product-search-field">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+                <label class="sr-only" for="product-search">Search by product name or category</label>
+                <input id="product-search" name="search" type="search" value="{{ $search }}" placeholder="Search product or category" maxlength="100">
+            </div>
+            <button class="product-search-button" type="submit">Search</button>
+            @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}">Clear</a>@endif
+        </form>
+        @if($search !== '')<p class="product-search-summary">{{ $products->count() }} {{ Str::plural('product', $products->count()) }} found for “{{ $search }}”</p>@endif
+    </section>
     <section style="display:grid;gap:14px">
         @forelse($products->groupBy('category') as $category => $items)
         <h2 style="margin:20px 0 0;border-bottom:2px solid #171817;padding-bottom:8px">{{ $category }}</h2>
@@ -42,7 +54,21 @@
             @if(auth()->user()->hasRole('super_admin'))<form method="POST" action="{{ route('products.destroy', $product) }}" style="margin-top:12px" onsubmit="return confirm('Permanently delete this product?')">@csrf @method('DELETE')<button class="logout" style="color:#b42318" type="submit">Delete</button></form>@endif
         </article>
         @endforeach
-        @empty <div class="welcome">No products yet. Add your first product above.</div> @endforelse
+        @empty <div class="welcome">{{ $search !== '' ? 'No products match your search.' : 'No products yet. Add your first product above.' }}</div> @endforelse
     </section>
 </div></main></div>
+<style>
+.product-search-panel{margin-bottom:22px;padding:16px 18px;background:#fff;border:1px solid #daddd1;border-radius:8px}
+.product-search-form{display:flex;align-items:center;gap:10px}
+.product-search-field{min-width:0;flex:1;height:48px;display:flex;align-items:center;gap:11px;padding:0 14px;border:1px solid #cfd2c8;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.product-search-field:focus-within{border-color:#737d00;box-shadow:0 0 0 3px rgba(175,185,26,.17)}
+.product-search-field svg{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
+.product-search-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#171817;font:inherit}
+.product-search-field input::placeholder{color:#858a82}
+.product-search-button{height:48px;padding:0 24px;border:0;border-radius:8px;background:#171817;color:#fff;font:700 15px inherit;cursor:pointer}
+.product-search-button:hover{background:#30322e}
+.product-search-clear{height:48px;padding:0 12px;display:grid;place-items:center;color:#555b52;font-weight:700;text-decoration:none}
+.product-search-summary{margin:11px 0 0;color:#6d736a;font-size:13px}
+@media(max-width:640px){.product-search-form{display:grid;grid-template-columns:1fr auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}.product-search-clear{padding-inline:8px}}
+</style>
 @endsection

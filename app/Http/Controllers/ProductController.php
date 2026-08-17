@@ -7,15 +7,27 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ProductController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $search = trim((string) $request->query('search', ''));
+
         return view('products.index', [
-            'products' => Product::query()->menuOrder()->get(),
+            'products' => Product::query()
+                ->when($search !== '', function ($query) use ($search): void {
+                    $query->where(function ($query) use ($search): void {
+                        $query->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('category', 'like', '%'.$search.'%');
+                    });
+                })
+                ->menuOrder()
+                ->get(),
+            'search' => $search,
         ]);
     }
 
