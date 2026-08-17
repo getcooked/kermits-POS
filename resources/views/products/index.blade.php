@@ -2,7 +2,18 @@
 @section('title', 'Product Management')
 @section('content')
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard">
-    <header class="topbar"><div><h1 style="font-size:24px">Product management</h1><span class="muted">Add and update cashier products</span></div><a class="logout" style="text-decoration:none;color:inherit" href="{{ route('dashboard') }}">Dashboard</a></header>
+    <header class="topbar product-management-header">
+        <div><h1 style="font-size:24px">Product management</h1><span class="muted">Add and update cashier products</span></div>
+        <form method="GET" action="{{ route('products.index') }}" class="product-search-form" aria-label="Search products">
+            <div class="product-search-field">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+                <input id="product-search" name="search" type="search" value="{{ $search }}" placeholder="Search products or categories" maxlength="100" aria-label="Search products or categories">
+            </div>
+            <button class="product-search-button" type="submit">Search</button>
+            @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}" aria-label="Clear search" title="Clear search"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>@endif
+        </form>
+    </header>
+    @if($search !== '')<p class="product-search-summary">{{ $products->count() }} {{ Str::plural('product', $products->count()) }} found for “{{ $search }}”</p>@endif
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error" style="background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px">{{ $errors->first() }}</div>@endif
     @if(auth()->user()->hasRole('super_admin'))<section class="welcome" style="padding:26px;margin-bottom:22px">
@@ -20,18 +31,6 @@
             <button class="button" style="width:auto;padding-inline:26px" type="submit">Add product</button>
         </form>
     </section>@endif
-    <section class="product-search-panel" aria-label="Search products">
-        <form method="GET" action="{{ route('products.index') }}" class="product-search-form">
-            <div class="product-search-field">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-                <label class="sr-only" for="product-search">Search by product name or category</label>
-                <input id="product-search" name="search" type="search" value="{{ $search }}" placeholder="Search product or category" maxlength="100">
-            </div>
-            <button class="product-search-button" type="submit">Search</button>
-            @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}">Clear</a>@endif
-        </form>
-        @if($search !== '')<p class="product-search-summary">{{ $products->count() }} {{ Str::plural('product', $products->count()) }} found for “{{ $search }}”</p>@endif
-    </section>
     <section style="display:grid;gap:14px">
         @forelse($products->groupBy('category') as $category => $items)
         <h2 style="margin:20px 0 0;border-bottom:2px solid #171817;padding-bottom:8px">{{ $category }}</h2>
@@ -58,17 +57,21 @@
     </section>
 </div></main></div>
 <style>
-.product-search-panel{margin-bottom:22px;padding:16px 18px;background:#fff;border:1px solid #daddd1;border-radius:8px}
-.product-search-form{display:flex;align-items:center;gap:10px}
-.product-search-field{min-width:0;flex:1;height:48px;display:flex;align-items:center;gap:11px;padding:0 14px;border:1px solid #cfd2c8;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.product-management-header{gap:28px}
+.product-management-header>div{flex:0 0 auto}
+.product-search-form{width:min(720px,60%);display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.product-search-field{min-width:0;flex:1;height:50px;display:flex;align-items:center;gap:11px;padding:0 16px;border:1px solid #d2d5cb;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
 .product-search-field:focus-within{border-color:#737d00;box-shadow:0 0 0 3px rgba(175,185,26,.17)}
 .product-search-field svg{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
-.product-search-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#171817;font:inherit}
+.product-search-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#171817;font-family:inherit;font-size:15px;font-weight:500}
 .product-search-field input::placeholder{color:#858a82}
-.product-search-button{height:48px;padding:0 24px;border:0;border-radius:8px;background:#171817;color:#fff;font:700 15px inherit;cursor:pointer}
+.product-search-button{height:50px;padding:0 25px;border:0;border-radius:8px;background:#171817;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
 .product-search-button:hover{background:#30322e}
-.product-search-clear{height:48px;padding:0 12px;display:grid;place-items:center;color:#555b52;font-weight:700;text-decoration:none}
-.product-search-summary{margin:11px 0 0;color:#6d736a;font-size:13px}
-@media(max-width:640px){.product-search-form{display:grid;grid-template-columns:1fr auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}.product-search-clear{padding-inline:8px}}
+.product-search-clear{width:44px;height:44px;display:grid;place-items:center;border-radius:8px;color:#555b52;text-decoration:none}
+.product-search-clear:hover{background:#e8e9e3;color:#171817}
+.product-search-clear svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.product-search-summary{margin:-12px 0 20px;color:#6d736a;font-size:13px;text-align:right}
+@media(max-width:900px){.product-management-header{display:grid;align-items:start}.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
+@media(max-width:640px){.product-search-form{display:grid;grid-template-columns:1fr auto auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}}
 </style>
 @endsection
