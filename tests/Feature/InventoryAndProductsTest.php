@@ -93,6 +93,7 @@ class InventoryAndProductsTest extends TestCase
 
         Product::query()->create(['name' => 'Iced Spanish Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
         Product::query()->create(['name' => 'Almond Roca', 'category' => 'Starters', 'price' => 260, 'stock' => 10]);
+        Product::query()->create(['name' => 'Celebration Slice', 'category' => 'Junior Size Cake', 'price' => 150, 'stock' => 10]);
 
         $this->actingAs($admin)
             ->get('/products?search=Spanish')
@@ -105,6 +106,54 @@ class InventoryAndProductsTest extends TestCase
             ->assertOk()
             ->assertSee('Almond Roca')
             ->assertDontSee('Iced Spanish Latte');
+
+        $this->actingAs($superAdmin)
+            ->get('/products?search=Junior+Cake+Size')
+            ->assertOk()
+            ->assertSee('Celebration Slice')
+            ->assertDontSee('Almond Roca');
+    }
+
+    public function test_new_categories_are_immediately_searchable_and_available_in_catalogs(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->actingAs($admin)->post('/products', [
+            'name' => 'Seasonal Cooler',
+            'category' => 'Seasonal   Cold Drinks',
+            'description' => 'A newly added menu category.',
+            'price' => 95,
+            'stock' => 12,
+            'active' => 1,
+        ])->assertRedirect('/products');
+
+        $this->assertDatabaseHas('products', [
+            'name' => 'Seasonal Cooler',
+            'category' => 'Seasonal Cold Drinks',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/products?search=Drinks+Seasonal+Cold')
+            ->assertOk()
+            ->assertSee('Seasonal Cooler');
+
+        $this->actingAs($superAdmin)
+            ->get('/cashier')
+            ->assertOk()
+            ->assertSee('data-category-filter="Seasonal Cold Drinks"', false);
+
+        $this->actingAs($cashier)
+            ->get('/cashier')
+            ->assertOk()
+            ->assertSee('data-category-filter="Seasonal Cold Drinks"', false);
+
+        $this->actingAs($customer)
+            ->get('/shop')
+            ->assertOk()
+            ->assertSee('data-shop-category="Seasonal Cold Drinks"', false);
     }
 
     public function test_add_product_form_is_collapsed_until_needed_and_reopens_after_validation_errors(): void

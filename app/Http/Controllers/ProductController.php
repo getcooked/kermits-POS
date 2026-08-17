@@ -15,15 +15,18 @@ class ProductController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = preg_replace('/\s+/', ' ', trim((string) $request->query('search', ''))) ?? '';
+        $terms = array_slice(preg_split('/\s+/', $search, flags: PREG_SPLIT_NO_EMPTY) ?: [], 0, 10);
 
         return view('products.index', [
             'products' => Product::query()
-                ->when($search !== '', function ($query) use ($search): void {
-                    $query->where(function ($query) use ($search): void {
-                        $query->where('name', 'like', '%'.$search.'%')
-                            ->orWhere('category', 'like', '%'.$search.'%');
-                    });
+                ->when($terms !== [], function ($query) use ($terms): void {
+                    foreach ($terms as $term) {
+                        $query->where(function ($query) use ($term): void {
+                            $query->where('name', 'like', '%'.$term.'%')
+                                ->orWhere('category', 'like', '%'.$term.'%');
+                        });
+                    }
                 })
                 ->menuOrder()
                 ->get(),
@@ -41,7 +44,7 @@ class ProductController extends Controller
 
         Product::query()->create($data);
 
-        return back()->with('status', 'Product added successfully.');
+        return redirect()->route('products.index')->with('status', 'Product added successfully.');
     }
 
     public function update(ProductRequest $request, Product $product): RedirectResponse

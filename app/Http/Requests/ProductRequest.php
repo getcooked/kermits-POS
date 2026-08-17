@@ -3,9 +3,18 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 
 class ProductRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'name' => Str::squish((string) $this->input('name')),
+            'category' => Str::squish((string) $this->input('category')),
+        ]);
+    }
+
     public function authorize(): bool
     {
         return true;
