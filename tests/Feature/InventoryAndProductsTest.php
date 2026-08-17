@@ -98,6 +98,30 @@ class InventoryAndProductsTest extends TestCase
             ->assertDontSee('Iced Spanish Latte');
     }
 
+    public function test_add_product_form_is_collapsed_until_needed_and_reopens_after_validation_errors(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        $collapsedPage = $this->actingAs($superAdmin)
+            ->get('/products')
+            ->assertOk()
+            ->assertSee('class="product-create"', false);
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/<details class="product-create"\s+open\s*>/',
+            $collapsedPage->getContent(),
+        );
+
+        $invalidCreatePage = $this->actingAs($superAdmin)
+            ->followingRedirects()
+            ->post('/products', ['form_context' => 'create']);
+
+        $this->assertMatchesRegularExpression(
+            '/<details class="product-create"\s+open\s*>/',
+            $invalidCreatePage->getContent(),
+        );
+    }
+
     public function test_product_picture_is_served_through_laravel(): void
     {
         Storage::fake('public');

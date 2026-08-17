@@ -16,10 +16,13 @@
     @if($search !== '')<p class="product-search-summary">{{ $products->count() }} {{ Str::plural('product', $products->count()) }} found for “{{ $search }}”</p>@endif
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error" style="background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px">{{ $errors->first() }}</div>@endif
-    @if(auth()->user()->hasRole('super_admin'))<section class="welcome" style="padding:26px;margin-bottom:22px">
-        <h2 style="margin:0 0 20px">Add a product</h2>
+    @if(auth()->user()->hasRole('super_admin'))<details class="product-create" @if(old('form_context') === 'create') open @endif>
+        <summary><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="product-create-open">Add product</span><span class="product-create-close">Close form</span></summary>
+        <section class="welcome product-create-panel">
+        <h2>New product</h2>
         <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data">@csrf
-            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px">
+            <input type="hidden" name="form_context" value="create">
+            <div class="product-create-grid">
                 <div class="field"><label for="name">Product name</label><input class="control" id="name" name="name" value="{{ old('name') }}" required></div>
                 <div class="field"><label for="category">Category</label><input class="control" id="category" name="category" value="{{ old('category') }}" placeholder="e.g. Starters" required></div>
                 <div class="field"><label for="price">Price (₱)</label><input class="control" id="price" name="price" type="number" min="0.01" step="0.01" value="{{ old('price') }}" required></div>
@@ -30,7 +33,8 @@
             <label class="check"><input name="active" type="checkbox" value="1" checked> Show this product on the cashier page</label>
             <button class="button" style="width:auto;padding-inline:26px" type="submit">Add product</button>
         </form>
-    </section>@endif
+        </section>
+    </details>@endif
     <section style="display:grid;gap:14px">
         @forelse($products->groupBy('category') as $category => $items)
         <h2 style="margin:20px 0 0;border-bottom:2px solid #171817;padding-bottom:8px">{{ $category }}</h2>
@@ -71,7 +75,21 @@
 .product-search-clear:hover{background:#e8e9e3;color:#171817}
 .product-search-clear svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .product-search-summary{margin:-12px 0 20px;color:#6d736a;font-size:13px;text-align:right}
+.product-create{margin:0 0 22px}
+.product-create>summary{width:max-content;min-height:46px;display:flex;align-items:center;gap:9px;padding:0 18px;border-radius:8px;background:#171817;color:#fff;font-size:14px;font-weight:800;cursor:pointer;list-style:none;user-select:none}
+.product-create>summary::-webkit-details-marker{display:none}
+.product-create>summary:hover{background:#30322e}
+.product-create>summary svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;transition:transform .18s}
+.product-create[open]>summary svg{transform:rotate(45deg)}
+.product-create-close{display:none}
+.product-create[open] .product-create-open{display:none}
+.product-create[open] .product-create-close{display:inline}
+.product-create-panel{margin-top:12px;padding:26px}
+.product-create-panel h2{margin:0 0 20px;font-size:20px}
+.product-create-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px}
 @media(max-width:900px){.product-management-header{display:grid;align-items:start}.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
+@media(max-width:820px){.product-create-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.product-search-form{display:grid;grid-template-columns:1fr auto auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}}
+@media(max-width:520px){.product-create-grid{grid-template-columns:1fr}.product-create>summary{width:100%;justify-content:center}}
 </style>
 @endsection
