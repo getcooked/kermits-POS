@@ -316,7 +316,7 @@ class OrderingTest extends TestCase
         }
     }
 
-    public function test_cashier_can_link_a_purchase_to_a_customer_for_history_and_reports(): void
+    public function test_cashier_sales_are_always_recorded_as_walk_in_purchases(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
@@ -330,8 +330,8 @@ class OrderingTest extends TestCase
             'cash_received' => 100,
         ])->assertRedirect('/receipts/1');
 
-        $this->assertDatabaseHas('orders', ['customer_id' => $customer->id, 'user_id' => $cashier->id]);
-        $this->actingAs($admin)->get('/reports')->assertOk()->assertSee('Connected Customer');
-        $this->actingAs($customer)->get('/history')->assertOk()->assertSee('Connected Product');
+        $this->assertDatabaseHas('orders', ['customer_id' => null, 'user_id' => $cashier->id]);
+        $this->actingAs($admin)->get('/reports')->assertOk()->assertSee('Walk-in Customer');
+        $this->actingAs($customer)->get('/history')->assertOk()->assertDontSee('Connected Product');
     }
 }

@@ -47,7 +47,7 @@ class InventoryAndProductsTest extends TestCase
         $this->assertDatabaseCount('stock_movements', 0);
     }
 
-    public function test_super_admin_creates_products_and_admin_can_update_menu_pictures(): void
+    public function test_super_admin_and_admin_can_create_products_and_update_menu_pictures(): void
     {
         Storage::fake('public');
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
@@ -73,7 +73,16 @@ class InventoryAndProductsTest extends TestCase
         ])->assertRedirect();
 
         Storage::disk('public')->assertExists($product->fresh()->image_path);
-        $this->actingAs($admin)->post('/products', [])->assertForbidden();
+        $this->actingAs($admin)->post('/products', [
+            'name' => 'Admin Product',
+            'category' => 'Drinks',
+            'description' => 'Created by an administrator',
+            'price' => 75,
+            'stock' => 8,
+            'active' => 1,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('products', ['name' => 'Admin Product']);
         $this->actingAs($admin)->delete('/products/'.$product->id)->assertForbidden();
     }
 
@@ -105,10 +114,11 @@ class InventoryAndProductsTest extends TestCase
         $collapsedPage = $this->actingAs($superAdmin)
             ->get('/products')
             ->assertOk()
-            ->assertSee('class="product-create"', false);
+            ->assertSee('id="product-create-toggle"', false)
+            ->assertSee('aria-expanded="false"', false);
 
-        $this->assertDoesNotMatchRegularExpression(
-            '/<details class="product-create"\s+open\s*>/',
+        $this->assertMatchesRegularExpression(
+            '/<section id="product-create-panel" class="welcome product-create-panel"\s+hidden\s*>/',
             $collapsedPage->getContent(),
         );
 
@@ -116,8 +126,9 @@ class InventoryAndProductsTest extends TestCase
             ->followingRedirects()
             ->post('/products', ['form_context' => 'create']);
 
-        $this->assertMatchesRegularExpression(
-            '/<details class="product-create"\s+open\s*>/',
+        $invalidCreatePage->assertSee('aria-expanded="true"', false);
+        $this->assertDoesNotMatchRegularExpression(
+            '/<section id="product-create-panel" class="welcome product-create-panel"\s+hidden\s*>/',
             $invalidCreatePage->getContent(),
         );
     }

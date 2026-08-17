@@ -7,7 +7,6 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\SystemSetting;
-use App\Models\User;
 use App\Services\OrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +21,6 @@ class CashierController extends Controller
         return view('roles.cashier', [
             'products' => Product::query()->available()->menuOrder()->get(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
-            'customers' => User::query()->where('role', User::ROLE_CUSTOMER)->orderBy('name')->get(['id', 'name', 'email']),
         ]);
     }
 
@@ -115,9 +113,6 @@ class CashierController extends Controller
             cashReceivedCents: $request->cashReceivedCents(),
             paymentMethod: $request->validated('payment_method'),
             paymentReference: $request->validated('payment_reference'),
-            customer: $request->validated('customer_id')
-                ? User::query()->where('role', User::ROLE_CUSTOMER)->findOrFail($request->validated('customer_id'))
-                : null,
         );
 
         return redirect()

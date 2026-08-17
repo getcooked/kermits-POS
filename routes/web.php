@@ -86,6 +86,7 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('/reservations/{reservation}/status', [ReservationController::class, 'updateStatus'])->name('reservations.status');
         Route::get('/crud', [ProductController::class, 'index'])->name('crud.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
     });
 
@@ -96,7 +97,6 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/staff/cashiers/{cashier}', [CashierAccountController::class, 'destroy'])->name('cashiers.destroy');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
-        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::get('/settings/payment', [PaymentSettingsController::class, 'edit'])->name('settings.payment.edit');
         Route::put('/settings/payment', [PaymentSettingsController::class, 'update'])->name('settings.payment.update');

@@ -3,7 +3,8 @@
 @section('content')
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard">
     <header class="topbar product-management-header">
-        <div><h1 style="font-size:24px">Product management</h1><span class="muted">Add and update cashier products</span></div>
+        <div class="product-page-heading"><h1 style="font-size:24px">Product management</h1><span class="muted">Add and update cashier products</span></div>
+        <div class="product-header-actions">
         <form method="GET" action="{{ route('products.index') }}" class="product-search-form" aria-label="Search products">
             <div class="product-search-field">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
@@ -12,13 +13,13 @@
             <button class="product-search-button" type="submit">Search</button>
             @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}" aria-label="Clear search" title="Clear search"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>@endif
         </form>
+        @if(auth()->user()->hasRole('super_admin', 'admin'))<button id="product-create-toggle" class="product-create-toggle" type="button" aria-controls="product-create-panel" aria-expanded="{{ old('form_context') === 'create' ? 'true' : 'false' }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>{{ old('form_context') === 'create' ? 'Close form' : 'Add product' }}</span></button>@endif
+        </div>
     </header>
     @if($search !== '')<p class="product-search-summary">{{ $products->count() }} {{ Str::plural('product', $products->count()) }} found for “{{ $search }}”</p>@endif
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error" style="background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px">{{ $errors->first() }}</div>@endif
-    @if(auth()->user()->hasRole('super_admin'))<details class="product-create" @if(old('form_context') === 'create') open @endif>
-        <summary><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="product-create-open">Add product</span><span class="product-create-close">Close form</span></summary>
-        <section class="welcome product-create-panel">
+    @if(auth()->user()->hasRole('super_admin', 'admin'))<section id="product-create-panel" class="welcome product-create-panel" {{ old('form_context') === 'create' ? '' : 'hidden' }}>
         <h2>New product</h2>
         <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data">@csrf
             <input type="hidden" name="form_context" value="create">
@@ -33,8 +34,7 @@
             <label class="check"><input name="active" type="checkbox" value="1" checked> Show this product on the cashier page</label>
             <button class="button" style="width:auto;padding-inline:26px" type="submit">Add product</button>
         </form>
-        </section>
-    </details>@endif
+    </section>@endif
     <section style="display:grid;gap:14px">
         @forelse($products->groupBy('category') as $category => $items)
         <h2 style="margin:20px 0 0;border-bottom:2px solid #171817;padding-bottom:8px">{{ $category }}</h2>
@@ -62,8 +62,9 @@
 </div></main></div>
 <style>
 .product-management-header{gap:28px}
-.product-management-header>div{flex:0 0 auto}
-.product-search-form{width:min(720px,60%);display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.product-page-heading{flex:0 0 auto}
+.product-header-actions{min-width:0;flex:1;display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.product-search-form{width:min(650px,100%);display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .product-search-field{min-width:0;flex:1;height:50px;display:flex;align-items:center;gap:11px;padding:0 16px;border:1px solid #d2d5cb;border-radius:8px;background:#fff;transition:border-color .15s,box-shadow .15s}
 .product-search-field:focus-within{border-color:#737d00;box-shadow:0 0 0 3px rgba(175,185,26,.17)}
 .product-search-field svg{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
@@ -75,21 +76,31 @@
 .product-search-clear:hover{background:#e8e9e3;color:#171817}
 .product-search-clear svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .product-search-summary{margin:-12px 0 20px;color:#6d736a;font-size:13px;text-align:right}
-.product-create{margin:0 0 22px}
-.product-create>summary{width:max-content;min-height:46px;display:flex;align-items:center;gap:9px;padding:0 18px;border-radius:8px;background:#171817;color:#fff;font-size:14px;font-weight:800;cursor:pointer;list-style:none;user-select:none}
-.product-create>summary::-webkit-details-marker{display:none}
-.product-create>summary:hover{background:#30322e}
-.product-create>summary svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;transition:transform .18s}
-.product-create[open]>summary svg{transform:rotate(45deg)}
-.product-create-close{display:none}
-.product-create[open] .product-create-open{display:none}
-.product-create[open] .product-create-close{display:inline}
-.product-create-panel{margin-top:12px;padding:26px}
+.product-create-toggle{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 18px;border:0;border-radius:8px;background:#171817;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap}
+.product-create-toggle:hover{background:#30322e}
+.product-create-toggle svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;transition:transform .18s}
+.product-create-toggle[aria-expanded="true"] svg{transform:rotate(45deg)}
+.product-create-panel{margin:0 0 22px;padding:26px}
 .product-create-panel h2{margin:0 0 20px;font-size:20px}
 .product-create-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px}
-@media(max-width:900px){.product-management-header{display:grid;align-items:start}.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
+@media(max-width:1100px){.product-management-header{display:grid;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
 @media(max-width:820px){.product-create-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:640px){.product-search-form{display:grid;grid-template-columns:1fr auto auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}}
-@media(max-width:520px){.product-create-grid{grid-template-columns:1fr}.product-create>summary{width:100%;justify-content:center}}
+@media(max-width:640px){.product-header-actions{display:grid}.product-search-form{display:grid;grid-template-columns:1fr auto auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}.product-create-toggle{width:100%;justify-content:center}}
+@media(max-width:520px){.product-create-grid{grid-template-columns:1fr}}
 </style>
+@if(auth()->user()->hasRole('super_admin', 'admin'))<script>
+(() => {
+    const toggle = document.getElementById('product-create-toggle');
+    const panel = document.getElementById('product-create-panel');
+    if (!toggle || !panel) return;
+
+    toggle.addEventListener('click', () => {
+        const opening = panel.hidden;
+        panel.hidden = !opening;
+        toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        toggle.querySelector('span').textContent = opening ? 'Close form' : 'Add product';
+        if (opening) panel.querySelector('input:not([type="hidden"])')?.focus();
+    });
+})();
+</script>@endif
 @endsection
