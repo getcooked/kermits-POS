@@ -334,4 +334,34 @@ class OrderingTest extends TestCase
         $this->actingAs($admin)->get('/reports')->assertOk()->assertSee('Walk-in Customer');
         $this->actingAs($customer)->get('/history')->assertOk()->assertDontSee('Connected Product');
     }
+
+    public function test_staff_and_customer_catalogs_show_categories_only_in_the_filter_bar(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        Product::query()->create(['name' => 'Category Drink', 'category' => 'Drinks', 'price' => 100, 'stock' => 5, 'active' => true]);
+        Product::query()->create(['name' => 'Category Starter', 'category' => 'Starters', 'price' => 120, 'stock' => 5, 'active' => true]);
+
+        $this->actingAs($cashier)
+            ->get('/cashier')
+            ->assertOk()
+            ->assertSee('data-category-filter="Drinks"', false)
+            ->assertSee('data-pos-scroll="-1"', false)
+            ->assertDontSee('data-category-heading', false);
+
+        $this->actingAs($superAdmin)
+            ->get('/cashier')
+            ->assertOk()
+            ->assertSee('data-category-filter="Drinks"', false)
+            ->assertSee('data-pos-scroll="-1"', false)
+            ->assertDontSee('data-category-heading', false);
+
+        $this->actingAs($customer)
+            ->get('/shop')
+            ->assertOk()
+            ->assertSee('data-shop-category="Drinks"', false)
+            ->assertSee('data-shop-scroll="-1"', false)
+            ->assertDontSee('data-shop-heading', false);
+    }
 }
