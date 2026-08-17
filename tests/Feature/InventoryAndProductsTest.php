@@ -91,27 +91,30 @@ class InventoryAndProductsTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
-        Product::query()->create(['name' => 'Iced Spanish Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
-        Product::query()->create(['name' => 'Almond Roca', 'category' => 'Starters', 'price' => 260, 'stock' => 10]);
-        Product::query()->create(['name' => 'Celebration Slice', 'category' => 'Junior Size Cake', 'price' => 150, 'stock' => 10]);
+        $latte = Product::query()->create(['name' => 'Iced Spanish Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
+        $almondRoca = Product::query()->create(['name' => 'Almond Roca', 'category' => 'Starters', 'price' => 260, 'stock' => 10]);
+        $celebrationSlice = Product::query()->create(['name' => 'Celebration Slice', 'category' => 'Junior Size Cake', 'price' => 150, 'stock' => 10]);
 
         $this->actingAs($admin)
             ->get('/products?search=Spanish')
             ->assertOk()
             ->assertSee('Iced Spanish Latte')
-            ->assertDontSee('Almond Roca');
+            ->assertSee(route('products.update', $latte), false)
+            ->assertDontSee(route('products.update', $almondRoca), false);
 
         $this->actingAs($superAdmin)
             ->get('/products?search=Starters')
             ->assertOk()
             ->assertSee('Almond Roca')
-            ->assertDontSee('Iced Spanish Latte');
+            ->assertSee(route('products.update', $almondRoca), false)
+            ->assertDontSee(route('products.update', $latte), false);
 
         $this->actingAs($superAdmin)
             ->get('/products?search=Junior+Cake+Size')
             ->assertOk()
             ->assertSee('Celebration Slice')
-            ->assertDontSee('Almond Roca');
+            ->assertSee(route('products.update', $celebrationSlice), false)
+            ->assertDontSee(route('products.update', $almondRoca), false);
     }
 
     public function test_new_categories_are_immediately_searchable_and_available_in_catalogs(): void
@@ -138,7 +141,10 @@ class InventoryAndProductsTest extends TestCase
         $this->actingAs($admin)
             ->get('/products?search=Drinks+Seasonal+Cold')
             ->assertOk()
-            ->assertSee('Seasonal Cooler');
+            ->assertSee('Seasonal Cooler')
+            ->assertSee('list="product-search-options"', false)
+            ->assertSee('<option value="Seasonal Cold Drinks" label="Category"></option>', false)
+            ->assertSee('<option value="Seasonal Cooler" label="Product"></option>', false);
 
         $this->actingAs($superAdmin)
             ->get('/cashier')

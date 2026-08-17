@@ -8,8 +8,13 @@
         <form method="GET" action="{{ route('products.index') }}" class="product-search-form" aria-label="Search products">
             <div class="product-search-field">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-                <input id="product-search" name="search" type="search" value="{{ $search }}" placeholder="Search products or categories" maxlength="100" aria-label="Search products or categories">
+                <input id="product-search" name="search" type="search" list="product-search-options" value="{{ $search }}" placeholder="Search or choose a product or category" maxlength="100" autocomplete="off" aria-label="Search or choose a product or category">
+                <button class="product-search-dropdown" type="button" aria-label="Show products and categories" title="Show products and categories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"></path></svg></button>
             </div>
+            <datalist id="product-search-options">
+                @foreach($searchCategories as $category)<option value="{{ $category }}" label="Category"></option>@endforeach
+                @foreach($searchProducts as $productName)<option value="{{ $productName }}" label="Product"></option>@endforeach
+            </datalist>
             <button class="product-search-button" type="submit">Search</button>
             @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}" aria-label="Clear search" title="Clear search"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>@endif
         </form>
@@ -70,6 +75,9 @@
 .product-search-field svg{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
 .product-search-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#171817;font-family:inherit;font-size:15px;font-weight:500}
 .product-search-field input::placeholder{color:#858a82}
+.product-search-dropdown{width:32px;height:32px;flex:0 0 32px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:#62675f;cursor:pointer}
+.product-search-dropdown:hover{background:#eff0ea;color:#171817}
+.product-search-dropdown svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .product-search-button{height:50px;padding:0 25px;border:0;border-radius:8px;background:#171817;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
 .product-search-button:hover{background:#30322e}
 .product-search-clear{width:44px;height:44px;display:grid;place-items:center;border-radius:8px;color:#555b52;text-decoration:none}
@@ -88,6 +96,25 @@
 @media(max-width:640px){.product-header-actions{display:grid}.product-search-form{display:grid;grid-template-columns:1fr auto auto}.product-search-field{grid-column:1/-1}.product-search-button{padding-inline:20px}.product-create-toggle{width:100%;justify-content:center}}
 @media(max-width:520px){.product-create-grid{grid-template-columns:1fr}}
 </style>
+<script>
+(() => {
+    const input = document.getElementById('product-search');
+    const dropdown = document.querySelector('.product-search-dropdown');
+    const options = new Set([...document.querySelectorAll('#product-search-options option')].map(option => option.value));
+    if (!input) return;
+
+    dropdown?.addEventListener('click', () => {
+        input.focus();
+        if (typeof input.showPicker === 'function') {
+            try { input.showPicker(); } catch (error) {}
+        }
+    });
+
+    input.addEventListener('change', () => {
+        if (options.has(input.value.trim())) input.form?.requestSubmit();
+    });
+})();
+</script>
 @if(auth()->user()->hasRole('super_admin', 'admin'))<script>
 (() => {
     const toggle = document.getElementById('product-create-toggle');

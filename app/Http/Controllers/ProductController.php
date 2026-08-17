@@ -31,6 +31,14 @@ class ProductController extends Controller
                 ->menuOrder()
                 ->get(),
             'search' => $search,
+            'searchCategories' => Product::query()
+                ->whereNotNull('category')
+                ->distinct()
+                ->orderBy('category')
+                ->pluck('category'),
+            'searchProducts' => Product::query()
+                ->orderBy('name')
+                ->pluck('name'),
         ]);
     }
 
