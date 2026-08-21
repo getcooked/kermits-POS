@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CashierAccountController;
 use App\Http\Controllers\CashierController;
@@ -91,6 +92,10 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('role:super_admin')->group(function (): void {
+        Route::get('/staff/admins', [AdminAccountController::class, 'index'])->name('admins.index');
+        Route::put('/staff/admins/{admin}/password', [AdminAccountController::class, 'updatePassword'])
+            ->middleware('throttle:5,1')
+            ->name('admins.password.update');
         Route::get('/staff/cashiers', [CashierAccountController::class, 'index'])->name('cashiers.index');
         Route::post('/staff/cashiers', [CashierAccountController::class, 'store'])->name('cashiers.store');
         Route::put('/staff/cashiers/{cashier}', [CashierAccountController::class, 'update'])->name('cashiers.update');

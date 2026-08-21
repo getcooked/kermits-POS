@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class MobileApiTest extends TestCase
@@ -66,6 +67,25 @@ class MobileApiTest extends TestCase
 
         $otherToken = $this->login($other);
         $this->withToken($otherToken)->getJson('/api/v1/orders/'.$orderId)->assertForbidden();
+    }
+
+    public function test_catalog_returns_an_absolute_product_image_url(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('products/mobile-meal.png', 'image');
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER, 'password' => 'MobilePassword123!']);
+        $product = Product::query()->create([
+            'name' => 'Photographed Mobile Meal',
+            'category' => 'Meals',
+            'price' => 250,
+            'stock' => 5,
+            'active' => true,
+            'image_path' => 'products/mobile-meal.png',
+        ]);
+
+        $this->withToken($this->login($customer))->getJson('/api/v1/products')
+            ->assertOk()
+            ->assertJsonPath('data.products.0.image_url', route('products.image', $product));
     }
 
     public function test_customer_can_create_and_view_a_cash_reservation(): void

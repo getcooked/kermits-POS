@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Reservation;
 use App\Models\User;
+use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -202,7 +204,7 @@ class OrderingTest extends TestCase
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $product = Product::query()->create(['name' => 'Connected Online Sale', 'price' => 275, 'stock' => 5, 'active' => true]);
-        $order = app(\App\Services\OrderService::class)->create(
+        $order = app(OrderService::class)->create(
             user: $customer,
             quantities: [$product->id => 1],
             paymentStatus: 'pending',
@@ -288,7 +290,7 @@ class OrderingTest extends TestCase
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
-        \App\Models\Reservation::query()->create([
+        Reservation::query()->create([
             'user_id' => $customer->id,
             'reference' => 'KRM-REPORT-LIVE',
             'type' => 'table',

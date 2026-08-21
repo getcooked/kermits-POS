@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -115,7 +116,7 @@ class AuthenticationAndAccessTest extends TestCase
             'password' => 'password123',
             'role' => User::ROLE_CUSTOMER,
         ]);
-        $order = \App\Models\Order::query()->create([
+        $order = Order::query()->create([
             'user_id' => $customer->id,
             'customer_id' => $customer->id,
             'total' => 100,
@@ -178,7 +179,7 @@ class AuthenticationAndAccessTest extends TestCase
             'password' => 'password123',
             'role' => User::ROLE_CASHIER,
         ]);
-        $order = \App\Models\Order::query()->create([
+        $order = Order::query()->create([
             'user_id' => $cashier->id,
             'total' => 200,
             'payment_method' => 'cash',
@@ -240,5 +241,4 @@ class AuthenticationAndAccessTest extends TestCase
 
         $this->assertGuest();
     }
-
 }

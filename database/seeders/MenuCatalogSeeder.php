@@ -128,14 +128,14 @@ class MenuCatalogSeeder extends Seeder
     private function cakes(): array
     {
         $cakes = [
-            ['Chocolate Pistachio',1400,140], ['Strawberry Pistachio',1400,140], ['Classic Tiramisu',1200,130],
-            ['Pistachio Tiramisu',1200,130], ['Mango Tiramisu',1200,130], ['Rocher Chocolate',1100,110],
-            ['Blackout Chocolate',1100,110], ['Black Forest',1100,110], ['Salted Chocolate',1100,110],
-            ['Cookies & Cream',1100,110], ['Midnight Chocolate',1100,110], ['Chocolate Overload',1100,110],
-            ['Red Velvet',1100,110], ['Carrot Cake',1100,110], ['Ube Custard',1100,110], ['Ube Classic',1000,100],
-            ['Mango Overload',1100,110], ['Mango Graham',1100,110], ['Mango Tres Leches',1100,110],
-            ['Mango Buttercreme',1000,100], ['Pistachio Sans Rival',1200,130], ['Classic Sans Rival',1100,120],
-            ['White Forest',1000,100], ['Salted Caramel',1000,100],
+            ['Chocolate Pistachio', 1400, 140], ['Strawberry Pistachio', 1400, 140], ['Classic Tiramisu', 1200, 130],
+            ['Pistachio Tiramisu', 1200, 130], ['Mango Tiramisu', 1200, 130], ['Rocher Chocolate', 1100, 110],
+            ['Blackout Chocolate', 1100, 110], ['Black Forest', 1100, 110], ['Salted Chocolate', 1100, 110],
+            ['Cookies & Cream', 1100, 110], ['Midnight Chocolate', 1100, 110], ['Chocolate Overload', 1100, 110],
+            ['Red Velvet', 1100, 110], ['Carrot Cake', 1100, 110], ['Ube Custard', 1100, 110], ['Ube Classic', 1000, 100],
+            ['Mango Overload', 1100, 110], ['Mango Graham', 1100, 110], ['Mango Tres Leches', 1100, 110],
+            ['Mango Buttercreme', 1000, 100], ['Pistachio Sans Rival', 1200, 130], ['Classic Sans Rival', 1100, 120],
+            ['White Forest', 1000, 100], ['Salted Caramel', 1000, 100],
         ];
 
         return collect($cakes)->flatMap(fn ($cake) => [

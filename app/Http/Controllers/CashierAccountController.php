@@ -6,8 +6,8 @@ use App\Http\Requests\StoreCashierAccountRequest;
 use App\Http\Requests\UpdateCashierAccountRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class CashierAccountController extends Controller
 {

@@ -10,6 +10,7 @@
         @if(auth()->user()->hasRole('super_admin','admin'))<a href="{{ route('reports') }}">@include('partials.nav-icon',['name'=>'reports']) Reporting</a>@endif
         @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Catalog</a><a href="{{ route('inventory.index') }}">@include('partials.nav-icon',['name'=>'inventory']) Inventory</a>@endif
         @if(auth()->user()->hasRole('super_admin','admin'))<a href="{{ route('customers.index') }}">@include('partials.nav-icon',['name'=>'users']) Customers</a>@endif
+        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('admins.index') }}">@include('partials.nav-icon',['name'=>'users']) Admin Accounts</a>@endif
     </nav>
     <div class="side-user"><span>{{ strtoupper(substr(auth()->user()->name,0,1)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>{{ str(auth()->user()->role)->replace('_',' ')->title() }}</small></div><form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg></button></form></div>
 </aside>

@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateCustomerAccountRequest;
 use App\Models\Reservation;
 use App\Models\User;
-use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class CustomerController extends Controller
 {

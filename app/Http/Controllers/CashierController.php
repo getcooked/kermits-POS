@@ -90,6 +90,7 @@ class CashierController extends Controller
 
                 if ($newQuantity === 0) {
                     $item->delete();
+
                     continue;
                 }
 
@@ -131,6 +132,7 @@ class CashierController extends Controller
                     throw ValidationException::withMessages(['payment_reference' => 'A valid 13-digit GCash reference is required.']);
                 }
                 $lockedOrder->update(['payment_status' => 'paid', 'cash_received' => null, 'change_due' => null]);
+
                 return;
             }
 
