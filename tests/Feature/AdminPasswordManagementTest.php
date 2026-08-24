@@ -32,17 +32,17 @@ class AdminPasswordManagementTest extends TestCase
             ->assertSee($admin->name);
 
         $this->put('/staff/admins/'.$admin->id.'/password', [
-            'password' => 'NewPassword456',
-            'password_confirmation' => 'NewPassword456',
+            'password' => 'NewPassword456!',
+            'password_confirmation' => 'NewPassword456!',
         ])->assertRedirect();
 
         $admin->refresh();
-        $this->assertTrue(Hash::check('NewPassword456', $admin->password));
+        $this->assertTrue(Hash::check('NewPassword456!', $admin->password));
         $this->assertNotSame('old-token', $admin->remember_token);
         $this->assertDatabaseMissing('sessions', ['user_id' => $admin->id]);
 
         $this->post('/logout');
-        $this->post('/login', ['email' => $admin->email, 'password' => 'NewPassword456'])
+        $this->post('/login', ['email' => $admin->email, 'password' => 'NewPassword456!'])
             ->assertRedirect('/dashboard');
     }
 
@@ -54,8 +54,8 @@ class AdminPasswordManagementTest extends TestCase
         foreach ([$admin, $cashier] as $unauthorizedUser) {
             $this->actingAs($unauthorizedUser)->get('/staff/admins')->assertForbidden();
             $this->put('/staff/admins/'.$admin->id.'/password', [
-                'password' => 'NewPassword456',
-                'password_confirmation' => 'NewPassword456',
+                'password' => 'NewPassword456!',
+                'password_confirmation' => 'NewPassword456!',
             ])->assertForbidden();
         }
     }
@@ -73,8 +73,8 @@ class AdminPasswordManagementTest extends TestCase
 
         foreach ([$superAdmin, $cashier] as $protectedUser) {
             $this->actingAs($superAdmin)->put('/staff/admins/'.$protectedUser->id.'/password', [
-                'password' => 'NewPassword456',
-                'password_confirmation' => 'NewPassword456',
+                'password' => 'NewPassword456!',
+                'password_confirmation' => 'NewPassword456!',
             ])->assertNotFound();
             $this->assertTrue(Hash::check('OriginalPassword123', $protectedUser->fresh()->password));
         }

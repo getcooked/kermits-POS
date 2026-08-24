@@ -49,8 +49,8 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'buyer.account',
             'email' => 'buyer@gmail.com',
             'phone' => '09171234567',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
             'role' => User::ROLE_SUPER_ADMIN,
         ])->assertRedirect('/shop');
 
@@ -85,8 +85,8 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'updated.customer',
             'email' => 'updated@gmail.com',
             'phone' => '09181234567',
-            'password' => 'securepass123',
-            'password_confirmation' => 'securepass123',
+            'password' => 'SecurePass123!',
+            'password_confirmation' => 'SecurePass123!',
         ];
 
         $this->actingAs($admin)->put('/customers/'.$customer->id, $update)->assertForbidden();
@@ -101,7 +101,7 @@ class AuthenticationAndAccessTest extends TestCase
         ]);
 
         $this->post('/logout');
-        $this->post('/login', ['email' => 'updated.customer', 'password' => 'securepass123'])
+        $this->post('/login', ['email' => 'updated.customer', 'password' => 'SecurePass123!'])
             ->assertRedirect('/shop');
     }
 
@@ -145,8 +145,8 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'new.cashier',
             'email' => 'cashier@gmail.com',
             'phone' => '09191234567',
-            'password' => 'cashierpass123',
-            'password_confirmation' => 'cashierpass123',
+            'password' => 'CashierPass123!',
+            'password_confirmation' => 'CashierPass123!',
             'role' => User::ROLE_SUPER_ADMIN,
         ];
 
@@ -164,7 +164,7 @@ class AuthenticationAndAccessTest extends TestCase
         ]);
 
         $this->post('/logout');
-        $this->post('/login', ['email' => 'new.cashier', 'password' => 'cashierpass123'])
+        $this->post('/login', ['email' => 'new.cashier', 'password' => 'CashierPass123!'])
             ->assertRedirect('/cashier');
     }
 
@@ -190,8 +190,8 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'cashier.updated',
             'email' => 'updatedcashier@gmail.com',
             'phone' => '09181234567',
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
         ];
 
         $this->actingAs($admin)->put('/staff/cashiers/'.$cashier->id, $update)->assertForbidden();

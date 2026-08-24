@@ -21,7 +21,7 @@
             @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
             <form method="POST" action="{{ route('web-seeder.store') }}">@csrf
                 <div class="field"><label for="deployment_key">Deployment key</label><input id="deployment_key" name="deployment_key" type="password" autocomplete="off" required></div>
-                <div class="field"><label for="password">Account password</label><input id="password" name="password" type="password" minlength="12" autocomplete="new-password" required></div>
+                <div class="field"><label for="password">Account password</label><input id="password" name="password" type="password" minlength="12" autocomplete="new-password" required><small>Use uppercase, lowercase, a number, and a symbol.</small></div>
                 <div class="field"><label for="password_confirmation">Confirm password</label><input id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required></div>
                 <button class="button" type="submit">Create and lock accounts</button>
             </form>

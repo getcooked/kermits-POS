@@ -55,7 +55,7 @@ class PasswordResetController extends Controller
             'password' => [
                 'required',
                 'confirmed',
-                PasswordRule::min(8)->letters()->numbers(),
+                PasswordRule::defaults(),
             ],
         ]);
 

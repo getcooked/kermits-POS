@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\AuthenticateMobileToken;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RoleMiddleware;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(AddSecurityHeaders::class);
         $middleware->append(PreventBackHistory::class);
         $middleware->redirectUsersTo(function (Request $request): string {
             $user = $request->user();

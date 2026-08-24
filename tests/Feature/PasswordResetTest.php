@@ -63,8 +63,8 @@ class PasswordResetTest extends TestCase
                 $response = $this->post(route('password.update'), [
                     'token' => $notification->token,
                     'email' => $user->email,
-                    'password' => 'Secure12345',
-                    'password_confirmation' => 'Secure12345',
+                    'password' => 'SecurePass123!',
+                    'password_confirmation' => 'SecurePass123!',
                 ]);
 
                 $response->assertRedirect(route('login'));
@@ -73,6 +73,6 @@ class PasswordResetTest extends TestCase
             }
         );
 
-        $this->assertTrue(Hash::check('Secure12345', $user->fresh()->password));
+        $this->assertTrue(Hash::check('SecurePass123!', $user->fresh()->password));
     }
 }

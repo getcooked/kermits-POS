@@ -50,8 +50,8 @@ class MobileRegistrationTest extends TestCase
             'username' => 'new.customer',
             'email' => 'new.customer@gmail.com',
             'phone' => '09171234567',
-            'password' => 'Password123',
-            'password_confirmation' => 'Password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
             'role' => User::ROLE_SUPER_ADMIN,
         ])->assertCreated()->assertJsonPath('data.role', User::ROLE_CUSTOMER);
 
@@ -70,8 +70,8 @@ class MobileRegistrationTest extends TestCase
             'username' => 'unverified',
             'email' => 'unverified@gmail.com',
             'phone' => '09171234567',
-            'password' => 'Password123',
-            'password_confirmation' => 'Password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ])->assertUnprocessable();
 
         $this->assertDatabaseMissing('users', ['email' => 'unverified@gmail.com']);

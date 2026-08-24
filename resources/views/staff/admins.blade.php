@@ -15,8 +15,8 @@
                     <header><span>{{ strtoupper(substr($admin->name,0,1)) }}</span><div><h2>{{ $admin->name }}</h2><p>{{ $admin->username ?: 'No username' }} · {{ $admin->email }}</p></div><b>Admin</b></header>
                     <form method="POST" action="{{ route('admins.password.update',$admin) }}">
                         @csrf @method('PUT')
-                        <div class="field"><label for="password-{{ $admin->id }}">New password</label><input class="control" id="password-{{ $admin->id }}" name="password" type="password" minlength="8" autocomplete="new-password" required><small>At least 8 characters with letters and numbers.</small></div>
-                        <div class="field"><label for="password-confirmation-{{ $admin->id }}">Confirm new password</label><input class="control" id="password-confirmation-{{ $admin->id }}" name="password_confirmation" type="password" minlength="8" autocomplete="new-password" required></div>
+                        <div class="field"><label for="password-{{ $admin->id }}">New password</label><input class="control" id="password-{{ $admin->id }}" name="password" type="password" minlength="12" autocomplete="new-password" required><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
+                        <div class="field"><label for="password-confirmation-{{ $admin->id }}">Confirm new password</label><input class="control" id="password-confirmation-{{ $admin->id }}" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required></div>
                         <button class="button" type="submit">Change password</button>
                     </form>
                 </article>

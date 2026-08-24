@@ -48,8 +48,8 @@
                     <div class="field"><label>Username</label><input class="control" name="username" value="{{ old('username') }}" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" autocomplete="username" required @disabled(! $verifiedEmail)><small>Letters, numbers, dots, underscores, and hyphens only.</small></div>
                     <div class="field"><label>Email address</label><input class="control" name="email" type="email" value="{{ old('email', $verifiedEmail) }}" autocomplete="email" readonly required></div>
                     <div class="field"><label>Phone number</label><input class="control" name="phone" type="tel" inputmode="numeric" value="{{ old('phone') }}" minlength="11" maxlength="11" pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" required @disabled(! $verifiedEmail)><small>11 digits starting with 09.</small></div>
-                    <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="8" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
-                    <div class="field"><label>Confirm password</label><input class="control" name="password_confirmation" type="password" minlength="8" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
+                    <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
+                    <div class="field"><label>Confirm password</label><input class="control" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
                     @unless($verifiedEmail)<p class="locked-note">Verify your Gmail first to unlock account creation.</p>@endunless
                     <button class="register-button" @disabled(! $verifiedEmail)>Create account <span>&rarr;</span></button>
                 </form>

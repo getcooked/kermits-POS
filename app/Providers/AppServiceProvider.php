@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,6 +21,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Password::defaults(fn (): Password => Password::min(12)
+            ->mixedCase()
+            ->letters()
+            ->numbers()
+            ->symbols());
+
         View::composer(
             ['landing', 'shop.index', 'customer.history', 'reservations.create'],
             fn ($view) => $view->with(

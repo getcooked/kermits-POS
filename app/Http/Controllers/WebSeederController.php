@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -29,7 +30,7 @@ class WebSeederController extends Controller
 
         $validated = $request->validate([
             'deployment_key' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
         if (! hash_equals((string) config('web-seeder.key'), $validated['deployment_key'])) {
