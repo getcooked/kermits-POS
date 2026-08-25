@@ -60,6 +60,6 @@ class LandingController extends Controller
 
     private function appReleasePath(): string
     {
-        return storage_path('app/releases/kermits.apk');
+        return config('mobile.release_path');
     }
 }
