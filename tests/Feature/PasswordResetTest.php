@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -18,6 +19,35 @@ class PasswordResetTest extends TestCase
         $this->get(route('password.request'))
             ->assertOk()
             ->assertSee('Reset your password');
+    }
+
+    public function test_super_admin_recovery_is_available_from_the_admin_login(): void
+    {
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee(route('superadmin.password.request'));
+
+        $this->get(route('superadmin.password.request'))
+            ->assertOk()
+            ->assertSee('Recover Super Admin access');
+    }
+
+    public function test_super_admin_recovery_sends_only_to_a_super_admin_account(): void
+    {
+        Notification::fake();
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->post(route('superadmin.password.email'), ['email' => $superAdmin->email])
+            ->assertSessionHas('status')
+            ->assertSessionDoesntHaveErrors();
+
+        $this->post(route('superadmin.password.email'), ['email' => $admin->email])
+            ->assertSessionHas('status')
+            ->assertSessionDoesntHaveErrors();
+
+        Notification::assertSentTo($superAdmin, ResetPassword::class);
+        Notification::assertNotSentTo($admin, ResetPassword::class);
     }
 
     public function test_reset_link_can_be_requested_for_an_active_user(): void
@@ -53,6 +83,20 @@ class PasswordResetTest extends TestCase
     {
         Notification::fake();
         $user = User::factory()->create();
+        DB::table('sessions')->insert([
+            'id' => 'active-web-session',
+            'user_id' => $user->id,
+            'payload' => 'test',
+            'last_activity' => now()->timestamp,
+        ]);
+        DB::table('mobile_api_tokens')->insert([
+            'user_id' => $user->id,
+            'name' => 'Android phone',
+            'token_hash' => hash('sha256', 'active-mobile-token'),
+            'expires_at' => now()->addDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->post(route('password.email'), ['email' => $user->email]);
 
@@ -74,5 +118,7 @@ class PasswordResetTest extends TestCase
         );
 
         $this->assertTrue(Hash::check('SecurePass123!', $user->fresh()->password));
+        $this->assertDatabaseMissing('sessions', ['user_id' => $user->id]);
+        $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $user->id]);
     }
 }

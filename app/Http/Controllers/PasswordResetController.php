@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -16,10 +17,25 @@ class PasswordResetController extends Controller
 {
     public function request(): View
     {
-        return view('auth.forgot-password');
+        return view('auth.forgot-password', ['superAdminRecovery' => false]);
+    }
+
+    public function requestSuperAdmin(): View
+    {
+        return view('auth.forgot-password', ['superAdminRecovery' => true]);
     }
 
     public function email(Request $request): RedirectResponse
+    {
+        return $this->sendResetLink($request);
+    }
+
+    public function emailSuperAdmin(Request $request): RedirectResponse
+    {
+        return $this->sendResetLink($request, User::ROLE_SUPER_ADMIN);
+    }
+
+    private function sendResetLink(Request $request, ?string $requiredRole = null): RedirectResponse
     {
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160'],
@@ -27,6 +43,7 @@ class PasswordResetController extends Controller
 
         $user = User::query()
             ->whereRaw('LOWER(email) = ?', [Str::lower($validated['email'])])
+            ->when($requiredRole, fn ($query, string $role) => $query->where('role', $role))
             ->first();
 
         if ($user) {
@@ -66,6 +83,9 @@ class PasswordResetController extends Controller
                     'password' => Hash::make($password),
                     'remember_token' => Str::random(60),
                 ])->save();
+
+                DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+                DB::table('mobile_api_tokens')->where('user_id', $user->id)->delete();
 
                 event(new PasswordReset($user));
             }

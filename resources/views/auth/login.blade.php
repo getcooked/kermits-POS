@@ -8,7 +8,7 @@
         <form method="POST" action="{{ route('login.store') }}">@csrf
             <div class="field"><label for="email">Username or email address</label><input class="control" id="email" name="email" type="text" value="{{ old('email') }}" autocomplete="username" placeholder="Username or name@gmail.com" required autofocus>@error('email')<p class="error">{{ $message }}</p>@enderror</div>
             <div class="field"><label for="password">Password</label><input class="control" id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>@error('password')<p class="error">{{ $message }}</p>@enderror</div>
-            <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1"> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div><button class="login-button" type="submit">Log in <span>&rarr;</span></button><p style="text-align:center;margin:18px 0 0;color:#687286">New customer? <a href="{{ route('register') }}">Create an account</a></p>
+            <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1"> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div><button class="login-button" type="submit">Log in <span>&rarr;</span></button><p style="text-align:center;margin:18px 0 0;color:#687286">Super Admin locked out? <a href="{{ route('superadmin.password.request') }}">Recover access</a></p><p style="text-align:center;margin:10px 0 0;color:#687286">New customer? <a href="{{ route('register') }}">Create an account</a></p>
         </form>
     </div></div>
 </section></main>

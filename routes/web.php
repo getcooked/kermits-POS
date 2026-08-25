@@ -16,6 +16,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\SuperAdminSecurityController;
 use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +46,11 @@ Route::middleware('guest')->controller(PasswordResetController::class)->group(fu
     Route::post('/reset-password', 'update')
         ->middleware('throttle:5,1')
         ->name('password.update');
+    Route::get('/admin/forgot-password', 'requestSuperAdmin')
+        ->name('superadmin.password.request');
+    Route::post('/admin/forgot-password', 'emailSuperAdmin')
+        ->middleware('throttle:3,1')
+        ->name('superadmin.password.email');
 });
 
 Route::middleware('auth')->group(function (): void {
@@ -92,6 +98,11 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('role:super_admin')->group(function (): void {
+        Route::get('/staff/security', [SuperAdminSecurityController::class, 'edit'])
+            ->name('superadmin.security.edit');
+        Route::put('/staff/security/password', [SuperAdminSecurityController::class, 'updatePassword'])
+            ->middleware('throttle:5,1')
+            ->name('superadmin.security.password.update');
         Route::get('/staff/admins', [AdminAccountController::class, 'index'])->name('admins.index');
         Route::put('/staff/admins/{admin}/password', [AdminAccountController::class, 'updatePassword'])
             ->middleware('throttle:5,1')
