@@ -16,6 +16,7 @@ class AppDownloadTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('mobile.download_enabled', false);
         $this->releasePath = storage_path('app/releases/kermits.apk');
         File::delete($this->releasePath);
     }
@@ -39,6 +40,7 @@ class AppDownloadTest extends TestCase
     public function test_android_release_can_be_downloaded_from_the_landing_page(): void
     {
         File::put($this->releasePath, 'test apk');
+        config()->set('mobile.download_enabled', true);
 
         $this->get('/')
             ->assertOk()
@@ -62,6 +64,7 @@ class AppDownloadTest extends TestCase
         }
 
         File::put($this->releasePath, 'test apk');
+        config()->set('mobile.download_enabled', true);
 
         foreach ($pages as $page) {
             $this->actingAs($customer)->get($page)

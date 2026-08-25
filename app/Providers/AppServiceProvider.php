@@ -31,7 +31,8 @@ class AppServiceProvider extends ServiceProvider
             ['landing', 'shop.index', 'customer.history', 'reservations.create'],
             fn ($view) => $view->with(
                 'appDownloadAvailable',
-                file_exists(storage_path('app/releases/kermits.apk')),
+                config('mobile.download_enabled')
+                    && file_exists(storage_path('app/releases/kermits.apk')),
             ),
         );
     }

@@ -45,7 +45,11 @@ class LandingController extends Controller
 
     public function downloadApp(): BinaryFileResponse
     {
-        abort_unless(file_exists($this->appReleasePath()), 404);
+        abort_unless(
+            config('mobile.download_enabled')
+                && file_exists($this->appReleasePath()),
+            404,
+        );
 
         return response()->download(
             $this->appReleasePath(),
