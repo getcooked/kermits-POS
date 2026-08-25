@@ -17,7 +17,9 @@ class AppDownloadTest extends TestCase
     {
         parent::setUp();
         config()->set('mobile.download_enabled', false);
-        $this->releasePath = storage_path('app/releases/kermits.apk');
+        $this->releasePath = storage_path('framework/testing/kermits-test.apk');
+        config()->set('mobile.release_path', $this->releasePath);
+        File::ensureDirectoryExists(dirname($this->releasePath));
         File::delete($this->releasePath);
     }
 

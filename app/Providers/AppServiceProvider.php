@@ -32,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
             fn ($view) => $view->with(
                 'appDownloadAvailable',
                 config('mobile.download_enabled')
-                    && file_exists(storage_path('app/releases/kermits.apk')),
+                    && file_exists(config('mobile.release_path')),
             ),
         );
     }
