@@ -21,6 +21,7 @@ use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+Route::view('/app', 'mobile.app')->name('mobile.app');
 Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
 Route::get('/menu-images/{product}', ProductImageController::class)->name('products.image');
 Route::get('/seeder', [WebSeederController::class, 'show'])->name('web-seeder.show');
