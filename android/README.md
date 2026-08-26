@@ -30,6 +30,7 @@ The task copies `app/build/outputs/apk/debug/app-debug.apk` to `storage/app/rele
 - Cash or GCash order submission
 - Order history and reservation history
 - HTTPS-only release default, shrinking, resource optimization, and debug-only HTTP logging
+- Web-aligned customer UI with circular Kermit's branding, dark navigation, search, category filters, menu cards, and cart summary
 
 ## Release checklist
 
