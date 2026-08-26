@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Kermits" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#8C960C</item>
+        <item name="android:navigationBarColor">#F4F5EE</item>
+        <item name="android:statusBarColor">#171817</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
