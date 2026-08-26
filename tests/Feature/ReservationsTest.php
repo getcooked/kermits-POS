@@ -60,6 +60,28 @@ class ReservationsTest extends TestCase
         $this->assertDatabaseCount('reservations', 0);
     }
 
+    public function test_viewing_the_booking_form_does_not_consume_the_submission_rate_limit(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        for ($visit = 0; $visit < 11; $visit++) {
+            $this->actingAs($customer)->get('/book')->assertOk();
+        }
+
+        $this->post('/book', [
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'guests' => 2,
+            'payment_method' => 'cash',
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('reservations', 1);
+    }
+
     public function test_table_reservation_requires_an_allowed_table_size(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -154,12 +176,13 @@ class ReservationsTest extends TestCase
         $this->assertDatabaseHas('reservations', ['user_id' => $customer->id, 'reservation_fee' => 250, 'food_total' => 400, 'total_amount' => 650, 'payment_method' => 'gcash', 'payment_status' => 'pending']);
     }
 
-    public function test_gcash_proof_is_private_and_visible_only_to_owner_and_authorized_staff(): void
+    public function test_gcash_proof_is_private_and_visible_only_to_owner_and_super_admin(): void
     {
         Storage::fake('local');
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $other = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
         $this->actingAs($customer)->post('/book', [
             'type' => 'table', 'table_size' => 2, 'customer_name' => $customer->name,
@@ -171,7 +194,8 @@ class ReservationsTest extends TestCase
         $reservation = Reservation::query()->whereBelongsTo($customer)->firstOrFail();
         Storage::disk('local')->assertExists($reservation->payment_proof_path);
         $this->actingAs($customer)->get('/reservations/'.$reservation->id.'/payment-proof')->assertOk();
-        $this->actingAs($admin)->get('/reservations/'.$reservation->id.'/payment-proof')->assertOk();
+        $this->actingAs($superAdmin)->get('/reservations/'.$reservation->id.'/payment-proof')->assertOk();
+        $this->actingAs($admin)->get('/reservations/'.$reservation->id.'/payment-proof')->assertForbidden();
         $this->actingAs($other)->get('/reservations/'.$reservation->id.'/payment-proof')->assertForbidden();
     }
 
@@ -212,9 +236,9 @@ class ReservationsTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_admin_can_confirm_a_reservation(): void
+    public function test_super_admin_can_confirm_a_reservation(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $reservation = Reservation::query()->create([
             'reference' => 'KRM-TEST',
             'type' => 'exclusive',
@@ -225,20 +249,43 @@ class ReservationsTest extends TestCase
             'guests' => 20,
         ]);
 
-        $this->actingAs($admin)->patch('/reservations/'.$reservation->id.'/status', [
+        $this->actingAs($superAdmin)->patch('/reservations/'.$reservation->id.'/status', [
             'status' => 'confirmed',
         ])->assertRedirect();
 
         $this->assertDatabaseHas('reservations', [
             'id' => $reservation->id,
             'status' => 'confirmed',
-            'handled_by' => $admin->id,
+            'handled_by' => $superAdmin->id,
         ]);
     }
 
-    public function test_admin_can_see_table_and_food_request_details(): void
+    public function test_admin_cannot_access_or_update_reservations(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $reservation = Reservation::query()->create([
+            'reference' => 'KRM-ADMIN-FORBIDDEN',
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => 'Customer',
+            'email' => 'customer@gmail.com',
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay(),
+            'guests' => 2,
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($admin)->get('/reservations')->assertForbidden();
+        $this->actingAs($admin)
+            ->patch('/reservations/'.$reservation->id.'/status', ['status' => 'confirmed'])
+            ->assertForbidden();
+
+        $this->assertSame('pending', $reservation->fresh()->status);
+    }
+
+    public function test_super_admin_can_see_table_and_food_request_details(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $meal = Product::query()->create(['name' => 'Kermit Special', 'price' => 175, 'stock' => 10, 'active' => true]);
         $reservation = Reservation::query()->create([
             'reference' => 'KRM-ADMIN-VIEW',
@@ -254,7 +301,7 @@ class ReservationsTest extends TestCase
         ]);
         $reservation->items()->create(['product_id' => $meal->id, 'quantity' => 2, 'unit_price' => 175, 'subtotal' => 350]);
 
-        $this->actingAs($admin)->get('/reservations')
+        $this->actingAs($superAdmin)->get('/reservations')
             ->assertOk()
             ->assertSee('4-seater table')
             ->assertSee('09171234567')
@@ -264,30 +311,30 @@ class ReservationsTest extends TestCase
             ->assertSee('Approve reservation');
     }
 
-    public function test_reservation_only_becomes_successful_after_admin_approval(): void
+    public function test_reservation_only_becomes_successful_after_super_admin_approval(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $reservation = Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-APPROVAL', 'type' => 'table', 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
         $url = URL::temporarySignedRoute('reservations.success', now()->addMinutes(10), ['reference' => $reservation->reference]);
 
         $this->actingAs($customer)->get($url)->assertOk()->assertSee('AWAITING ADMIN APPROVAL')->assertDontSee('Reservation confirmed');
-        $this->actingAs($admin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'confirmed'])->assertRedirect();
+        $this->actingAs($superAdmin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'confirmed'])->assertRedirect();
         $this->actingAs($customer)->get($url)->assertOk()->assertSee('Reservation confirmed')->assertSee('ADMIN APPROVED');
     }
 
-    public function test_admin_cannot_skip_pending_reservation_to_completed(): void
+    public function test_super_admin_cannot_skip_pending_reservation_to_completed(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $reservation = Reservation::query()->create(['reference' => 'KRM-ORDERED', 'type' => 'table', 'customer_name' => 'Customer', 'email' => 'customer@gmail.com', 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
 
-        $this->actingAs($admin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'completed'])->assertSessionHasErrors('status');
+        $this->actingAs($superAdmin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'completed'])->assertSessionHasErrors('status');
         $this->assertSame('pending', $reservation->fresh()->status);
     }
 
-    public function test_admin_cannot_approve_more_than_eight_tables_in_the_same_time_slot(): void
+    public function test_super_admin_cannot_approve_more_than_eight_tables_in_the_same_time_slot(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $schedule = now()->addDays(2)->startOfHour();
 
         foreach (range(1, 8) as $number) {
@@ -316,7 +363,7 @@ class ReservationsTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $this->actingAs($admin)
+        $this->actingAs($superAdmin)
             ->patch('/reservations/'.$pending->id.'/status', ['status' => 'confirmed'])
             ->assertSessionHasErrors('status');
 

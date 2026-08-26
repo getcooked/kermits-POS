@@ -27,17 +27,17 @@ Only paid orders are included in dashboard sales totals and sales reports.
 
 ### Inventory
 
-Admin or super-admin -> inventory adjustment -> validation -> locked product update -> stock movement audit record.
+Super-admin -> inventory adjustment -> validation -> locked product update -> stock movement audit record.
 
 Stock-out operations cannot reduce inventory below zero.
 
 ### Reservation
 
-Public booking form -> throttled submission -> validated reservation -> signed confirmation link -> admin review and status update.
+Public booking form -> throttled submission -> validated reservation -> signed confirmation link -> super-admin review and status update.
 
 ## Role boundary
 
-Customer routes and staff routes are separate route groups. Navigation visibility is only a convenience; authorization is enforced by server-side role middleware on every protected route.
+Customer, cashier, and super-admin routes are separate route groups. Regular admin accounts have no administrative page access. Navigation visibility is only a convenience; authorization is enforced by server-side role middleware on every protected route.
 
 ## Development rules
 

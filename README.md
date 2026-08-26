@@ -8,8 +8,8 @@ A Laravel capstone project for restaurant sales, inventory, customer ordering, a
 | --- | --- |
 | Customer | Shop, own orders, table/food/exclusive reservations |
 | Cashier | Point of sale and staff receipts |
-| Admin | Dashboard, customers, inventory, reports, reservations |
-| Super admin | All admin tools, product management, and POS |
+| Admin | No administrative web pages |
+| Super admin | Dashboard, customers, inventory, reports, reservations, product management, and POS |
 
 Public registration always creates a **customer** account. Staff roles must be assigned through an authorized administrative process or database seeder.
 
@@ -51,7 +51,7 @@ php artisan test
 composer audit --locked
 ```
 
-Current verified baseline: **77 tests, 422 assertions**, with no known Composer security advisories.
+Current verified baseline: **95 tests, 531 assertions**, with no known Composer security advisories.
 
 ## Mobile API readiness
 

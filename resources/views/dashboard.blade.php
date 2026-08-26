@@ -7,9 +7,9 @@
     <nav class="side-nav">
         <a class="active" href="{{ route('dashboard') }}">@include('partials.nav-icon',['name'=>'home']) Dashboard</a>
         @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>@endif
-        @if(auth()->user()->hasRole('super_admin','admin'))<a href="{{ route('reports') }}">@include('partials.nav-icon',['name'=>'reports']) Reporting</a>@endif
+        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('reports') }}">@include('partials.nav-icon',['name'=>'reports']) Reporting</a>@endif
         @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Catalog</a><a href="{{ route('inventory.index') }}">@include('partials.nav-icon',['name'=>'inventory']) Inventory</a>@endif
-        @if(auth()->user()->hasRole('super_admin','admin'))<a href="{{ route('customers.index') }}">@include('partials.nav-icon',['name'=>'users']) Customers</a>@endif
+        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('customers.index') }}">@include('partials.nav-icon',['name'=>'users']) Customers</a>@endif
         @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('admins.index') }}">@include('partials.nav-icon',['name'=>'users']) Admin Accounts</a>@endif
     </nav>
     <div class="side-user"><span>{{ strtoupper(substr(auth()->user()->name,0,1)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>{{ str(auth()->user()->role)->replace('_',' ')->title() }}</small></div><form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg></button></form></div>
@@ -23,7 +23,7 @@
     </section>
     <section class="stat-row"><div><span>Active products</span><strong>{{ $productsCount }}</strong><small>Available in catalog</small></div><div><span>Low stock alerts</span><strong>{{ $lowStock->count() }}</strong><small>Products need attention</small></div><div><span>Transactions</span><strong>{{ $ordersCount }}</strong><small>All recorded sales</small></div></section>
     <div class="dash-grid">
-        <section class="panel"><div class="panel-head"><div><h2>Recent sales</h2><p>Latest completed transactions</p></div>@if(auth()->user()->hasRole('super_admin','admin'))<a href="{{ route('reports') }}">View reports</a>@endif</div>
+        <section class="panel"><div class="panel-head"><div><h2>Recent sales</h2><p>Latest completed transactions</p></div>@if(auth()->user()->hasRole('super_admin'))<a href="{{ route('reports') }}">View reports</a>@endif</div>
         <div class="sales-list">@forelse($recentOrders as $order)<a href="{{ route('receipts.show',$order) }}"><span class="order-mark">#{{ $order->id }}</span><div><strong>{{ $order->user->name }}</strong><small>{{ $order->created_at->format('M d · h:i A') }} · {{ ucfirst($order->payment_method) }}</small></div><b>₱{{ number_format($order->total,2) }}</b></a>@empty<p class="empty">No sales yet. Open the cashier to record your first transaction.</p>@endforelse</div></section>
         <section class="panel"><div class="panel-head"><div><h2>Inventory alerts</h2><p>Items running low</p></div>@if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">Manage</a>@endif</div>
         <div class="stock-list">@forelse($lowStock as $product)<div>@if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="">@else<span>{{ strtoupper(substr($product->name,0,1)) }}</span>@endif<div><strong>{{ $product->name }}</strong><small>Only {{ $product->stock }} remaining</small></div><b>{{ $product->stock }}</b></div>@empty<p class="empty">Stock levels look healthy.</p>@endforelse</div></section>

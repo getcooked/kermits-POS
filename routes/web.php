@@ -56,13 +56,13 @@ Route::middleware('guest')->controller(PasswordResetController::class)->group(fu
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
     Route::get('/reservations/{reservation}/payment-proof', [ReservationController::class, 'proof'])
-        ->middleware('role:customer,super_admin,admin')
+        ->middleware('role:customer,super_admin')
         ->name('reservations.payment-proof');
     Route::get('/reservations/{reservation}/details', [ReservationController::class, 'show'])
-        ->middleware('role:customer,super_admin,admin')
+        ->middleware('role:customer,super_admin')
         ->name('reservations.show');
     Route::get('/reservations/{reservation}/receipt', [ReservationController::class, 'receipt'])
-        ->middleware('role:customer,super_admin,admin')
+        ->middleware('role:customer,super_admin')
         ->name('reservations.receipt');
 
     Route::middleware('role:customer')->group(function (): void {
@@ -72,17 +72,18 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/history', [CustomerHistoryController::class, 'index'])->name('customer.history');
 
         Route::controller(ReservationController::class)
-            ->middleware('throttle:10,1')
             ->group(function (): void {
                 Route::get('/book', 'create')->name('reservations.create');
-                Route::post('/book', 'store')->name('reservations.store');
+                Route::post('/book', 'store')
+                    ->middleware('throttle:10,1')
+                    ->name('reservations.store');
                 Route::get('/book/success/{reference}', 'success')
                     ->middleware('signed')
                     ->name('reservations.success');
             });
     });
 
-    Route::middleware('role:super_admin,admin')->group(function (): void {
+    Route::middleware('role:super_admin')->group(function (): void {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{customer}/history', [CustomerController::class, 'show'])->name('customers.show');
@@ -136,6 +137,6 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::get('/receipts/{order}', [ReportController::class, 'receipt'])
-        ->middleware('role:super_admin,admin,cashier,customer')
+        ->middleware('role:super_admin,cashier,customer')
         ->name('receipts.show');
 });
