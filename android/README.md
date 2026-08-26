@@ -1,6 +1,6 @@
 # Kermit's Customer Android App
 
-Native Kotlin + Jetpack Compose customer application for the Laravel `/api/v1` API.
+Native Kotlin + Jetpack Compose customer application for the Laravel `/api/v1` API. It renders entirely with Android Compose UI and does not embed the website in a WebView.
 
 ## Open and run
 
@@ -12,6 +12,15 @@ The release build uses `https://kermits-pos.com/api/v1/` by default. For a local
 cd android
 ./gradlew assembleRelease
 ```
+
+To build an installable, debug-signed native APK and publish that exact artifact to Laravel's `/download-app` route, run:
+
+```powershell
+cd android
+./gradlew :app:publishDownloadApk
+```
+
+The task copies `app/build/outputs/apk/debug/app-debug.apk` to `storage/app/releases/kermits.apk`. Laravel continues to serve it as `Kermits-Restaurant.apk`.
 
 ## Included customer flow
 
@@ -30,4 +39,4 @@ cd android
 4. Run `assembleRelease`, install the signed artifact on a clean device, and exercise login, ordering, logout, and history flows against staging.
 5. Add Crashlytics or an equivalent crash reporting service before publishing.
 
-The repository host used for development does not currently have Java, Gradle, or the Android SDK installed, so the local workspace cannot execute the Android build until Android Studio or the command-line Android toolchain is installed.
+The build requires JDK 17 or newer and an Android SDK with API 35. Android Studio's bundled runtime is suitable when `JAVA_HOME` points to a complete installation.

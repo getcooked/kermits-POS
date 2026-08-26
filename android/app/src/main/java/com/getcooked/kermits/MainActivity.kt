@@ -27,6 +27,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,7 +62,16 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
     fun placeOrder(payment: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createOrder(mapOf("items" to cart.map { mapOf("product_id" to it.key, "quantity" to it.value) }, "payment_method" to payment)); check(response.isSuccessful); cart = emptyMap(); orders = api.orders().data; done(true) } catch (e: Exception) { error = "Order could not be placed"; done(false) } finally { busy = false } }
     fun placeReservation(phone: String, at: String, size: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createReservation("table".formPart(), size.formPart(), phone.formPart(), at.formPart(), null, null, "cash".formPart(), null); check(response.isSuccessful); reservations = api.reservations().data; done(true) } catch (e: Exception) { error = "Reservation could not be submitted"; done(false) } finally { busy = false } }
-    companion object { fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory { override fun <T : ViewModel> create(modelClass: Class<T>) = AppViewModel(api, store) as T } }
+    companion object {
+        fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                require(modelClass.isAssignableFrom(AppViewModel::class.java))
+
+                return AppViewModel(api, store) as T
+            }
+        }
+    }
 }
 
 @Composable fun KermitsTheme(content: @Composable () -> Unit) { MaterialTheme(colorScheme = lightColorScheme(primary = androidx.compose.ui.graphics.Color(0xFF737D00), onPrimary = androidx.compose.ui.graphics.Color.White, background = androidx.compose.ui.graphics.Color(0xFFF4F5EE), surface = androidx.compose.ui.graphics.Color.White), content = content) }
@@ -93,7 +103,7 @@ fun KermitsApp(vm: AppViewModel) {
             when (tab) {
                 0 -> MenuScreen(vm, payment, { payment = it }, { message -> orderMessage = message })
                 1 -> HistoryScreen("Your orders", vm.orders.map { "#${it.id}  ${money(it.total)}  ${it.payment_status}" })
-                2 -> ReservationScreen(vm, setMessage)
+                2 -> ReservationScreen(vm) { message -> orderMessage = message }
                 else -> { Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(22.dp)); OutlinedButton(onClick = { vm.logout() }) { Text("Sign out") } }
             }
             orderMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
@@ -130,4 +140,4 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     Spacer(Modifier.height(16.dp)); Button(onClick = { vm.placeReservation(phone, date, size) { ok -> setMessage(if (ok) "Reservation request submitted." else "Reservation could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Request reservation") }
     Spacer(Modifier.height(26.dp)); HistoryScreen("Recent reservations", vm.reservations.map { "${it.reference}  ${it.status}  ${money(it.total_amount)}" })
 }
-private fun money(value: Double) = "₱${String.format("%,.2f", value)}"
+private fun money(value: Double) = "₱${String.format(Locale.US, "%,.2f", value)}"
