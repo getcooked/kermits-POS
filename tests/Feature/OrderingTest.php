@@ -184,6 +184,37 @@ class OrderingTest extends TestCase
         ]);
     }
 
+    public function test_customer_menu_contains_reservations_and_both_payment_choices(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $menu = $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('>Menu</a>', false)
+            ->assertDontSee('>Shop</a>', false)
+            ->assertSee('data-menu-reserve', false)
+            ->assertSee('Walk In Pay')
+            ->assertSee('value="cash"', false)
+            ->assertSee('GCash')
+            ->assertSee('value="gcash"', false);
+
+        $this->assertSame(1, substr_count($menu->getContent(), route('reservations.create')));
+
+        foreach (['/history', '/book'] as $page) {
+            $this->actingAs($customer)->get($page)
+                ->assertOk()
+                ->assertSee('>Menu</a>', false)
+                ->assertDontSee('>Shop</a>', false)
+                ->assertDontSee('>Reserve</a>', false);
+        }
+
+        $this->actingAs($customer)->get('/book')
+            ->assertSee('Walk In Pay')
+            ->assertSee('value="cash"', false)
+            ->assertSee('GCash')
+            ->assertSee('value="gcash"', false);
+    }
+
     public function test_customer_gcash_order_requires_exactly_thirteen_reference_digits(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
