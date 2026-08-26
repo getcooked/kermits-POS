@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReservationRequest;
 use App\Http\Requests\UpdateReservationStatusRequest;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
@@ -23,18 +24,22 @@ class ReservationController extends Controller
 
     private const EXCLUSIVE_FEE = 5000;
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $checkoutOrder = $this->checkoutOrder($request, $request->query('order'));
+
         return view('reservations.create', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'tableFees' => self::TABLE_FEES,
             'exclusiveFee' => self::EXCLUSIVE_FEE,
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
+            'checkoutOrder' => $checkoutOrder,
         ]);
     }
 
     public function store(StoreReservationRequest $request): RedirectResponse
     {
+        $checkoutOrder = $this->checkoutOrder($request, $request->validated('order_id'));
         $proofPath = $request->hasFile('payment_proof')
             ? $request->file('payment_proof')->store('payment-proofs', 'local')
             : null;
@@ -45,7 +50,7 @@ class ReservationController extends Controller
                     ? self::TABLE_FEES[(int) $request->validated('table_size')]
                     : self::EXCLUSIVE_FEE;
                 $reservation = Reservation::query()->create([
-                    ...$request->safe()->except(['menu_items', 'payment_proof']),
+                    ...$request->safe()->except(['menu_items', 'payment_proof', 'order_id']),
                     'user_id' => $request->user()->id,
                     'customer_name' => $request->user()->name,
                     'email' => $request->user()->email,
@@ -103,6 +108,12 @@ class ReservationController extends Controller
             now()->addMinutes(30),
             ['reference' => $reservation->reference],
         );
+
+        if ($checkoutOrder) {
+            return redirect()
+                ->route('shop.orders.show', $checkoutOrder)
+                ->with('status', 'Reservation added. Your order receipt is ready.');
+        }
 
         return redirect()->to($url);
     }
@@ -226,5 +237,17 @@ class ReservationController extends Controller
         } while (Reservation::query()->where('reference', $reference)->exists());
 
         return $reference;
+    }
+
+    private function checkoutOrder(Request $request, mixed $orderId): ?Order
+    {
+        if (! is_numeric($orderId) || (int) $orderId < 1) {
+            return null;
+        }
+
+        return Order::query()
+            ->whereKey((int) $orderId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
     }
 }

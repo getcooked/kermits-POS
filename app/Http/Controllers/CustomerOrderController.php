@@ -31,7 +31,7 @@ class CustomerOrderController extends Controller
             customer: $request->user(),
         );
 
-        return redirect()->route('shop.orders.show', $order);
+        return redirect()->route('reservations.create', ['order' => $order]);
     }
 
     public function show(Order $order): View

@@ -16,6 +16,7 @@ class StoreReservationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'order_id' => ['nullable', 'integer', 'min:1'],
             'type' => ['required', 'in:table,exclusive'],
             'table_size' => ['nullable', 'required_if:type,table', 'integer', 'in:1,2,4,8,12'],
             'customer_name' => ['required', 'string', 'max:120'],
