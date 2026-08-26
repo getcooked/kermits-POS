@@ -173,7 +173,7 @@ class OrderingTest extends TestCase
             'quantities' => [$product->id => 1],
             'payment_method' => 'gcash',
             'payment_reference' => '1234567890123',
-        ])->assertRedirect('/shop/orders/1');
+        ])->assertRedirect(route('reservations.create', ['order' => 1]));
 
         $this->assertDatabaseHas('orders', [
             'user_id' => $customer->id,
@@ -182,6 +182,91 @@ class OrderingTest extends TestCase
             'payment_status' => 'pending',
             'payment_reference' => '1234567890123',
         ]);
+    }
+
+    public function test_customer_order_flows_through_reservation_to_the_order_receipt(): void
+    {
+        $customer = User::factory()->create([
+            'name' => 'Reservation Checkout Customer',
+            'email' => 'reservation-checkout@gmail.com',
+            'role' => User::ROLE_CUSTOMER,
+        ]);
+        $product = Product::query()->create([
+            'name' => 'Reservation Checkout Meal',
+            'price' => 250,
+            'stock' => 5,
+            'active' => true,
+        ]);
+
+        $this->actingAs($customer)->post('/shop/orders', [
+            'quantities' => [$product->id => 1],
+            'payment_method' => 'cash',
+        ])->assertRedirect(route('reservations.create', ['order' => 1]));
+
+        $order = Order::query()->firstOrFail();
+
+        $this->get(route('reservations.create', ['order' => $order]))
+            ->assertOk()
+            ->assertSee('data-checkout-order', false)
+            ->assertSee('Order #000001')
+            ->assertSee('name="order_id" value="'.$order->id.'"', false)
+            ->assertSee('Complete your reservation to continue to the order receipt.')
+            ->assertSee('Submit reservation &amp; view receipt', false);
+
+        $this->post('/book', [
+            'order_id' => $order->id,
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'payment_method' => 'cash',
+        ])->assertRedirect(route('shop.orders.show', $order))
+            ->assertSessionHas('status', 'Reservation added. Your order receipt is ready.');
+
+        $this->assertDatabaseHas('reservations', [
+            'user_id' => $customer->id,
+            'type' => 'table',
+            'table_size' => 2,
+            'status' => 'pending',
+        ]);
+
+        $this->get(route('shop.orders.show', $order))
+            ->assertOk()
+            ->assertSee('Reservation added. Your order receipt is ready.')
+            ->assertSee('Order Receipt')
+            ->assertSee('Reservation Checkout Meal');
+    }
+
+    public function test_customer_cannot_attach_another_customers_order_to_a_reservation(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $otherCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $order = Order::query()->create([
+            'user_id' => $owner->id,
+            'customer_id' => $owner->id,
+            'total' => 100,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+        ]);
+
+        $this->actingAs($otherCustomer)
+            ->get(route('reservations.create', ['order' => $order]))
+            ->assertNotFound();
+
+        $this->post('/book', [
+            'order_id' => $order->id,
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => $otherCustomer->name,
+            'email' => $otherCustomer->email,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'payment_method' => 'cash',
+        ])->assertNotFound();
+
+        $this->assertDatabaseCount('reservations', 0);
     }
 
     public function test_customer_menu_contains_reservations_and_both_payment_choices(): void

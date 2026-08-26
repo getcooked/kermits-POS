@@ -51,7 +51,7 @@ php artisan test
 composer audit --locked
 ```
 
-Current verified baseline: **97 tests, 564 assertions**, with no known Composer security advisories.
+Current verified baseline: **99 tests, 583 assertions**, with no known Composer security advisories.
 
 ## Mobile API readiness
 

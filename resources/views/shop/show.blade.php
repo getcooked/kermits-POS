@@ -7,6 +7,8 @@
             <div><p>ORDER RECEIVED</p><h1>Thank you, {{ auth()->user()->name }}.</h1></div>
         </header>
 
+        @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
+
         <article class="online-receipt">
             <div class="receipt-brand">
                 <img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's">
