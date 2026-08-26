@@ -57,6 +57,8 @@ Current verified baseline: **99 tests, 583 assertions**, with no known Composer 
 
 The versioned customer API is available under `/api/v1` and supports customer login/logout, profile details, the live product catalog, ordering, order history, reservations, and reservation history. Mobile access tokens are hashed in the database, expire after 30 days, and are limited to five active devices per customer.
 
+The installable customer PWA is available at `/app`. It provides customer login, menu search and filtering, a locally persisted cart, cash/GCash ordering, table reservations, and activity history. Deploy the built Vite assets with `npm run build`; the app shell is cached by `public/mobile-sw.js` for repeat visits, while customer data always comes from the API.
+
 Before connecting an Android build to production, deploy the latest code and run:
 
 ```powershell
