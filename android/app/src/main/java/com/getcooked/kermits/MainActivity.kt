@@ -66,12 +66,16 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var cart by mutableStateOf<Map<Int, Int>>(emptyMap()); private set
     var busy by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
+    var registrationMessage by mutableStateOf<String?>(null); private set
     val signedIn get() = store.token != null
     init { if (signedIn) refresh() }
     fun login(login: String, password: String) = run { busy = true; error = null; viewModelScope.launch { try { val response = api.login(LoginRequest(login.trim(), password)); if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect."; return@launch }; val result = response.body()?.data ?: error("Empty login response"); store.token = result.token; user = result.user; try { load() } catch (_: Exception) { error = "Signed in, but the latest menu could not be loaded." } } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection." } finally { busy = false } } }
     fun logout() = viewModelScope.launch { runCatching { api.logout() }; store.clear(); user = null; products = emptyList(); orders = emptyList(); reservations = emptyList() }
-    fun refresh() = viewModelScope.launch { busy = true; try { load() } catch (e: Exception) { error = "Could not load the latest menu" } finally { busy = false } }
-    private suspend fun load() { val catalog = api.products().data; products = catalog.products; orders = api.orders().data; reservations = api.reservations().data; user = user ?: api.me()["data"] }
+    fun refresh() = viewModelScope.launch { busy = true; error = null; try { products = api.products().data.products } catch (_: Exception) { error = "Could not load the latest menu" }; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] }; busy = false }
+    private suspend fun load() { products = api.products().data.products; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] } }
+    fun sendCode(email: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.sendRegistrationCode(SendCodeRequest(email.trim().lowercase())); check(response.isSuccessful); registrationMessage = "Verification code sent to ${email.trim()}"; done(response.body()?.data?.challenge) } catch (_: Exception) { error = "Could not send the verification code"; done(null) } finally { busy = false } }
+    fun verifyCode(challenge: String, email: String, code: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.verifyRegistrationCode(VerifyCodeRequest(challenge, email.trim().lowercase(), code)); check(response.isSuccessful); done(response.body()?.data?.registration_token) } catch (_: Exception) { error = "The verification code is invalid or expired"; done(null) } finally { busy = false } }
+    fun register(request: RegisterRequest, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.register(request); check(response.isSuccessful); registrationMessage = "Account created. You can now log in."; done(true) } catch (_: Exception) { error = "Could not create the account. Check your details."; done(false) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
     fun placeOrder(payment: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createOrder(mapOf("items" to cart.map { mapOf("product_id" to it.key, "quantity" to it.value) }, "payment_method" to payment)); check(response.isSuccessful); cart = emptyMap(); orders = api.orders().data; done(true) } catch (e: Exception) { error = "Order could not be placed"; done(false) } finally { busy = false } }
@@ -100,11 +104,12 @@ private fun BrandLogo(modifier: Modifier = Modifier) {
 fun KermitsApp(vm: AppViewModel) {
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var registering by remember { mutableStateOf(false) }
     var tab by remember { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
     if (!vm.signedIn) {
-        LoginScreen(vm, login, { login = it }, password, { password = it })
+        if (registering) RegistrationScreen(vm, onBack = { registering = false }) else LoginScreen(vm, login, { login = it }, password, { password = it }, onRegister = { registering = true })
         return
     }
     Scaffold(containerColor = Color(0xFFF0F0F0), bottomBar = { NavigationBar(containerColor = Color(0xFF202124)) { listOf("Menu", "Orders", "Reservations", "Account").forEachIndexed { index, label -> NavigationBarItem(selected = tab == index, onClick = { tab = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF202124), selectedTextColor = Color.White, indicatorColor = Color(0xFFB5C019), unselectedIconColor = Color(0xFFB7BAB5), unselectedTextColor = Color(0xFFB7BAB5)), icon = { Icon(listOf(Icons.Default.Home, Icons.Default.ReceiptLong, Icons.Default.CalendarMonth, Icons.Default.Person)[index], label) }, label = { Text(label) }) } } }) { padding ->
@@ -124,15 +129,15 @@ fun KermitsApp(vm: AppViewModel) {
 }
 
 @Composable
-private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit) {
+private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFF5F5EF))) {
         val wide = maxWidth >= 600.dp
         if (wide) Row(Modifier.fillMaxSize()) {
             BrandPanel(Modifier.weight(0.96f).fillMaxHeight())
-            LoginForm(vm, login, setLogin, password, setPassword, Modifier.weight(1.04f).fillMaxHeight())
+            LoginForm(vm, login, setLogin, password, setPassword, onRegister, Modifier.weight(1.04f).fillMaxHeight())
         } else Column(Modifier.fillMaxSize()) {
             BrandPanel(Modifier.fillMaxWidth().heightIn(min = 205.dp, max = 270.dp))
-            LoginForm(vm, login, setLogin, password, setPassword, Modifier.fillMaxWidth().weight(1f))
+            LoginForm(vm, login, setLogin, password, setPassword, onRegister, Modifier.fillMaxWidth().weight(1f))
         }
     }
 }
@@ -153,7 +158,7 @@ private fun BrandPanel(modifier: Modifier) {
 }
 
 @Composable
-private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, modifier: Modifier) {
+private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, modifier: Modifier) {
     Column(modifier.background(Color(0xFFF7F7F1)).verticalScroll(rememberScrollState()).padding(horizontal = 26.dp, vertical = 34.dp), verticalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).align(Alignment.CenterHorizontally)) {
             Text("WELCOME BACK", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
@@ -165,10 +170,28 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = false, onCheckedChange = null); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(15.dp)); Button(onClick = { vm.login(login, password) }, enabled = !vm.busy && login.isNotBlank() && password.isNotBlank(), shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
-            Spacer(Modifier.height(18.dp)); Text("New customer? Create an account on the Kermit’s web app.", color = Color(0xFF687286), fontSize = 12.sp, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { Text("New customer? ", color = Color(0xFF687286), fontSize = 12.sp); TextButton(onClick = onRegister, contentPadding = PaddingValues(0.dp)) { Text("Create an account", color = Color(0xFF626B00), fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
         }
     }
 }
+
+@Composable
+private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
+    var email by remember { mutableStateOf("") }; var challenge by remember { mutableStateOf<String?>(null) }; var code by remember { mutableStateOf("") }; var token by remember { mutableStateOf<String?>(null) }
+    var name by remember { mutableStateOf("") }; var username by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).verticalScroll(rememberScrollState()).padding(24.dp)) {
+        TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+        Spacer(Modifier.height(12.dp)); Text("SIGN UP", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold); Text("Create your account", fontSize = 30.sp, fontWeight = FontWeight.Bold); Text("Verify your Gmail first, then create your customer account securely.", color = Color(0xFF687286), modifier = Modifier.padding(top = 7.dp))
+        Spacer(Modifier.height(22.dp)); Text("Step 1  Gmail verification", fontWeight = FontWeight.Bold); Text("Use a Gmail address you can open now.", color = Color(0xFF687286), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)); Spacer(Modifier.height(10.dp))
+        OutlinedTextField(email, { email = it }, label = { Text("Gmail address") }, placeholder = { Text("name@gmail.com") }, enabled = challenge == null, singleLine = true, colors = loginFieldColors(), modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp)); Button(onClick = { vm.sendCode(email) { issuedChallenge -> challenge = issuedChallenge } }, enabled = challenge == null && email.matches(Regex("^[^@\\s]+@gmail\\.com$")) && !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("Send code") }
+        if (challenge != null && token == null) { Spacer(Modifier.height(12.dp)); OutlinedTextField(code, { code = it.take(6) }, label = { Text("6-digit verification code") }, singleLine = true, colors = loginFieldColors(), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { vm.verifyCode(challenge!!, email, code) { verified -> token = verified } }, enabled = code.length == 6 && !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("Verify Gmail") } }
+        if (token != null) { Spacer(Modifier.height(22.dp)); Text("Step 2  Account details", fontWeight = FontWeight.Bold); Spacer(Modifier.height(10.dp)); RegistrationField("Full name", name) { name = it }; RegistrationField("Username", username) { username = it }; RegistrationField("Phone number", phone) { phone = it }; RegistrationField("Password", password, true) { password = it }; RegistrationField("Confirm password", confirmation, true) { confirmation = it }; Spacer(Modifier.height(12.dp)); Button(onClick = { vm.register(RegisterRequest(token!!, name, username, email, phone, password, confirmation)) { ok -> if (ok) onBack() } }, enabled = !vm.busy && name.isNotBlank() && username.length >= 3 && phone.matches(Regex("09\\d{9}")) && password.length >= 12 && password == confirmation, modifier = Modifier.fillMaxWidth()) { Text("Create account") } }
+        vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }; vm.registrationMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
+    }
+}
+
+@Composable private fun RegistrationField(label: String, value: String, password: Boolean = false, onChange: (String) -> Unit) { OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = true, visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None, colors = loginFieldColors(), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) }
 
 @Composable
 private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
