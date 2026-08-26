@@ -1,6 +1,5 @@
 package com.getcooked.kermits
 
-import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -61,8 +60,10 @@ interface KermitsApi {
     @POST("logout") suspend fun logout(): Response<Unit>
     @GET("products") suspend fun products(): CatalogResponse
     @GET("orders") suspend fun orders(): ListOrdersResponse
+    @GET("orders/{order}") suspend fun order(@Path("order") id: Int): Response<Map<String, Order>>
     @POST("orders") suspend fun createOrder(@Body body: Map<String, Any>): retrofit2.Response<Map<String, Order>>
     @GET("reservations") suspend fun reservations(): ListReservationsResponse
+    @GET("reservations/{reservation}") suspend fun reservation(@Path("reservation") id: Int): Response<Map<String, Reservation>>
     @Multipart
     @POST("reservations") suspend fun createReservation(
         @Part("type") type: RequestBody, @Part("table_size") tableSize: RequestBody?,

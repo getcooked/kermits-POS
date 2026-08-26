@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,6 +64,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var products by mutableStateOf<List<Product>>(emptyList()); private set
     var orders by mutableStateOf<List<Order>>(emptyList()); private set
     var reservations by mutableStateOf<List<Reservation>>(emptyList()); private set
+    var gcashQrUrl by mutableStateOf<String?>(null); private set
     var cart by mutableStateOf<Map<Int, Int>>(emptyMap()); private set
     var busy by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
@@ -71,11 +73,13 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     init { if (signedIn) refresh() }
     fun login(login: String, password: String) = run { busy = true; error = null; viewModelScope.launch { try { val response = api.login(LoginRequest(login.trim(), password)); if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect."; return@launch }; val result = response.body()?.data ?: error("Empty login response"); store.token = result.token; user = result.user; try { load() } catch (_: Exception) { error = "Signed in, but the latest menu could not be loaded." } } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection." } finally { busy = false } } }
     fun logout() = viewModelScope.launch { runCatching { api.logout() }; store.clear(); user = null; products = emptyList(); orders = emptyList(); reservations = emptyList() }
-    fun refresh() = viewModelScope.launch { busy = true; error = null; try { products = api.products().data.products } catch (_: Exception) { error = "Could not load the latest menu" }; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] }; busy = false }
-    private suspend fun load() { products = api.products().data.products; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] } }
+    fun refresh() = viewModelScope.launch { busy = true; error = null; try { val catalog = api.products().data; products = catalog.products; gcashQrUrl = catalog.gcash_qr_url } catch (_: Exception) { error = "Could not load the latest menu" }; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] }; busy = false }
+    private suspend fun load() { val catalog = api.products().data; products = catalog.products; gcashQrUrl = catalog.gcash_qr_url; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] } }
     fun sendCode(email: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.sendRegistrationCode(SendCodeRequest(email.trim().lowercase())); check(response.isSuccessful); registrationMessage = "Verification code sent to ${email.trim()}"; done(response.body()?.data?.challenge) } catch (_: Exception) { error = "Could not send the verification code"; done(null) } finally { busy = false } }
     fun verifyCode(challenge: String, email: String, code: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.verifyRegistrationCode(VerifyCodeRequest(challenge, email.trim().lowercase(), code)); check(response.isSuccessful); done(response.body()?.data?.registration_token) } catch (_: Exception) { error = "The verification code is invalid or expired"; done(null) } finally { busy = false } }
     fun register(request: RegisterRequest, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.register(request); check(response.isSuccessful); registrationMessage = "Account created. You can now log in."; done(true) } catch (_: Exception) { error = "Could not create the account. Check your details."; done(false) } finally { busy = false } }
+    fun loadOrder(id: Int, done: (Order?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.order(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this order"; done(null) } finally { busy = false } }
+    fun loadReservation(id: Int, done: (Reservation?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.reservation(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this reservation"; done(null) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
     fun placeOrder(payment: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createOrder(mapOf("items" to cart.map { mapOf("product_id" to it.key, "quantity" to it.value) }, "payment_method" to payment)); check(response.isSuccessful); cart = emptyMap(); orders = api.orders().data; done(true) } catch (e: Exception) { error = "Order could not be placed"; done(false) } finally { busy = false } }
@@ -108,6 +112,8 @@ fun KermitsApp(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
+    var selectedOrder by remember { mutableStateOf<Order?>(null) }
+    var selectedReservation by remember { mutableStateOf<Reservation?>(null) }
     if (!vm.signedIn) {
         if (registering) RegistrationScreen(vm, onBack = { registering = false }) else LoginScreen(vm, login, { login = it }, password, { password = it }, onRegister = { registering = true })
         return
@@ -118,14 +124,16 @@ fun KermitsApp(vm: AppViewModel) {
             Spacer(Modifier.height(18.dp))
             when (tab) {
                 0 -> MenuScreen(vm, payment, { payment = it }, { message -> orderMessage = message })
-                1 -> HistoryScreen("Your orders", vm.orders.map { "#${it.id}  ${money(it.total)}  ${it.payment_status}" })
-                2 -> ReservationScreen(vm) { message -> orderMessage = message }
+                1 -> HistoryScreen("Your orders", vm.orders.map { "#${it.id}  ${money(it.total)}  ${it.payment_status}" }, onClick = { vm.loadOrder(it) { selectedOrder = it } })
+                2 -> ReservationScreen(vm, onDetail = { id -> vm.loadReservation(id) { selectedReservation = it } }) { message -> orderMessage = message }
                 else -> { Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(22.dp)); OutlinedButton(onClick = { vm.logout() }) { Text("Sign out") } }
             }
             orderMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
         }
     }
+    selectedOrder?.let { DetailDialog("Order #${it.id}", "${money(it.total)} · ${it.payment_status}", it.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedOrder = null } }
+    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservation.reservation_at, "Payment: ${reservation.payment_method}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
 }
 
 @Composable
@@ -208,6 +216,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     Text("Today's menu", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     Text("Prepared fresh for every guest.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(14.dp)); OutlinedTextField(query, { query = it }, placeholder = { Text("Search menu") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+    vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(120.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
     Spacer(Modifier.height(10.dp)); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("All") + vm.products.mapNotNull { it.category }.distinct().forEach { category -> FilterChip(selected = if (category == "All") query.isBlank() else query == category, onClick = { query = if (category == "All") "" else category }, label = { Text(category) }, modifier = Modifier.padding(end = 8.dp)) } }
     Spacer(Modifier.height(8.dp))
     filtered.groupBy { it.category ?: "Favorites" }.forEach { (category, items) ->
@@ -222,14 +231,15 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     if (vm.cart.isNotEmpty()) { Surface(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp), color = Color(0xFF202124), contentColor = Color.White) { Column(Modifier.padding(16.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${vm.cart.values.sum()} item(s) in your order", fontWeight = FontWeight.Bold); Text(money(vm.cart.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum())) }; Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") }) }; Button(onClick = { vm.placeOrder(payment) { ok -> setMessage(if (ok) "Order placed successfully." else "Order could not be placed.") } }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB5C019), contentColor = Color(0xFF202124))) { Text("Place order") } } } }
 }
 
-@Composable private fun HistoryScreen(title: String, rows: List<String>) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp)); if (rows.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else rows.forEach { row -> ListItem(headlineContent = { Text(row) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) } }
-@Composable private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
+@Composable private fun HistoryScreen(title: String, rows: List<String>, onClick: ((Int) -> Unit)? = null) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp)); if (rows.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else rows.forEach { row -> val id = Regex("#?(\\d+)").find(row)?.groupValues?.get(1)?.toIntOrNull(); ListItem(headlineContent = { Text(row) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { if (id != null) onClick?.invoke(id) }) } }
+@Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { TextButton(onClick = close) { Text("Close") } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
+@Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
     var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }
     Text("Plan your visit", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Table reservations are reviewed by our team.", color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(16.dp))
     OutlinedTextField(phone, { phone = it }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
     OutlinedTextField(date, { date = it }, label = { Text("Date and time (YYYY-MM-DD HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
     Text("Table size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text(value) }, modifier = Modifier.padding(end = 6.dp)) } }
     Spacer(Modifier.height(16.dp)); Button(onClick = { vm.placeReservation(phone, date, size) { ok -> setMessage(if (ok) "Reservation request submitted." else "Reservation could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Request reservation") }
-    Spacer(Modifier.height(26.dp)); HistoryScreen("Recent reservations", vm.reservations.map { "${it.reference}  ${it.status}  ${money(it.total_amount)}" })
+    Spacer(Modifier.height(26.dp)); HistoryScreen("Recent reservations", vm.reservations.map { "#${it.id}  ${it.reference}  ${it.status}  ${money(it.total_amount)}" }, onDetail)
 }
 private fun money(value: Double) = "₱${String.format(Locale.US, "%,.2f", value)}"
