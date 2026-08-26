@@ -1,5 +1,8 @@
 package com.getcooked.kermits
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,6 +44,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import com.squareup.moshi.Moshi
 import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,7 +88,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
     fun placeOrder(payment: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createOrder(mapOf("items" to cart.map { mapOf("product_id" to it.key, "quantity" to it.value) }, "payment_method" to payment)); check(response.isSuccessful); cart = emptyMap(); orders = api.orders().data; done(true) } catch (e: Exception) { error = "Order could not be placed"; done(false) } finally { busy = false } }
-    fun placeReservation(phone: String, at: String, size: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createReservation("table".formPart(), size.formPart(), phone.formPart(), at.formPart(), null, null, "cash".formPart(), null); check(response.isSuccessful); reservations = api.reservations().data; done(true) } catch (e: Exception) { error = "Reservation could not be submitted"; done(false) } finally { busy = false } }
+    fun placeReservation(phone: String, at: String, size: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.createReservation("table".formPart(), size.formPart(), phone.formPart(), at.formPart(), null, null, "cash".formPart(), null); if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "Reservation details are invalid"; done(false); return@launch }; reservations = api.reservations().data; done(true) } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection."; done(false) } finally { busy = false } }
     companion object {
         private fun apiError(body: String?): String? = body?.let { runCatching { Moshi.Builder().build().adapter(ApiError::class.java).fromJson(it) }.getOrNull() }?.let { apiError -> apiError.message ?: apiError.errors?.values?.flatten()?.firstOrNull() }
         fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory {
@@ -234,10 +239,10 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
 @Composable private fun HistoryScreen(title: String, rows: List<String>, onClick: ((Int) -> Unit)? = null) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp)); if (rows.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else rows.forEach { row -> val id = Regex("#?(\\d+)").find(row)?.groupValues?.get(1)?.toIntOrNull(); ListItem(headlineContent = { Text(row) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { if (id != null) onClick?.invoke(id) }) } }
 @Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { TextButton(onClick = close) { Text("Close") } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
 @Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
-    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }
+    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance() }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
     Text("Plan your visit", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Table reservations are reviewed by our team.", color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(16.dp))
     OutlinedTextField(phone, { phone = it }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
-    OutlinedTextField(date, { date = it }, label = { Text("Date and time (YYYY-MM-DD HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
+    OutlinedTextField(date, {}, label = { Text("Preferred date and time") }, placeholder = { Text("Choose your schedule") }, readOnly = true, singleLine = true, modifier = Modifier.fillMaxWidth().clickable { DatePickerDialog(context, { _, year, month, day -> calendar.set(year, month, day); TimePickerDialog(context, { _, hour, minute -> calendar.set(Calendar.HOUR_OF_DAY, hour); calendar.set(Calendar.MINUTE, minute); date = dateFormat.format(calendar.time) }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), false).show() }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show() }); Spacer(Modifier.height(10.dp))
     Text("Table size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text(value) }, modifier = Modifier.padding(end = 6.dp)) } }
     Spacer(Modifier.height(16.dp)); Button(onClick = { vm.placeReservation(phone, date, size) { ok -> setMessage(if (ok) "Reservation request submitted." else "Reservation could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Request reservation") }
     Spacer(Modifier.height(26.dp)); HistoryScreen("Recent reservations", vm.reservations.map { "#${it.id}  ${it.reference}  ${it.status}  ${money(it.total_amount)}" }, onDetail)
