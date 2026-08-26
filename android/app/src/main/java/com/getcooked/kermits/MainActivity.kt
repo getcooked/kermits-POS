@@ -104,17 +104,7 @@ fun KermitsApp(vm: AppViewModel) {
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
     if (!vm.signedIn) {
-        Column(Modifier.fillMaxSize().background(Color(0xFF171817)).padding(28.dp), verticalArrangement = Arrangement.Center) {
-            BrandLogo(Modifier.size(88.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
-            Spacer(Modifier.height(22.dp)); Text("KERMIT'S", style = MaterialTheme.typography.labelLarge, color = Color(0xFFB5C019), letterSpacing = 2.sp)
-            Text("Good food.\nGood company.", style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(12.dp)); Text("Sign in to order your favorites and plan your next visit.", color = Color(0xFFB7BAB5))
-            Spacer(Modifier.height(28.dp))
-            OutlinedTextField(login, { login = it }, label = { Text("Username or email address") }, singleLine = true, colors = loginFieldColors(), modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp)); OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), colors = loginFieldColors(), modifier = Modifier.fillMaxWidth())
-            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp)) }
-            Spacer(Modifier.height(18.dp)); Button(onClick = { vm.login(login, password) }, enabled = !vm.busy && login.isNotBlank() && password.isNotBlank(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold); Text("→", fontSize = 22.sp) } }
-        }
+        LoginScreen(vm, login, { login = it }, password, { password = it })
         return
     }
     Scaffold(containerColor = Color(0xFFF0F0F0), bottomBar = { NavigationBar(containerColor = Color(0xFF202124)) { listOf("Menu", "Orders", "Reservations", "Account").forEachIndexed { index, label -> NavigationBarItem(selected = tab == index, onClick = { tab = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF202124), selectedTextColor = Color.White, indicatorColor = Color(0xFFB5C019), unselectedIconColor = Color(0xFFB7BAB5), unselectedTextColor = Color(0xFFB7BAB5)), icon = { Icon(listOf(Icons.Default.Home, Icons.Default.ReceiptLong, Icons.Default.CalendarMonth, Icons.Default.Person)[index], label) }, label = { Text(label) }) } } }) { padding ->
@@ -129,6 +119,53 @@ fun KermitsApp(vm: AppViewModel) {
             }
             orderMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFF5F5EF))) {
+        val wide = maxWidth >= 600.dp
+        if (wide) Row(Modifier.fillMaxSize()) {
+            BrandPanel(Modifier.weight(0.96f).fillMaxHeight())
+            LoginForm(vm, login, setLogin, password, setPassword, Modifier.weight(1.04f).fillMaxHeight())
+        } else Column(Modifier.fillMaxSize()) {
+            BrandPanel(Modifier.fillMaxWidth().heightIn(min = 205.dp, max = 270.dp))
+            LoginForm(vm, login, setLogin, password, setPassword, Modifier.fillMaxWidth().weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun BrandPanel(modifier: Modifier) {
+    Column(modifier.background(Color(0xFF171817)).padding(horizontal = 28.dp, vertical = 30.dp)) {
+        BrandLogo(Modifier.size(84.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(6.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text("RESTAURANT POS", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Text("Simple tools for\nbetter service.", color = Color.White, fontSize = 34.sp, lineHeight = 37.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(14.dp))
+            Text("Manage sales, products, inventory, reports, and receipts from one reliable system.", color = Color(0xFFB9BCB5), fontSize = 15.sp, lineHeight = 23.sp)
+        }
+        Text("Time-honored recipes since 2000", color = Color(0xFF858982), fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, modifier: Modifier) {
+    Column(modifier.background(Color(0xFFF7F7F1)).verticalScroll(rememberScrollState()).padding(horizontal = 26.dp, vertical = 34.dp), verticalArrangement = Arrangement.Center) {
+        Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).align(Alignment.CenterHorizontally)) {
+            Text("WELCOME BACK", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp)); Text("Log in to your account", color = Color(0xFF202124), fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp)); Text("Enter your details to continue to Kermit’s.", color = Color(0xFF687286), fontSize = 15.sp)
+            Spacer(Modifier.height(28.dp))
+            OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
+            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = false, onCheckedChange = null); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(15.dp)); Button(onClick = { vm.login(login, password) }, enabled = !vm.busy && login.isNotBlank() && password.isNotBlank(), shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
+            Spacer(Modifier.height(18.dp)); Text("New customer? Create an account on the Kermit’s web app.", color = Color(0xFF687286), fontSize = 12.sp, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
