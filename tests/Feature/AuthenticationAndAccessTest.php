@@ -235,6 +235,25 @@ class AuthenticationAndAccessTest extends TestCase
         $this->actingAs($cashier)->get('/inventory')->assertForbidden();
     }
 
+    public function test_super_admin_dashboard_uses_the_complete_shared_navigation(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        $this->actingAs($superAdmin)->get('/dashboard')
+            ->assertOk()
+            ->assertSee(route('dashboard'), false)
+            ->assertSee(route('superadmin.security.edit'), false)
+            ->assertSee(route('cashier'), false)
+            ->assertSee(route('reports'), false)
+            ->assertSee(route('inventory.index'), false)
+            ->assertSee(route('reservations.index'), false)
+            ->assertSee(route('products.index'), false)
+            ->assertSee(route('admins.index'), false)
+            ->assertSee(route('cashiers.index'), false)
+            ->assertSee(route('settings.payment.edit'), false)
+            ->assertSee(route('customers.index'), false);
+    }
+
     public function test_invalid_credentials_are_rejected(): void
     {
         $this->post('/login', [
