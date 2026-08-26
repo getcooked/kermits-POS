@@ -7,8 +7,8 @@
         <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ route('app.download') }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span><form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg></button></form></div>
     </nav>
     <header><div class="shop-header-main"><div class="shop-title"><h1>Menu</h1><a class="menu-reserve" data-menu-reserve href="{{ route('reservations.create') }}">Reserve</a></div><div class="shop-search"><button type="button" aria-label="Search products"><span></span></button><input id="shop-search" type="search" placeholder="Search products"></div></div><div class="shop-category-row"><button class="category-arrow" type="button" data-shop-scroll="-1" aria-label="Scroll categories left">‹</button><div class="shop-category-tabs"><button class="active" type="button" data-shop-category="all">All</button>@foreach($products->pluck('category')->unique()->values() as $category)<button type="button" data-shop-category="{{ $category }}">{{ $category }}</button>@endforeach</div><button class="category-arrow" type="button" data-shop-scroll="1" aria-label="Scroll categories right">›</button></div></header>
-    @if($errors->any())<div class="error shop-error">{{ $errors->first() }}</div>@endif
-    <form method="POST" action="{{ route('shop.orders.store') }}">@csrf
+    @if($errors->any())<div class="error shop-error" role="alert">{{ $errors->first() }}</div>@endif
+    <form method="POST" action="{{ route('shop.orders.store') }}" enctype="multipart/form-data" data-shop-order-form>@csrf
         <div class="customer-order-layout"><section><div class="shop-grid">
             @forelse($products->groupBy('category') as $category => $items)
                 @foreach($items as $product)
@@ -20,24 +20,68 @@
             @empty
                 <p>No menu items are available.</p>
             @endforelse
-        </div></section><aside class="customer-cart"><h2>Current Order</h2><div class="customer-cart-name">{{ auth()->user()->name }}</div><div id="customer-cart-items" class="customer-cart-items"><p>No items selected.</p></div><div class="customer-cart-total"><span>Total</span><strong id="customer-cart-total">&#8369;0.00</strong></div><button type="button" data-checkout-open>Continue</button></aside></div>
-        <div class="order-bar"><div><strong>Ready to order?</strong><small>Review your items and choose Walk In Pay or GCash.</small></div><button type="button" data-checkout-open>Review & payment <span>&rarr;</span></button></div>
-        <div class="checkout-modal" data-checkout-modal hidden>
-            <button class="checkout-backdrop" type="button" aria-label="Close payment" data-checkout-close></button>
-            <section class="checkout-panel" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
-                <header><div><p>ORDER CHECKOUT</p><h2 id="checkout-title">Choose payment method</h2><span>Your selected products will be reserved after submission.</span></div><button type="button" aria-label="Close payment" data-checkout-close>&times;</button></header>
-                <div class="checkout-options">
-                    <label><input type="radio" name="payment_method" value="cash" @checked(old('payment_method','cash')==='cash')><span><strong>Walk In Pay</strong><small>Pay the exact total at the counter when collecting your order.</small></span></label>
-                    <label><input type="radio" name="payment_method" value="gcash" @checked(old('payment_method')==='gcash')><span><strong>GCash</strong><small>Scan the QR and enter the 13-digit transaction reference.</small></span></label>
+        </div></section><aside class="customer-cart"><h2>Current Order</h2><div class="customer-cart-name">{{ auth()->user()->name }}</div><div id="customer-cart-items" class="customer-cart-items"><p>No items selected.</p></div><div class="customer-cart-total"><span>Total</span><strong id="customer-cart-total">&#8369;0.00</strong></div><p class="cart-error" data-cart-error role="alert" hidden></p><button type="button" data-checkout-open>Place Order</button></aside></div>
+        <div class="order-bar"><div><strong>Ready to order?</strong><small>Place the order, reserve your table, then choose payment.</small></div><button type="button" data-checkout-open>Place Order <span>&rarr;</span></button></div>
+
+        <dialog class="checkout-modal" data-checkout-modal aria-labelledby="checkout-title">
+            <section class="checkout-panel">
+                <div class="checkout-head">
+                    <div><p>ORDER CHECKOUT</p><h2 id="checkout-title">Complete your visit</h2><span>Reserve a table first. Payment comes last.</span></div>
+                    <button type="button" aria-label="Close checkout" data-checkout-close>&times;</button>
                 </div>
-                <div class="gcash-checkout" data-gcash-fields>
-                    <div class="shop-qr"><img src="{{ $gcashQrPath ? asset('storage/'.$gcashQrPath) : asset('gcash-qr-placeholder.svg') }}" alt="Kermit's GCash QR code"><small>{{ $gcashQrPath ? 'Scan using your GCash app.' : 'The Super Admin has not uploaded the GCash QR yet.' }}</small></div>
-                    <div class="field"><label for="payment_reference">GCash transaction reference</label><input class="control" id="payment_reference" name="payment_reference" value="{{ old('payment_reference') }}" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" placeholder="Enter exactly 13 digits"><small>Use the reference shown after your successful GCash payment.</small></div>
-                </div>
-                <div class="checkout-note" data-payment-note></div>
-                <button class="place-order-button" type="submit">Place my order <span>&rarr;</span></button>
+
+                <ol class="checkout-progress" aria-label="Checkout progress">
+                    <li class="complete"><span>1</span>Order</li>
+                    <li data-progress-step="reservation"><span>2</span>Reservation</li>
+                    <li data-progress-step="payment"><span>3</span>Payment</li>
+                    <li><span>4</span>Receipt</li>
+                </ol>
+
+                <section class="checkout-step" data-checkout-step="reservation">
+                    <div class="checkout-step-title"><p>STEP 2 OF 4</p><h3>Reserve a table</h3><span>Your selected food is already in the order, so only the table details are needed here.</span></div>
+
+                    <div class="checkout-order-summary">
+                        <div><strong>Your order</strong><b data-modal-order-total>&#8369;0.00</b></div>
+                        <div class="checkout-order-lines" data-modal-order-lines></div>
+                    </div>
+
+                    <div class="checkout-fields">
+                        <div class="field"><label for="checkout_name">Full name</label><input class="control" id="checkout_name" value="{{ auth()->user()->name }}" readonly></div>
+                        <div class="field"><label for="checkout_phone">Phone number</label><input class="control" id="checkout_phone" name="phone" type="tel" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11" placeholder="09XXXXXXXXX" value="{{ old('phone', auth()->user()->phone) }}" required><small>11 digits starting with 09</small></div>
+                        <div class="field"><label for="checkout_table_size">Table size</label><select class="control" id="checkout_table_size" name="table_size" required>@foreach($tableFees as $size => $fee)<option value="{{ $size }}" data-fee="{{ $fee }}" @selected((int) old('table_size', 2) === $size)>{{ $size }} {{ $size === 1 ? 'seat' : 'seats' }} &middot; &#8369;{{ number_format($fee, 2) }}</option>@endforeach</select></div>
+                        <div class="field"><label for="checkout_reservation_at">Date and time</label><input class="control" id="checkout_reservation_at" name="reservation_at" type="datetime-local" min="{{ now()->addHour()->format('Y-m-d\TH:i') }}" value="{{ old('reservation_at') }}" required></div>
+                        <div class="field full"><label for="checkout_notes">Additional notes (optional)</label><textarea class="control" id="checkout_notes" name="notes" rows="3" placeholder="Accessibility needs, seating preferences, or other notes">{{ old('notes') }}</textarea></div>
+                    </div>
+
+                    <div class="checkout-actions"><button type="button" class="checkout-secondary" data-checkout-close>Back to menu</button><button type="button" class="checkout-primary" data-reservation-submit>Submit reservation <span>&rarr;</span></button></div>
+                </section>
+
+                <section class="checkout-step" data-checkout-step="payment" hidden>
+                    <div class="checkout-step-title"><p>STEP 3 OF 4</p><h3>Payment</h3><span>Choose how you will pay, then continue directly to your receipt.</span></div>
+
+                    <div class="payment-total-card">
+                        <div><span>Food order</span><strong data-payment-order-total>&#8369;0.00</strong></div>
+                        <div><span>Table reservation</span><strong data-payment-reservation-fee>&#8369;0.00</strong></div>
+                        <div><b>Total due</b><b data-payment-total>&#8369;0.00</b></div>
+                    </div>
+
+                    <fieldset class="checkout-payment-fieldset"><legend>Payment method</legend><div class="checkout-options">
+                        <label><input type="radio" name="payment_method" value="cash" @checked(old('payment_method','cash')==='cash')><span><strong>Walk In Pay</strong><small>Pay the total at the counter when you arrive.</small></span></label>
+                        <label><input type="radio" name="payment_method" value="gcash" @checked(old('payment_method')==='gcash')><span><strong>GCash</strong><small>Scan the QR and submit your payment details.</small></span></label>
+                    </div></fieldset>
+
+                    <div class="gcash-checkout" data-gcash-fields>
+                        <div class="shop-qr"><img src="{{ $gcashQrPath ? asset('storage/'.$gcashQrPath) : asset('gcash-qr-placeholder.svg') }}" alt="Kermit's GCash QR code"><small>{{ $gcashQrPath ? 'Scan using your GCash app.' : 'The Super Admin has not uploaded the GCash QR yet.' }}</small></div>
+                        <div class="gcash-details">
+                            <div class="field"><label for="payment_reference">GCash transaction reference</label><input class="control" id="payment_reference" name="payment_reference" value="{{ old('payment_reference') }}" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" placeholder="Enter exactly 13 digits"><small>Use the 13-digit reference shown by GCash.</small></div>
+                            <div class="field"><label for="payment_proof">Payment proof</label><input class="control" id="payment_proof" name="payment_proof" type="file" accept="image/jpeg,image/png,image/webp"><small>Upload a JPG, PNG, or WebP image up to 5 MB.</small></div>
+                        </div>
+                    </div>
+                    <div class="checkout-note" data-payment-note aria-live="polite"></div>
+                    <div class="checkout-actions"><button type="button" class="checkout-secondary" data-payment-back>&larr; Reservation</button><button class="checkout-primary" type="submit">Confirm payment &amp; view receipt <span>&rarr;</span></button></div>
+                </section>
             </section>
-        </div>
+        </dialog>
     </form>
 </main>
 <style>
@@ -65,16 +109,94 @@
 .shop-grid article>div{padding-bottom:18px!important}.shop-price{display:grid!important;grid-template-columns:1fr auto!important;align-items:end!important;gap:14px!important;margin:0!important;padding-right:48px!important}.shop-price strong{white-space:nowrap!important}.shop-price span{display:block!important;min-width:max-content!important;color:#596273!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:right!important;white-space:nowrap!important}.shop-add{right:14px!important;bottom:12px!important}@media(max-width:430px){.shop-price{padding-right:46px!important;gap:8px!important}.shop-price span{font-size:11px!important}}
 .customer-app-link b{display:none}.customer-app-link.disabled{opacity:.55;cursor:default;pointer-events:none}@media(max-width:900px){.customer-app-link span{display:none}.customer-app-link b{display:inline;font:inherit}}
 .shop-title{display:flex;align-items:center;gap:14px}.menu-reserve{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 16px;border-radius:10px;background:#202124;color:#fff;text-decoration:none;font-size:13px;font-weight:850}.menu-reserve:hover{background:#36383b}@media(max-width:650px){.shop-title{justify-content:space-between}.menu-reserve{min-height:38px;padding:8px 14px}}
+.cart-error{margin:12px 0 0;padding:10px;border-radius:9px;background:#fff0f0;color:#b42318;font-size:12px;font-weight:700}.checkout-modal:not([open]){display:none!important}.checkout-modal[open]{display:block}.checkout-modal{inset:0;width:min(760px,calc(100% - 24px));height:auto;max-height:min(92dvh,900px);margin:auto;padding:0;border:0;border-radius:20px;background:#f8f7f1;color:#171817;overflow:hidden;box-shadow:0 28px 90px rgba(0,0,0,.35)}.checkout-modal::backdrop{background:rgba(12,13,12,.66);backdrop-filter:blur(4px)}.checkout-panel{display:block;box-sizing:border-box;width:100%;height:auto;max-height:min(92dvh,900px);padding:28px;overflow-y:auto;background:#f8f7f1;box-shadow:none;scrollbar-width:thin}.checkout-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:20px;border-bottom:1px solid #dfe1d8}.checkout-head p,.checkout-step-title p{margin:0 0 6px;color:#747d00;font-size:10px;font-weight:900;letter-spacing:.14em}.checkout-head h2{margin:0;font-size:27px;letter-spacing:-.03em}.checkout-head span,.checkout-step-title>span{display:block;margin-top:6px;color:#6e746b;font-size:13px;line-height:1.45}.checkout-head>button{width:40px;height:40px;flex:0 0 40px;border:1px solid #d2d5cb;border-radius:10px;background:#fff;font-size:24px;cursor:pointer}.checkout-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:20px 0 24px;padding:0;list-style:none}.checkout-progress li{display:flex;align-items:center;gap:7px;color:#858a81;font-size:11px;font-weight:800}.checkout-progress li span{width:25px;height:25px;display:grid;place-items:center;border:1px solid #d3d6cc;border-radius:50%;background:#fff}.checkout-progress li.active{color:#171817}.checkout-progress li.active span{border-color:#171817;background:#171817;color:#fff}.checkout-progress li.complete{color:#687100}.checkout-progress li.complete span{border-color:#c7d300;background:#e9edb9;color:#5f6700}.checkout-step[hidden]{display:none!important}.checkout-step-title{margin-bottom:18px}.checkout-step-title h3{margin:0;font-size:24px;letter-spacing:-.03em}.checkout-order-summary,.payment-total-card{margin-bottom:20px;padding:16px;border:1px solid #dde0d6;border-radius:14px;background:#fff}.checkout-order-summary>div:first-child,.payment-total-card>div{display:flex;align-items:center;justify-content:space-between;gap:16px}.checkout-order-summary>div:first-child{padding-bottom:10px;border-bottom:1px solid #eceee8}.checkout-order-lines{display:grid;gap:7px;padding-top:10px}.checkout-order-lines>div{display:flex;justify-content:space-between;gap:16px;color:#61675f;font-size:12px}.checkout-order-lines>div strong{color:#252724}.checkout-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.checkout-fields .field{margin:0}.checkout-fields .full{grid-column:1/-1}.checkout-fields label,.gcash-details label{display:block;margin-bottom:6px;font-size:12px;font-weight:800}.checkout-fields small,.gcash-details small{display:block;margin-top:5px;color:#737970;font-size:10px}.checkout-fields .control,.gcash-details .control{box-sizing:border-box;width:100%}.checkout-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.checkout-actions button{min-height:48px;padding:12px 17px;border-radius:11px;font-weight:850;cursor:pointer}.checkout-secondary{border:1px solid #ccd0c5;background:#fff;color:#242624}.checkout-primary{min-width:210px;border:0;background:#171817;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:22px}.checkout-primary:hover{background:#30322e}.payment-total-card{display:grid;gap:9px}.payment-total-card>div{color:#666c63;font-size:13px}.payment-total-card>div:last-child{margin-top:5px;padding-top:12px;border-top:1px solid #dfe2d8;color:#171817;font-size:17px}.checkout-payment-fieldset{margin:0;padding:0;border:0}.checkout-payment-fieldset legend{margin-bottom:9px;font-size:12px;font-weight:850}.gcash-details{display:grid;gap:13px}.checkout-note{margin:16px 0 0}.checkout-options input:disabled+span{opacity:.65}@media(max-width:650px){.checkout-modal{width:calc(100% - 12px);max-height:96dvh;border-radius:16px}.checkout-panel{max-height:96dvh;padding:20px 16px}.checkout-progress{grid-template-columns:repeat(4,max-content);justify-content:space-between}.checkout-progress li{display:grid;justify-items:center;font-size:9px}.checkout-fields{grid-template-columns:1fr}.checkout-fields .full{grid-column:auto}.checkout-actions{display:grid;grid-template-columns:1fr}.checkout-primary{min-width:0}.checkout-secondary{order:2}.gcash-checkout{grid-template-columns:1fr}.shop-qr img{width:min(210px,100%)}}
 </style>
 
 <script>
 (() => {
-    const modal=document.querySelector('[data-checkout-modal]'),open=document.querySelector('[data-checkout-open]'),closers=document.querySelectorAll('[data-checkout-close]'),methods=document.querySelectorAll('input[name="payment_method"]'),gcash=document.querySelector('[data-gcash-fields]'),reference=document.getElementById('payment_reference'),note=document.querySelector('[data-payment-note]');
-    if(!modal)return;
-    const sync=()=>{const method=document.querySelector('input[name="payment_method"]:checked')?.value||'cash',isGcash=method==='gcash';gcash.hidden=!isGcash;reference.required=isGcash;reference.disabled=!isGcash;note.textContent=isGcash?'Your order will remain pending while the GCash reference is checked.':'Bring payment to the counter when collecting your order.'};
-    const show=()=>{modal.hidden=false;document.body.style.overflow='hidden';sync()};const hide=()=>{modal.hidden=true;document.body.style.overflow=''};
-    open.addEventListener('click',show);closers.forEach(button=>button.addEventListener('click',hide));methods.forEach(method=>method.addEventListener('change',sync));reference.addEventListener('input',()=>reference.value=reference.value.replace(/\D/g,'').slice(0,13));sync();
-    @if($errors->any()) show(); @endif
+    const form=document.querySelector('[data-shop-order-form]'),dialog=document.querySelector('[data-checkout-modal]');
+    if(!form||!dialog)return;
+
+    const cards=[...document.querySelectorAll('[data-shop-card]')],openers=[...document.querySelectorAll('[data-checkout-open]')],closers=[...dialog.querySelectorAll('[data-checkout-close]')],reservationStep=dialog.querySelector('[data-checkout-step="reservation"]'),paymentStep=dialog.querySelector('[data-checkout-step="payment"]'),reservationSubmit=dialog.querySelector('[data-reservation-submit]'),paymentBack=dialog.querySelector('[data-payment-back]'),paymentControls=[...paymentStep.querySelectorAll('input,select,textarea')],methods=[...paymentStep.querySelectorAll('input[name="payment_method"]')],gcash=dialog.querySelector('[data-gcash-fields]'),reference=document.getElementById('payment_reference'),proof=document.getElementById('payment_proof'),note=dialog.querySelector('[data-payment-note]'),table=document.getElementById('checkout_table_size'),cartError=document.querySelector('[data-cart-error]'),modalLines=dialog.querySelector('[data-modal-order-lines]'),money=value=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(value);
+    let opener=null;
+
+    const selectedItems=()=>cards.map(card=>({name:card.dataset.name,price:Number(card.dataset.price),quantity:Number(card.querySelector('.shop-quantity').value)||0})).filter(item=>item.quantity>0);
+    const orderTotal=()=>selectedItems().reduce((sum,item)=>sum+item.price*item.quantity,0);
+    const reservationFee=()=>Number(table.selectedOptions[0]?.dataset.fee||0);
+
+    function renderSummary(){
+        const items=selectedItems();
+        modalLines.replaceChildren();
+        items.forEach(item=>{
+            const row=document.createElement('div'),label=document.createElement('span'),amount=document.createElement('strong');
+            label.textContent=`${item.quantity} × ${item.name}`;
+            amount.textContent=money(item.price*item.quantity);
+            row.append(label,amount);
+            modalLines.append(row);
+        });
+        dialog.querySelector('[data-modal-order-total]').textContent=money(orderTotal());
+        dialog.querySelector('[data-payment-order-total]').textContent=money(orderTotal());
+        dialog.querySelector('[data-payment-reservation-fee]').textContent=money(reservationFee());
+        dialog.querySelector('[data-payment-total]').textContent=money(orderTotal()+reservationFee());
+    }
+
+    function syncPayment(){
+        const isPaymentStep=!paymentStep.hidden,isGcash=form.querySelector('input[name="payment_method"]:checked')?.value==='gcash';
+        gcash.hidden=!isGcash;
+        reference.disabled=!isPaymentStep||!isGcash;
+        proof.disabled=!isPaymentStep||!isGcash;
+        reference.required=isPaymentStep&&isGcash;
+        proof.required=isPaymentStep&&isGcash;
+        note.textContent=isGcash?'Your GCash details will remain pending until they are verified.':'Bring payment to the counter when you arrive for your reservation.';
+    }
+
+    function setStep(step){
+        const payment=step==='payment';
+        reservationStep.hidden=payment;
+        paymentStep.hidden=!payment;
+        paymentControls.forEach(control=>control.disabled=!payment);
+        dialog.querySelectorAll('[data-progress-step]').forEach(item=>item.classList.toggle('active',item.dataset.progressStep===step));
+        dialog.querySelector('[data-progress-step="reservation"]').classList.toggle('complete',payment);
+        renderSummary();
+        syncPayment();
+        requestAnimationFrame(()=>dialog.querySelector(payment?'input[name="payment_method"]:checked':'#checkout_phone')?.focus());
+    }
+
+    function openCheckout(step='reservation',force=false){
+        if(!force&&selectedItems().length===0){
+            cartError.textContent='Select at least one menu item before placing your order.';
+            cartError.hidden=false;
+            return;
+        }
+        cartError.hidden=true;
+        opener=document.activeElement;
+        setStep(step);
+        if(!dialog.open)dialog.showModal();
+    }
+
+    function closeCheckout(){dialog.close()}
+
+    openers.forEach(button=>button.addEventListener('click',()=>openCheckout()));
+    closers.forEach(button=>button.addEventListener('click',closeCheckout));
+    reservationSubmit.addEventListener('click',()=>{
+        const invalid=[...reservationStep.querySelectorAll('input,select,textarea')].find(control=>!control.checkValidity());
+        if(invalid){invalid.reportValidity();return}
+        setStep('payment');
+    });
+    paymentBack.addEventListener('click',()=>setStep('reservation'));
+    methods.forEach(method=>method.addEventListener('change',syncPayment));
+    table.addEventListener('change',renderSummary);
+    reference.addEventListener('input',()=>reference.value=reference.value.replace(/\D/g,'').slice(0,13));
+    document.getElementById('checkout_phone').addEventListener('input',event=>event.target.value=event.target.value.replace(/\D/g,'').slice(0,11));
+    dialog.addEventListener('click',event=>{
+        const bounds=dialog.getBoundingClientRect();
+        if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)closeCheckout();
+    });
+    dialog.addEventListener('close',()=>opener?.focus());
+
+    const reopenStep=@json($errors->hasAny(['payment_method','payment_reference','payment_proof']) ? 'payment' : ($errors->any() ? 'reservation' : null));
+    if(reopenStep)requestAnimationFrame(()=>openCheckout(reopenStep,true));
+    else setStep('reservation');
 })();
 </script>
 

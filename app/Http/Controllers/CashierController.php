@@ -30,7 +30,7 @@ class CashierController extends Controller
             'orders' => Order::query()
                 ->where('payment_status', 'pending')
                 ->whereNotNull('customer_id')
-                ->with(['customer', 'items.product'])
+                ->with(['customer', 'items.product', 'reservation'])
                 ->latest()
                 ->get(),
         ]);
@@ -41,7 +41,7 @@ class CashierController extends Controller
         $this->ensurePendingCustomerOrder($order);
 
         return view('roles.cashier-order-review', [
-            'order' => $order->load(['customer', 'items.product']),
+            'order' => $order->load(['customer', 'items.product', 'reservation']),
         ]);
     }
 
@@ -126,12 +126,15 @@ class CashierController extends Controller
         DB::transaction(function () use ($order, $request): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensurePendingCustomerOrder($lockedOrder);
+            $lockedOrder->load('reservation');
+            $amountDue = $lockedOrder->totalDue();
 
             if ($lockedOrder->payment_method === 'gcash') {
                 if (! preg_match('/^\d{13}$/', (string) $lockedOrder->payment_reference)) {
                     throw ValidationException::withMessages(['payment_reference' => 'A valid 13-digit GCash reference is required.']);
                 }
                 $lockedOrder->update(['payment_status' => 'paid', 'cash_received' => null, 'change_due' => null]);
+                $lockedOrder->reservation?->update(['payment_status' => 'paid']);
 
                 return;
             }
@@ -140,15 +143,16 @@ class CashierController extends Controller
                 'cash_received' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
             ]);
             $cash = round((float) $validated['cash_received'], 2);
-            if ($cash < (float) $lockedOrder->total) {
+            if ($cash < $amountDue) {
                 throw ValidationException::withMessages(['cash_received' => 'Customer cash must cover the complete order total.']);
             }
 
             $lockedOrder->update([
                 'payment_status' => 'paid',
                 'cash_received' => $cash,
-                'change_due' => $cash - (float) $lockedOrder->total,
+                'change_due' => $cash - $amountDue,
             ]);
+            $lockedOrder->reservation?->update(['payment_status' => 'paid']);
         }, attempts: 3);
 
         return redirect()->route('cashier.orders.index')->with('status', 'Complete order payment confirmed. Admin sales dashboards are now updated.');
