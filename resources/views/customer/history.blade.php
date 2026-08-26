@@ -18,7 +18,7 @@
             <a href="{{ route('shop') }}">Menu</a>
             <a class="active" href="{{ route('customer.history') }}" aria-current="page">History</a>
             @if($appDownloadAvailable)
-                <a class="history-app-link" href="{{ route('app.download') }}" download><span>Download app</span><b>App</b></a>
+                <a class="history-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>
             @else
                 <a class="history-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>
             @endif

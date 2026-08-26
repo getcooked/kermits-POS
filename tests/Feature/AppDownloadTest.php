@@ -43,15 +43,26 @@ class AppDownloadTest extends TestCase
     {
         File::put($this->releasePath, 'test apk');
         config()->set('mobile.download_enabled', true);
+        $downloadUrl = route('app.download', ['v' => filemtime($this->releasePath)]);
 
         $this->get('/')
             ->assertOk()
             ->assertSee('Download app')
-            ->assertSee(route('app.download'));
+            ->assertSee($downloadUrl);
 
-        $this->get('/download-app')
+        $response = $this->get($downloadUrl);
+
+        $response
             ->assertOk()
+            ->assertHeader('Pragma', 'no-cache')
+            ->assertHeader('Expires', '0')
             ->assertDownload('Kermits-Restaurant.apk');
+
+        $cacheControl = $response->headers->get('Cache-Control');
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertStringContainsString('no-cache', $cacheControl);
+        $this->assertStringContainsString('must-revalidate', $cacheControl);
+        $this->assertStringContainsString('max-age=0', $cacheControl);
     }
 
     public function test_customer_pages_show_the_current_app_download_state(): void
@@ -67,12 +78,13 @@ class AppDownloadTest extends TestCase
 
         File::put($this->releasePath, 'test apk');
         config()->set('mobile.download_enabled', true);
+        $downloadUrl = route('app.download', ['v' => filemtime($this->releasePath)]);
 
         foreach ($pages as $page) {
             $this->actingAs($customer)->get($page)
                 ->assertOk()
                 ->assertSee('Download app')
-                ->assertSee(route('app.download'));
+                ->assertSee($downloadUrl);
         }
     }
 }

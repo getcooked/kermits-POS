@@ -29,11 +29,18 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(
             ['landing', 'shop.index', 'customer.history', 'reservations.create'],
-            fn ($view) => $view->with(
-                'appDownloadAvailable',
-                config('mobile.download_enabled')
-                    && file_exists(config('mobile.release_path')),
-            ),
+            function ($view): void {
+                $releasePath = config('mobile.release_path');
+                $appDownloadAvailable = config('mobile.download_enabled')
+                    && is_file($releasePath);
+
+                $view->with([
+                    'appDownloadAvailable' => $appDownloadAvailable,
+                    'appDownloadUrl' => $appDownloadAvailable
+                        ? route('app.download', ['v' => filemtime($releasePath)])
+                        : null,
+                ]);
+            },
         );
     }
 }

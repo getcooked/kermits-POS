@@ -51,11 +51,17 @@ class LandingController extends Controller
             404,
         );
 
-        return response()->download(
+        $response = response()->download(
             $this->appReleasePath(),
             'Kermits-Restaurant.apk',
             ['Content-Type' => 'application/vnd.android.package-archive'],
         );
+
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Expires', '0');
+
+        return $response;
     }
 
     private function appReleasePath(): string

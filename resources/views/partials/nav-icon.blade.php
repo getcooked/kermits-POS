@@ -13,5 +13,6 @@
     @case('settings')<path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="m19 13.5 2-1.5-2-1.5-.5-1.3.4-2.5-2.5-.4-1.3-.8L13.5 2 12 4l-1.5.5L8.5 3 7 5l-1.5.5-.4 2.5-1.3.5L2 10l2 1.5v1.5L2.5 15l2 1.5.5 1.3-.4 2.5 2.5.4 1.3.8L10.5 22l1.5-2 1.5-.5 2 1.5 1.5-2 1.5-.5.4-2.5 1.3-.5Z"/>@break
     @case('security')<path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v11H5zM12 14v3"/>@break
     @case('orders')<path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"/>@break
+    @case('activity')<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2M7 4.5 4.5 7"/>@break
 @endswitch
 </svg>
