@@ -1,20 +1,9 @@
 @extends('layouts.app')
 @section('title','Kermit’s Dashboard')
 @section('content')
-<div class="app-shell">
-<aside class="sidebar">
-    <div class="side-brand"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT’S</strong></div>
-    <nav class="side-nav">
-        <a class="active" href="{{ route('dashboard') }}">@include('partials.nav-icon',['name'=>'home']) Dashboard</a>
-        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>@endif
-        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('reports') }}">@include('partials.nav-icon',['name'=>'reports']) Reporting</a>@endif
-        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Catalog</a><a href="{{ route('inventory.index') }}">@include('partials.nav-icon',['name'=>'inventory']) Inventory</a>@endif
-        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('customers.index') }}">@include('partials.nav-icon',['name'=>'users']) Customers</a>@endif
-        @if(auth()->user()->hasRole('super_admin'))<a href="{{ route('admins.index') }}">@include('partials.nav-icon',['name'=>'users']) Admin Accounts</a>@endif
-    </nav>
-    <div class="side-user"><span>{{ strtoupper(substr(auth()->user()->name,0,1)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>{{ str(auth()->user()->role)->replace('_',' ')->title() }}</small></div><form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg></button></form></div>
-</aside>
-<main class="workspace">
+<div class="admin-shell">
+@include('partials.admin-sidebar')
+<main class="admin-workspace">
     <header class="dash-head"><div><p>STORE OVERVIEW</p><h1>Hi, here’s what’s happening<br>at Kermit’s</h1></div><time class="date-chip" id="dashboard-date" datetime="{{ now()->toDateString() }}">{{ now()->format('F d, Y') }}</time></header>
     <section class="hero-metrics">
         <div><span>Total sales</span><strong>₱{{ number_format($sales,2) }}</strong><small>Across {{ $ordersCount }} completed orders</small></div>
