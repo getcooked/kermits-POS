@@ -37,6 +37,6 @@ A static QR code is not sufficient payment verification. Use an approved GCash/M
 ## Recommended next security milestones
 
 - Verify production SMTP delivery and add a verified-phone flow when an SMS provider is selected.
-- Add privileged-account audit logs and protection for the last super-admin account.
+- Protect the last super-admin account from deletion and define a retention policy for staff activity logs and IP addresses.
 - Add optional staff multi-factor authentication.
 - Add expiry or cancellation rules for abandoned pending customer orders so reserved stock is restored safely.

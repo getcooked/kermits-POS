@@ -223,7 +223,7 @@ class AuthenticationAndAccessTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
 
-        foreach (['/dashboard', '/customers', '/reports', '/inventory', '/products', '/reservations'] as $path) {
+        foreach (['/dashboard', '/customers', '/reports', '/inventory', '/products', '/reservations', '/activity-logs'] as $path) {
             $this->actingAs($superAdmin)->get($path)->assertOk();
             $this->actingAs($admin)->get($path)->assertForbidden();
         }
@@ -250,6 +250,7 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee(route('products.index'), false)
             ->assertSee(route('admins.index'), false)
             ->assertSee(route('cashiers.index'), false)
+            ->assertSee(route('activity-logs.index'), false)
             ->assertSee(route('settings.payment.edit'), false)
             ->assertSee(route('customers.index'), false);
     }

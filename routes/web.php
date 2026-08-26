@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CashierAccountController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PaymentSettingsController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImageController;
+use App\Http\Controllers\PublicStorageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\SuperAdminSecurityController;
@@ -21,9 +23,9 @@ use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
-Route::view('/app', 'mobile.app')->name('mobile.app');
 Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
 Route::get('/menu-images/{product}', ProductImageController::class)->name('products.image');
+Route::get('/media/{path}', PublicStorageController::class)->where('path', '.*')->name('public.media');
 Route::get('/seeder', [WebSeederController::class, 'show'])->name('web-seeder.show');
 Route::post('/seeder', [WebSeederController::class, 'store'])
     ->middleware('throttle:5,1')
@@ -102,6 +104,8 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('role:super_admin')->group(function (): void {
         Route::get('/staff/security', [SuperAdminSecurityController::class, 'edit'])
             ->name('superadmin.security.edit');
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])
+            ->name('activity-logs.index');
         Route::put('/staff/security/password', [SuperAdminSecurityController::class, 'updatePassword'])
             ->middleware('throttle:5,1')
             ->name('superadmin.security.password.update');

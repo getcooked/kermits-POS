@@ -22,7 +22,7 @@ class MobileCatalogController extends Controller
 
         return response()->json(['data' => [
             'products' => $products,
-            'gcash_qr_url' => $qrPath ? asset('storage/'.$qrPath) : null,
+            'gcash_qr_url' => $qrPath ? route('public.media', ['path' => $qrPath]) : null,
         ]]);
     }
 }
