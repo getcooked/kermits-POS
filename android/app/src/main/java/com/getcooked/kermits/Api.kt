@@ -26,6 +26,8 @@ data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
 data class LoginResponse(val data: LoginData)
 @JsonClass(generateAdapter = true)
+data class ApiError(val message: String? = null, val errors: Map<String, List<String>>? = null)
+@JsonClass(generateAdapter = true)
 data class CatalogData(val products: List<Product>, val gcash_qr_url: String?)
 @JsonClass(generateAdapter = true)
 data class CatalogResponse(val data: CatalogData)
@@ -37,7 +39,7 @@ data class ListReservationsResponse(val data: List<Reservation>)
 fun String.formPart(): RequestBody = toRequestBody("text/plain".toMediaType())
 
 interface KermitsApi {
-    @POST("login") suspend fun login(@Body request: LoginRequest): LoginResponse
+    @POST("login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     @GET("me") suspend fun me(): Map<String, User>
     @POST("logout") suspend fun logout(): Response<Unit>
     @GET("products") suspend fun products(): CatalogResponse

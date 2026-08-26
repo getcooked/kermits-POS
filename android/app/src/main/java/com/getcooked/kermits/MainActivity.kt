@@ -38,6 +38,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import com.squareup.moshi.Moshi
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -67,7 +68,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var error by mutableStateOf<String?>(null); private set
     val signedIn get() = store.token != null
     init { if (signedIn) refresh() }
-    fun login(login: String, password: String) = run { busy = true; viewModelScope.launch { try { val result = api.login(LoginRequest(login, password)); store.token = result.data.token; user = result.data.user; load() } catch (e: Exception) { error = e.message ?: "Unable to sign in" } finally { busy = false } } }
+    fun login(login: String, password: String) = run { busy = true; error = null; viewModelScope.launch { try { val response = api.login(LoginRequest(login.trim(), password)); if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect."; return@launch }; val result = response.body()?.data ?: error("Empty login response"); store.token = result.token; user = result.user; try { load() } catch (_: Exception) { error = "Signed in, but the latest menu could not be loaded." } } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection." } finally { busy = false } } }
     fun logout() = viewModelScope.launch { runCatching { api.logout() }; store.clear(); user = null; products = emptyList(); orders = emptyList(); reservations = emptyList() }
     fun refresh() = viewModelScope.launch { busy = true; try { load() } catch (e: Exception) { error = "Could not load the latest menu" } finally { busy = false } }
     private suspend fun load() { val catalog = api.products().data; products = catalog.products; orders = api.orders().data; reservations = api.reservations().data; user = user ?: api.me()["data"] }
@@ -76,6 +77,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun placeOrder(payment: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createOrder(mapOf("items" to cart.map { mapOf("product_id" to it.key, "quantity" to it.value) }, "payment_method" to payment)); check(response.isSuccessful); cart = emptyMap(); orders = api.orders().data; done(true) } catch (e: Exception) { error = "Order could not be placed"; done(false) } finally { busy = false } }
     fun placeReservation(phone: String, at: String, size: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createReservation("table".formPart(), size.formPart(), phone.formPart(), at.formPart(), null, null, "cash".formPart(), null); check(response.isSuccessful); reservations = api.reservations().data; done(true) } catch (e: Exception) { error = "Reservation could not be submitted"; done(false) } finally { busy = false } }
     companion object {
+        private fun apiError(body: String?): String? = body?.let { runCatching { Moshi.Builder().build().adapter(ApiError::class.java).fromJson(it) }.getOrNull() }?.let { apiError -> apiError.message ?: apiError.errors?.values?.flatten()?.firstOrNull() }
         fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -108,10 +110,10 @@ fun KermitsApp(vm: AppViewModel) {
             Text("Good food.\nGood company.", style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp)); Text("Sign in to order your favorites and plan your next visit.", color = Color(0xFFB7BAB5))
             Spacer(Modifier.height(28.dp))
-            OutlinedTextField(login, { login = it }, label = { Text("Username or email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp)); OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(login, { login = it }, label = { Text("Username or email address") }, singleLine = true, colors = loginFieldColors(), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp)); OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), colors = loginFieldColors(), modifier = Modifier.fillMaxWidth())
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp)) }
-            Spacer(Modifier.height(18.dp)); Button(onClick = { vm.login(login, password) }, enabled = !vm.busy && login.isNotBlank() && password.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(if (vm.busy) "Signing in..." else "Sign in") }
+            Spacer(Modifier.height(18.dp)); Button(onClick = { vm.login(login, password) }, enabled = !vm.busy && login.isNotBlank() && password.isNotBlank(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold); Text("→", fontSize = 22.sp) } }
         }
         return
     }
@@ -130,6 +132,14 @@ fun KermitsApp(vm: AppViewModel) {
         }
     }
 }
+
+@Composable
+private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Color(0xFF8C960C), unfocusedBorderColor = Color(0xFFD5D7CC),
+    focusedLabelColor = Color(0xFF737D00), unfocusedLabelColor = Color(0xFF687286),
+    focusedTextColor = Color(0xFF202124), unfocusedTextColor = Color(0xFF202124),
+    cursorColor = Color(0xFF737D00), focusedContainerColor = Color.White, unfocusedContainerColor = Color.White
+)
 
 @Composable
 private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit) {
