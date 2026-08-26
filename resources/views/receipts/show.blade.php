@@ -35,7 +35,7 @@
                     <div><dt>Date</dt><dd>{{ $order->created_at->format('M d, Y h:i A') }}</dd></div>
                     <div><dt>Customer</dt><dd>{{ $order->customer?->name ?? ($order->user?->hasRole(\App\Models\User::ROLE_CUSTOMER) ? $order->user->name : 'Walk-in Customer') }}</dd></div>
                     <div><dt>Cashier</dt><dd>{{ $order->user?->hasRole(\App\Models\User::ROLE_CASHIER, \App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_SUPER_ADMIN) ? $order->user->name : 'Online order' }}</dd></div>
-                    <div><dt>Payment</dt><dd>{{ ucfirst($order->payment_method) }}</dd></div>
+                    <div><dt>Payment</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
                 </dl>
 
                 <div class="receipt-items">

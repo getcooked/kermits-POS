@@ -17,7 +17,7 @@
                 <div><dt>Order</dt><dd>#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</dd></div>
                 <div><dt>Date</dt><dd>{{ $order->created_at->format('M d, Y h:i A') }}</dd></div>
                 <div><dt>Customer</dt><dd>{{ auth()->user()->name }}</dd></div>
-                <div><dt>Payment</dt><dd>{{ strtoupper($order->payment_method) }}</dd></div>
+                <div><dt>Payment</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
                 <div><dt>Status</dt><dd>Pending {{ $order->payment_method === 'gcash' ? 'payment verification' : 'counter payment' }}</dd></div>
                 @if($order->payment_reference)<div><dt>GCash reference</dt><dd>{{ $order->payment_reference }}</dd></div>@endif
             </dl>
