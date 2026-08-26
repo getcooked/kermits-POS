@@ -7,8 +7,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -16,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import androidx.compose.runtime.*
@@ -43,6 +54,8 @@ class MainActivity : ComponentActivity() {
         setContent { KermitsTheme { KermitsApp(ViewModelProvider(this, AppViewModel.factory(api, store))[AppViewModel::class.java]) } }
     }
 }
+
+private const val BRAND_LOGO_URL = "https://kermits-pos.com/kermits-logo.jpg"
 
 class AppViewModel(private val api: KermitsApi, private val store: SessionStore) : ViewModel() {
     var user by mutableStateOf<User?>(null); private set
@@ -74,7 +87,12 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     }
 }
 
-@Composable fun KermitsTheme(content: @Composable () -> Unit) { MaterialTheme(colorScheme = lightColorScheme(primary = androidx.compose.ui.graphics.Color(0xFF737D00), onPrimary = androidx.compose.ui.graphics.Color.White, background = androidx.compose.ui.graphics.Color(0xFFF4F5EE), surface = androidx.compose.ui.graphics.Color.White), content = content) }
+@Composable fun KermitsTheme(content: @Composable () -> Unit) { MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF737D00), onPrimary = Color.White, background = Color(0xFFF0F0F0), surface = Color.White, onSurface = Color(0xFF202124)), typography = Typography().copy(headlineLarge = Typography().headlineLarge.copy(fontWeight = FontWeight.Bold), headlineMedium = Typography().headlineMedium.copy(fontWeight = FontWeight.Bold)), content = content) }
+
+@Composable
+private fun BrandLogo(modifier: Modifier = Modifier) {
+    AsyncImage(BRAND_LOGO_URL, "Kermit's logo", modifier.clip(androidx.compose.foundation.shape.CircleShape), contentScale = ContentScale.Crop)
+}
 
 @Composable
 fun KermitsApp(vm: AppViewModel) {
@@ -84,10 +102,11 @@ fun KermitsApp(vm: AppViewModel) {
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
     if (!vm.signedIn) {
-        Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center) {
-            Text("KERMIT'S", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text("Good food.\nGood company.", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(12.dp)); Text("Sign in to order your favorites and plan your next visit.")
+        Column(Modifier.fillMaxSize().background(Color(0xFF171817)).padding(28.dp), verticalArrangement = Arrangement.Center) {
+            BrandLogo(Modifier.size(88.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
+            Spacer(Modifier.height(22.dp)); Text("KERMIT'S", style = MaterialTheme.typography.labelLarge, color = Color(0xFFB5C019), letterSpacing = 2.sp)
+            Text("Good food.\nGood company.", style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp)); Text("Sign in to order your favorites and plan your next visit.", color = Color(0xFFB7BAB5))
             Spacer(Modifier.height(28.dp))
             OutlinedTextField(login, { login = it }, label = { Text("Username or email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(10.dp)); OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
@@ -96,9 +115,9 @@ fun KermitsApp(vm: AppViewModel) {
         }
         return
     }
-    Scaffold(bottomBar = { NavigationBar { listOf("Menu", "Orders", "Reservations", "Account").forEachIndexed { index, label -> NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { Text(listOf("⌂", "▣", "◆", "●")[index]) }, label = { Text(label) }) } } }) { padding ->
+    Scaffold(containerColor = Color(0xFFF0F0F0), bottomBar = { NavigationBar(containerColor = Color(0xFF202124)) { listOf("Menu", "Orders", "Reservations", "Account").forEachIndexed { index, label -> NavigationBarItem(selected = tab == index, onClick = { tab = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF202124), selectedTextColor = Color.White, indicatorColor = Color(0xFFB5C019), unselectedIconColor = Color(0xFFB7BAB5), unselectedTextColor = Color(0xFFB7BAB5)), icon = { Icon(listOf(Icons.Default.Home, Icons.Default.ReceiptLong, Icons.Default.CalendarMonth, Icons.Default.Person)[index], label) }, label = { Text(label) }) } } }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Hi, ${vm.user?.name?.substringBefore(' ') ?: "there"}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); if (vm.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { BrandLogo(Modifier.size(42.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(2.dp)); Spacer(Modifier.width(10.dp)); Text("Hi, ${vm.user?.name?.substringBefore(' ') ?: "there"}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }; if (vm.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) }
             Spacer(Modifier.height(18.dp))
             when (tab) {
                 0 -> MenuScreen(vm, payment, { payment = it }, { message -> orderMessage = message })
@@ -114,20 +133,23 @@ fun KermitsApp(vm: AppViewModel) {
 
 @Composable
 private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val filtered = vm.products.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
     Text("Today's menu", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     Text("Prepared fresh for every guest.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.height(16.dp))
-    vm.products.groupBy { it.category ?: "Favorites" }.forEach { (category, items) ->
+    Spacer(Modifier.height(14.dp)); OutlinedTextField(query, { query = it }, placeholder = { Text("Search menu") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+    Spacer(Modifier.height(10.dp)); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("All") + vm.products.mapNotNull { it.category }.distinct().forEach { category -> FilterChip(selected = if (category == "All") query.isBlank() else query == category, onClick = { query = if (category == "All") "" else category }, label = { Text(category) }, modifier = Modifier.padding(end = 8.dp)) } }
+    Spacer(Modifier.height(8.dp))
+    filtered.groupBy { it.category ?: "Favorites" }.forEach { (category, items) ->
         Text(category, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 8.dp))
         items.forEach { product ->
-            ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (product.image_url != null) AsyncImage(product.image_url, product.name, Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop) else Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Text(product.name.take(1), style = MaterialTheme.typography.headlineMedium) }
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(product.name, fontWeight = FontWeight.Bold); Text(product.description.orEmpty(), maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(money(product.price), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }
-                IconButton(onClick = { vm.add(product) }) { Text("+") }
+            ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 10.dp), shape = RoundedCornerShape(12.dp)) { Column {
+                if (product.image_url != null) AsyncImage(product.image_url, product.name, Modifier.fillMaxWidth().height(142.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop) else Box(Modifier.fillMaxWidth().height(142.dp).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) { Text(product.name.take(1), style = MaterialTheme.typography.headlineMedium) }
+                Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(product.name, fontWeight = FontWeight.Bold); Text(product.description.orEmpty(), maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(money(product.price), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }; FilledIconButton(onClick = { vm.add(product) }, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF202124))) { Icon(Icons.Default.Add, "Add") } }
             } }
         }
     }
-    if (vm.cart.isNotEmpty()) { HorizontalDivider(Modifier.padding(vertical = 8.dp)); Text("${vm.cart.values.sum()} item(s) in your order", fontWeight = FontWeight.Bold); Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") }) }; Button(onClick = { vm.placeOrder(payment) { ok -> setMessage(if (ok) "Order placed successfully." else "Order could not be placed.") } }, modifier = Modifier.fillMaxWidth()) { Text("Place order") } }
+    if (vm.cart.isNotEmpty()) { Surface(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp), color = Color(0xFF202124), contentColor = Color.White) { Column(Modifier.padding(16.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${vm.cart.values.sum()} item(s) in your order", fontWeight = FontWeight.Bold); Text(money(vm.cart.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum())) }; Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") }) }; Button(onClick = { vm.placeOrder(payment) { ok -> setMessage(if (ok) "Order placed successfully." else "Order could not be placed.") } }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB5C019), contentColor = Color(0xFF202124))) { Text("Place order") } } } }
 }
 
 @Composable private fun HistoryScreen(title: String, rows: List<String>) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp)); if (rows.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else rows.forEach { row -> ListItem(headlineContent = { Text(row) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) } }
