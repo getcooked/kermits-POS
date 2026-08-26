@@ -98,7 +98,7 @@ class MobileReservationController extends Controller
             'payment_status' => $reservation->payment_status, 'payment_reference' => $reservation->payment_reference,
             'food_request' => $reservation->food_request, 'notes' => $reservation->notes, 'status' => $reservation->status,
             'items' => $reservation->items->map(fn ($item): array => [
-                'name' => $item->product?->name ?? 'Product', 'quantity' => $item->quantity,
+                'product_id' => $item->product_id, 'name' => $item->product?->name ?? 'Product', 'quantity' => $item->quantity,
                 'unit_price' => (float) $item->unit_price, 'subtotal' => (float) $item->subtotal,
             ])->values(),
         ];

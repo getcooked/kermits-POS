@@ -3,9 +3,13 @@ package com.getcooked.kermits
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 
+import android.content.Context
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -22,13 +27,13 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
@@ -38,7 +43,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -64,6 +72,16 @@ class MainActivity : ComponentActivity() {
 
 private const val BRAND_LOGO_URL = "https://kermits-pos.com/kermits-logo.jpg"
 
+data class CheckoutDetails(
+    val phone: String,
+    val reservationAt: String,
+    val tableSize: String,
+    val paymentMethod: String,
+    val paymentReference: String?,
+    val notes: String,
+    val proofUri: Uri?,
+)
+
 class AppViewModel(private val api: KermitsApi, private val store: SessionStore) : ViewModel() {
     var user by mutableStateOf<User?>(null); private set
     var products by mutableStateOf<List<Product>>(emptyList()); private set
@@ -87,8 +105,62 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun loadReservation(id: Int, done: (Reservation?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.reservation(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this reservation"; done(null) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
-    fun placeOrder(payment: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; try { val response = api.createOrder(mapOf("items" to cart.map { mapOf("product_id" to it.key, "quantity" to it.value) }, "payment_method" to payment)); check(response.isSuccessful); cart = emptyMap(); orders = api.orders().data; done(true) } catch (e: Exception) { error = "Order could not be placed"; done(false) } finally { busy = false } }
-    fun placeReservation(phone: String, at: String, size: String, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.createReservation("table".formPart(), size.formPart(), phone.formPart(), at.formPart(), null, null, "cash".formPart(), null); if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "Reservation details are invalid"; done(false); return@launch }; reservations = api.reservations().data; done(true) } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection."; done(false) } finally { busy = false } }
+    fun placeOrder(context: Context, details: CheckoutDetails, done: (Boolean) -> Unit) = viewModelScope.launch {
+        busy = true
+        error = null
+        try {
+            val parts = mutableMapOf<String, okhttp3.RequestBody>(
+                "payment_method" to details.paymentMethod.formPart(),
+                "table_size" to details.tableSize.formPart(),
+                "phone" to details.phone.formPart(),
+                "reservation_at" to details.reservationAt.formPart(),
+            )
+            if (details.paymentMethod == "gcash" && !details.paymentReference.isNullOrBlank()) parts["payment_reference"] = details.paymentReference.formPart()
+            if (details.notes.isNotBlank()) parts["notes"] = details.notes.formPart()
+            cart.entries.forEachIndexed { index, entry ->
+                parts["items[$index][product_id]"] = entry.key.toString().formPart()
+                parts["items[$index][quantity]"] = entry.value.toString().formPart()
+            }
+            val proof = if (details.paymentMethod == "gcash") details.proofUri?.toMultipart(context, "payment_proof") else null
+            val response = api.createOrder(parts, proof)
+            if (!response.isSuccessful) {
+                error = apiError(response.errorBody()?.string()) ?: "Order details are invalid."
+                done(false)
+                return@launch
+            }
+            cart = emptyMap()
+            orders = api.orders().data
+            reservations = api.reservations().data
+            done(true)
+        } catch (_: Exception) {
+            error = "Unable to reach Kermit's. Check your internet connection."
+            done(false)
+        } finally {
+            busy = false
+        }
+    }
+    fun placeReservation(context: Context, type: String, phone: String, at: String, size: String, guests: String, notes: String, foodRequest: String, menuItems: Map<Int, Int>, payment: String, reference: String, proofUri: Uri?, done: (Boolean) -> Unit) = viewModelScope.launch {
+        busy = true
+        error = null
+        try {
+            val response = api.createReservation(
+                type.formPart(),
+                if (type == "table") size.formPart() else null,
+                phone.formPart(),
+                at.formPart(),
+                if (type == "exclusive") guests.formPart() else null,
+                foodRequest.takeIf { it.isNotBlank() }?.formPart(),
+                payment.formPart(),
+                reference.takeIf { payment == "gcash" && it.isNotBlank() }?.formPart(),
+                if (payment == "gcash") proofUri?.toMultipart(context, "payment_proof") else null,
+                menuItems.mapKeys { (productId, _) -> "menu_items[$productId]" }.mapValues { (_, quantity) -> quantity.toString().formPart() },
+                notes.takeIf { it.isNotBlank() }?.formPart(),
+            )
+            if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "Reservation details are invalid"; done(false); return@launch }
+            reservations = api.reservations().data
+            done(true)
+        } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection."; done(false) } finally { busy = false }
+    }
     companion object {
         private fun apiError(body: String?): String? = body?.let { runCatching { Moshi.Builder().build().adapter(ApiError::class.java).fromJson(it) }.getOrNull() }?.let { apiError -> apiError.message ?: apiError.errors?.values?.flatten()?.firstOrNull() }
         fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory {
@@ -137,8 +209,8 @@ fun KermitsApp(vm: AppViewModel) {
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
         }
     }
-    selectedOrder?.let { DetailDialog("Order #${it.id}", "${money(it.total)} · ${it.payment_status}", it.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedOrder = null } }
-    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservation.reservation_at, "Payment: ${reservation.payment_method}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
+    selectedOrder?.let { order -> DetailDialog("Order #${order.id}", "${money(order.total)} · ${order.payment_status}", order.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" } + listOf("Payment: ${order.payment_method}${order.payment_reference?.let { " · Ref $it" } ?: ""}") + (order.reservation?.let { reservation -> listOf("Table: ${reservation.table_size}-seater", "Schedule: ${reservation.reservation_at}", "Reservation fee: ${money(reservation.total_amount)}") } ?: emptyList())) { selectedOrder = null } }
+    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservation.reservation_at, "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
 }
 
 @Composable
@@ -217,34 +289,114 @@ private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
 @Composable
 private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit, onReserve: () -> Unit) {
     var query by remember { mutableStateOf("") }
-    val filtered = vm.products.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
+    var category by remember { mutableStateOf("All") }
+    var checkingOut by remember { mutableStateOf(false) }
+    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }
+    var date by remember { mutableStateOf("") }
+    var tableSize by remember { mutableStateOf("4") }
+    var notes by remember { mutableStateOf("") }
+    var paymentReference by remember { mutableStateOf("") }
+    var proofUri by remember { mutableStateOf<Uri?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val calendar = remember { Calendar.getInstance() }
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+    val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> proofUri = uri }
+    val categories = listOf("All") + vm.products.mapNotNull { it.category }.distinct()
+    val filtered = vm.products.filter { product ->
+        (category == "All" || product.category == category) &&
+            (query.isBlank() || product.name.contains(query, ignoreCase = true) || product.description.orEmpty().contains(query, ignoreCase = true))
+    }
+    val cartTotal = vm.cart.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
+    val canPay = payment == "cash" || (paymentReference.length == 13 && proofUri != null)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Today's menu", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); OutlinedButton(onClick = onReserve, shape = RoundedCornerShape(10.dp)) { Text("Reserve") } }
     Text("Prepared fresh for every guest.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(14.dp)); OutlinedTextField(query, { query = it }, placeholder = { Text("Search menu") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-    vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(120.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
-    Spacer(Modifier.height(10.dp)); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("All") + vm.products.mapNotNull { it.category }.distinct().forEach { category -> FilterChip(selected = if (category == "All") query.isBlank() else query == category, onClick = { query = if (category == "All") "" else category }, label = { Text(category) }, modifier = Modifier.padding(end = 8.dp)) } }
+    Spacer(Modifier.height(10.dp)); Row(Modifier.horizontalScroll(rememberScrollState())) { categories.forEach { value -> FilterChip(selected = category == value, onClick = { category = value }, label = { Text(value) }, modifier = Modifier.padding(end = 8.dp)) } }
     Spacer(Modifier.height(8.dp))
     filtered.groupBy { it.category ?: "Favorites" }.forEach { (category, items) ->
         Text(category, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 8.dp))
         items.forEach { product ->
             ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 10.dp), shape = RoundedCornerShape(12.dp)) { Column {
                 if (product.image_url != null) AsyncImage(product.image_url, product.name, Modifier.fillMaxWidth().height(142.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop) else Box(Modifier.fillMaxWidth().height(142.dp).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) { Text(product.name.take(1), style = MaterialTheme.typography.headlineMedium) }
-                Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(product.name, fontWeight = FontWeight.Bold); Text(product.description.orEmpty(), maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(money(product.price), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }; FilledIconButton(onClick = { vm.add(product) }, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF202124))) { Icon(Icons.Default.Add, "Add") } }
+                Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(product.name, fontWeight = FontWeight.Bold); Text(product.description.orEmpty(), maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${money(product.price)} · ${product.stock} available", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }; Row(verticalAlignment = Alignment.CenterVertically) { val quantity = vm.cart[product.id] ?: 0; IconButton(onClick = { vm.remove(product) }, enabled = quantity > 0) { Icon(Icons.Default.Remove, "Remove") }; Text(quantity.toString(), fontWeight = FontWeight.Bold); FilledIconButton(onClick = { vm.add(product) }, enabled = quantity < product.stock, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF202124))) { Icon(Icons.Default.Add, "Add") } } }
             } }
         }
     }
-    if (vm.cart.isNotEmpty()) { Surface(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp), color = Color(0xFF202124), contentColor = Color.White) { Column(Modifier.padding(16.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${vm.cart.values.sum()} item(s) in your order", fontWeight = FontWeight.Bold); Text(money(vm.cart.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum())) }; Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") }) }; Button(onClick = { vm.placeOrder(payment) { ok -> setMessage(if (ok) "Order placed successfully." else "Order could not be placed.") } }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB5C019), contentColor = Color(0xFF202124))) { Text("Place order") } } } }
+    if (vm.cart.isNotEmpty()) {
+        Surface(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp), color = Color(0xFF202124), contentColor = Color.White) {
+            Column(Modifier.padding(16.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${vm.cart.values.sum()} item(s) in your order", fontWeight = FontWeight.Bold); Text(money(cartTotal)) }
+                if (!checkingOut) {
+                    Spacer(Modifier.height(10.dp))
+                    Button(onClick = { checkingOut = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB5C019), contentColor = Color(0xFF202124))) { Text("Continue to checkout") }
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                    Text("Table schedule", fontWeight = FontWeight.Bold)
+                    OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB5C019), unfocusedBorderColor = Color(0xFF777A73)))
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(date, {}, label = { Text("Date and time") }, placeholder = { Text("Choose schedule") }, readOnly = true, singleLine = true, modifier = Modifier.fillMaxWidth().clickable { DatePickerDialog(context, { _, year, month, day -> calendar.set(year, month, day); TimePickerDialog(context, { _, hour, minute -> calendar.set(Calendar.HOUR_OF_DAY, hour); calendar.set(Calendar.MINUTE, minute); date = dateFormat.format(calendar.time) }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), false).show() }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show() }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB5C019), unfocusedBorderColor = Color(0xFF777A73)))
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp)) } }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Notes") }, minLines = 2, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB5C019), unfocusedBorderColor = Color(0xFF777A73)))
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") }) }
+                    if (payment == "gcash") {
+                        vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
+                        OutlinedTextField(paymentReference, { paymentReference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB5C019), unfocusedBorderColor = Color(0xFF777A73)))
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { proofPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(proofUri?.lastPathSegment ?: "Attach payment proof") }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { vm.placeOrder(context, CheckoutDetails(phone, date, tableSize, payment, paymentReference, notes, proofUri)) { ok -> setMessage(if (ok) "Order and table request submitted." else "Order could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && canPay, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB5C019), contentColor = Color(0xFF202124))) { Text(if (vm.busy) "Submitting..." else "Submit order") }
+                }
+            }
+        }
+    }
 }
 
 @Composable private fun HistoryScreen(title: String, rows: List<String>, onClick: ((Int) -> Unit)? = null) { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp)); if (rows.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else rows.forEach { row -> val id = Regex("#?(\\d+)").find(row)?.groupValues?.get(1)?.toIntOrNull(); ListItem(headlineContent = { Text(row) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { if (id != null) onClick?.invoke(id) }) } }
 @Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { TextButton(onClick = close) { Text("Close") } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
 @Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
-    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance() }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
-    Text("Plan your visit", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Table reservations are reviewed by our team.", color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(16.dp))
-    OutlinedTextField(phone, { phone = it }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
+    var type by remember { mutableStateOf("table") }; var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; var guests by remember { mutableStateOf("20") }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var payment by remember { mutableStateOf("cash") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
+    val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance() }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> proofUri = uri }
+    val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
+    val reservationFee = if (type == "table") mapOf("1" to 100.0, "2" to 150.0, "4" to 250.0, "8" to 450.0, "12" to 650.0)[size] ?: 250.0 else 5000.0
+    val canPay = payment == "cash" || (reference.length == 13 && proofUri != null)
+    Text("Plan your visit", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("Reservations are reviewed by our team.", color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(16.dp))
+    Row(Modifier.horizontalScroll(rememberScrollState())) { FilterChip(selected = type == "table", onClick = { type = "table" }, label = { Text("Table") }, modifier = Modifier.padding(end = 8.dp)); FilterChip(selected = type == "exclusive", onClick = { type = "exclusive" }, label = { Text("Exclusive venue") }) }
+    Spacer(Modifier.height(10.dp)); OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
     OutlinedTextField(date, {}, label = { Text("Preferred date and time") }, placeholder = { Text("Choose your schedule") }, readOnly = true, singleLine = true, modifier = Modifier.fillMaxWidth().clickable { DatePickerDialog(context, { _, year, month, day -> calendar.set(year, month, day); TimePickerDialog(context, { _, hour, minute -> calendar.set(Calendar.HOUR_OF_DAY, hour); calendar.set(Calendar.MINUTE, minute); date = dateFormat.format(calendar.time) }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), false).show() }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show() }); Spacer(Modifier.height(10.dp))
-    Text("Table size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text(value) }, modifier = Modifier.padding(end = 6.dp)) } }
-    Spacer(Modifier.height(16.dp)); Button(onClick = { vm.placeReservation(phone, date, size) { ok -> setMessage(if (ok) "Reservation request submitted." else "Reservation could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Request reservation") }
+    if (type == "table") {
+        Text("Table size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp)) } }
+    } else {
+        OutlinedTextField(guests, { guests = it.filter(Char::isDigit).take(3) }, label = { Text("Number of guests") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+    }
+    Spacer(Modifier.height(12.dp)); Text("Food request", fontWeight = FontWeight.Bold); Text("Optional pre-order items", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    vm.products.take(8).forEach { product ->
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { Text(product.name, fontWeight = FontWeight.SemiBold); Text(money(product.price), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
+            val quantity = menuItems[product.id] ?: 0
+            IconButton(onClick = { menuItems = if (quantity <= 1) menuItems - product.id else menuItems + (product.id to quantity - 1) }, enabled = quantity > 0) { Icon(Icons.Default.Remove, "Remove") }
+            Text(quantity.toString(), fontWeight = FontWeight.Bold)
+            IconButton(onClick = { if (quantity < 22) menuItems = menuItems + (product.id to quantity + 1) }) { Icon(Icons.Default.Add, "Add") }
+        }
+    }
+    OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+    OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+    Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(reservationFee + selectedFoodTotal), fontWeight = FontWeight.Bold) }
+    Spacer(Modifier.height(8.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }) }
+    if (payment == "gcash") { vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }; OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { proofPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(proofUri?.lastPathSegment ?: "Attach payment proof") } }
+    Spacer(Modifier.height(16.dp)); Button(onClick = { vm.placeReservation(context, type, phone, date, size, guests, notes, foodRequest, menuItems, payment, reference, proofUri) { ok -> if (ok) { menuItems = emptyMap(); setMessage("Reservation request submitted.") } else setMessage("Reservation could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && (type == "table" || (guests.toIntOrNull() ?: 0) in 1..300) && canPay, modifier = Modifier.fillMaxWidth()) { Text(if (vm.busy) "Submitting..." else "Request reservation") }
     Spacer(Modifier.height(26.dp)); HistoryScreen("Recent reservations", vm.reservations.map { "#${it.id}  ${it.reference}  ${it.status}  ${money(it.total_amount)}" }, onDetail)
 }
 private fun money(value: Double) = "₱${String.format(Locale.US, "%,.2f", value)}"
+
+private fun Uri.toMultipart(context: Context, fieldName: String): MultipartBody.Part? {
+    val type = context.contentResolver.getType(this) ?: "image/jpeg"
+    val extension = type.substringAfter('/', "jpg")
+    val bytes = context.contentResolver.openInputStream(this)?.use { it.readBytes() } ?: return null
+    val body = bytes.toRequestBody(type.toMediaTypeOrNull())
+
+    return MultipartBody.Part.createFormData(fieldName, "$fieldName.$extension", body)
+}

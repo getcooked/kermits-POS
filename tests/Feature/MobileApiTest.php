@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -111,10 +113,64 @@ class MobileApiTest extends TestCase
             ->assertOk()->assertJsonPath('data.0.id', $reservationId);
     }
 
+    public function test_customer_can_submit_full_mobile_gcash_checkout_with_linked_reservation(): void
+    {
+        Storage::fake('local');
+        $customer = User::factory()->create([
+            'name' => 'Mobile Checkout', 'phone' => '09170000000',
+            'role' => User::ROLE_CUSTOMER, 'password' => 'MobilePassword123!',
+        ]);
+        $product = Product::query()->create([
+            'name' => 'Checkout Meal', 'category' => 'Meals', 'category_order' => 1,
+            'price' => 300, 'stock' => 4, 'active' => true,
+        ]);
+
+        $order = $this->withToken($this->login($customer))->post('/api/v1/orders', [
+            'items' => [['product_id' => $product->id, 'quantity' => 2]],
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_proof' => $this->fakePngUpload(),
+            'table_size' => 4,
+            'phone' => '09170000000',
+            'reservation_at' => now()->addDays(2)->toIso8601String(),
+            'notes' => 'Birthday lunch',
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.total', 600)
+            ->assertJsonPath('data.payment_reference', '1234567890123')
+            ->assertJsonPath('data.reservation.table_size', 4)
+            ->assertJsonPath('data.reservation.status', 'pending')
+            ->json('data');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order['id'],
+            'customer_id' => $customer->id,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+        ]);
+        $this->assertDatabaseHas('reservations', [
+            'order_id' => $order['id'],
+            'user_id' => $customer->id,
+            'table_size' => 4,
+            'payment_reference' => '1234567890123',
+            'notes' => 'Birthday lunch',
+        ]);
+        $reservation = Reservation::query()->where('order_id', $order['id'])->firstOrFail();
+        Storage::disk('local')->assertExists($reservation->payment_proof_path);
+    }
+
     private function login(User $user): string
     {
         return $this->postJson('/api/v1/login', [
             'login' => $user->email, 'password' => 'MobilePassword123!', 'device_name' => 'Feature test',
         ])->assertOk()->json('data.token');
+    }
+
+    private function fakePngUpload(): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gcash-proof-');
+        file_put_contents($path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+
+        return new UploadedFile($path, 'gcash-proof.png', 'image/png', null, true);
     }
 }
