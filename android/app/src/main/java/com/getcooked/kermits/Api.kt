@@ -23,9 +23,9 @@ data class Product(val id: Int, val name: String, val category: String?, val des
 @JsonClass(generateAdapter = true)
 data class OrderItem(val product_id: Int, val name: String, val quantity: Int, val unit_price: Double, val subtotal: Double)
 @JsonClass(generateAdapter = true)
-data class Order(val id: Int, val total: Double, val payment_method: String, val payment_status: String, val created_at: String?, val items: List<OrderItem> = emptyList())
+data class Order(val id: Int, val total: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val created_at: String?, val reservation: Reservation?, val items: List<OrderItem> = emptyList())
 @JsonClass(generateAdapter = true)
-data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val total_amount: Double, val payment_method: String, val status: String, val notes: String?, val items: List<OrderItem> = emptyList())
+data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList())
 @JsonClass(generateAdapter = true)
 data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
@@ -61,15 +61,17 @@ interface KermitsApi {
     @GET("products") suspend fun products(): CatalogResponse
     @GET("orders") suspend fun orders(): ListOrdersResponse
     @GET("orders/{order}") suspend fun order(@Path("order") id: Int): Response<Map<String, Order>>
-    @POST("orders") suspend fun createOrder(@Body body: Map<String, Any>): retrofit2.Response<Map<String, Order>>
+    @Multipart
+    @POST("orders") suspend fun createOrder(@PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>, @Part proof: MultipartBody.Part? = null): retrofit2.Response<Map<String, Order>>
     @GET("reservations") suspend fun reservations(): ListReservationsResponse
     @GET("reservations/{reservation}") suspend fun reservation(@Path("reservation") id: Int): Response<Map<String, Reservation>>
     @Multipart
     @POST("reservations") suspend fun createReservation(
         @Part("type") type: RequestBody, @Part("table_size") tableSize: RequestBody?,
         @Part("phone") phone: RequestBody, @Part("reservation_at") at: RequestBody,
-        @Part("guests") guests: RequestBody?, @Part("notes") notes: RequestBody?,
+        @Part("guests") guests: RequestBody?, @Part("food_request") foodRequest: RequestBody?,
         @Part("payment_method") payment: RequestBody, @Part("payment_reference") reference: RequestBody?,
-        @Part proof: MultipartBody.Part? = null
+        @Part proof: MultipartBody.Part? = null, @PartMap menuItems: Map<String, @JvmSuppressWildcards RequestBody> = emptyMap(),
+        @Part("notes") notes: RequestBody? = null
     ): retrofit2.Response<Map<String, Reservation>>
 }
