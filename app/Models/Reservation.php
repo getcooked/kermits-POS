@@ -10,6 +10,7 @@ class Reservation extends Model
 {
     protected $fillable = [
         'user_id',
+        'order_id',
         'reference',
         'type',
         'table_size',
@@ -51,6 +52,11 @@ class Reservation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     public function items(): HasMany

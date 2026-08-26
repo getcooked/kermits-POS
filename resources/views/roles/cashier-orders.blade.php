@@ -26,7 +26,7 @@
                                 <h2>{{ $order->customer?->name ?? 'Deleted customer' }}</h2>
                                 <span>{{ $order->customer?->email }} · {{ $order->created_at->format('M d, Y · h:i A') }}</span>
                             </div>
-                            <div class="order-total"><span>Order total</span><strong>&#8369;{{ number_format($order->total, 2) }}</strong></div>
+                            <div class="order-total"><span>Total due</span><strong>&#8369;{{ number_format($order->totalDue(), 2) }}</strong></div>
                         </header>
 
                         <section class="order-items">

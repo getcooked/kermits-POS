@@ -8,6 +8,9 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 class OrderingTest extends TestCase
@@ -164,27 +167,7 @@ class OrderingTest extends TestCase
             ->assertDontSee('Awaiting payment confirmation');
     }
 
-    public function test_customer_can_choose_cash_or_gcash_for_an_online_order(): void
-    {
-        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        $product = Product::query()->create(['name' => 'Customer Payment Product', 'price' => 150, 'stock' => 10, 'active' => true]);
-
-        $this->actingAs($customer)->post('/shop/orders', [
-            'quantities' => [$product->id => 1],
-            'payment_method' => 'gcash',
-            'payment_reference' => '1234567890123',
-        ])->assertRedirect(route('reservations.create', ['order' => 1]));
-
-        $this->assertDatabaseHas('orders', [
-            'user_id' => $customer->id,
-            'customer_id' => $customer->id,
-            'payment_method' => 'gcash',
-            'payment_status' => 'pending',
-            'payment_reference' => '1234567890123',
-        ]);
-    }
-
-    public function test_customer_order_flows_through_reservation_to_the_order_receipt(): void
+    public function test_customer_cash_checkout_creates_a_linked_order_and_table_reservation_then_shows_the_receipt(): void
     {
         $customer = User::factory()->create([
             'name' => 'Reservation Checkout Customer',
@@ -197,79 +180,55 @@ class OrderingTest extends TestCase
             'stock' => 5,
             'active' => true,
         ]);
+        $reservationAt = now()->addDay()->startOfMinute();
 
         $this->actingAs($customer)->post('/shop/orders', [
             'quantities' => [$product->id => 1],
-            'payment_method' => 'cash',
-        ])->assertRedirect(route('reservations.create', ['order' => 1]));
-
-        $order = Order::query()->firstOrFail();
-
-        $this->get(route('reservations.create', ['order' => $order]))
-            ->assertOk()
-            ->assertSee('data-checkout-order', false)
-            ->assertSee('Order #000001')
-            ->assertSee('name="order_id" value="'.$order->id.'"', false)
-            ->assertSee('Complete your reservation to continue to the order receipt.')
-            ->assertSee('Submit reservation &amp; view receipt', false);
-
-        $this->post('/book', [
-            'order_id' => $order->id,
-            'type' => 'table',
             'table_size' => 2,
-            'customer_name' => $customer->name,
-            'email' => $customer->email,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => $reservationAt->format('Y-m-d\TH:i'),
+            'notes' => 'Window table, please.',
             'payment_method' => 'cash',
-        ])->assertRedirect(route('shop.orders.show', $order))
-            ->assertSessionHas('status', 'Reservation added. Your order receipt is ready.');
+        ])->assertRedirect(route('shop.orders.show', 1));
 
+        $order = Order::query()->with('reservation')->firstOrFail();
+        $reservation = Reservation::query()->where('order_id', $order->id)->firstOrFail();
+
+        $this->assertTrue($order->reservation->is($reservation));
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 250,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+            'payment_reference' => null,
+        ]);
         $this->assertDatabaseHas('reservations', [
+            'order_id' => $order->id,
             'user_id' => $customer->id,
             'type' => 'table',
             'table_size' => 2,
+            'guests' => 2,
+            'phone' => '09171234567',
+            'food_request' => null,
+            'food_total' => 0,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+            'notes' => 'Window table, please.',
             'status' => 'pending',
         ]);
+        $this->assertDatabaseCount('reservation_items', 0);
+        $this->assertSame(4, $product->fresh()->stock);
 
         $this->get(route('shop.orders.show', $order))
             ->assertOk()
-            ->assertSee('Reservation added. Your order receipt is ready.')
             ->assertSee('Order Receipt')
-            ->assertSee('Reservation Checkout Meal');
+            ->assertSee('Reservation Checkout Meal')
+            ->assertSee('Walk In Pay');
     }
 
-    public function test_customer_cannot_attach_another_customers_order_to_a_reservation(): void
-    {
-        $owner = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        $otherCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        $order = Order::query()->create([
-            'user_id' => $owner->id,
-            'customer_id' => $owner->id,
-            'total' => 100,
-            'payment_method' => 'cash',
-            'payment_status' => 'pending',
-        ]);
-
-        $this->actingAs($otherCustomer)
-            ->get(route('reservations.create', ['order' => $order]))
-            ->assertNotFound();
-
-        $this->post('/book', [
-            'order_id' => $order->id,
-            'type' => 'table',
-            'table_size' => 2,
-            'customer_name' => $otherCustomer->name,
-            'email' => $otherCustomer->email,
-            'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
-            'payment_method' => 'cash',
-        ])->assertNotFound();
-
-        $this->assertDatabaseCount('reservations', 0);
-    }
-
-    public function test_customer_menu_contains_reservations_and_both_payment_choices(): void
+    public function test_customer_shop_uses_one_ordered_multi_step_checkout_dialog_without_food_request_fields(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
@@ -278,10 +237,28 @@ class OrderingTest extends TestCase
             ->assertSee('>Menu</a>', false)
             ->assertDontSee('>Shop</a>', false)
             ->assertSee('data-menu-reserve', false)
+            ->assertSee('data-checkout-modal', false)
+            ->assertSee('data-checkout-step="reservation"', false)
+            ->assertSee('name="table_size"', false)
+            ->assertSee('name="phone"', false)
+            ->assertSee('name="reservation_at"', false)
+            ->assertSee('name="notes"', false)
+            ->assertSee('Submit reservation')
+            ->assertSee('data-checkout-step="payment"', false)
             ->assertSee('Walk In Pay')
             ->assertSee('value="cash"', false)
             ->assertSee('GCash')
-            ->assertSee('value="gcash"', false);
+            ->assertSee('value="gcash"', false)
+            ->assertDontSee('Food Request')
+            ->assertDontSee('name="menu_items[', false)
+            ->assertDontSee('name="food_request"', false)
+            ->assertSeeInOrder([
+                'data-checkout-step="reservation"',
+                'Submit reservation',
+                'data-checkout-step="payment"',
+                'Walk In Pay',
+                'GCash',
+            ], false);
 
         $this->assertSame(1, substr_count($menu->getContent(), route('reservations.create')));
 
@@ -292,26 +269,103 @@ class OrderingTest extends TestCase
                 ->assertDontSee('>Shop</a>', false)
                 ->assertDontSee('>Reserve</a>', false);
         }
-
-        $this->actingAs($customer)->get('/book')
-            ->assertSee('Walk In Pay')
-            ->assertSee('value="cash"', false)
-            ->assertSee('GCash')
-            ->assertSee('value="gcash"', false);
     }
 
-    public function test_customer_gcash_order_requires_exactly_thirteen_reference_digits(): void
+    public function test_customer_gcash_checkout_requires_a_thirteen_digit_reference_and_image_proof(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $product = Product::query()->create(['name' => 'Reference Product', 'price' => 100, 'stock' => 5, 'active' => true]);
 
         $this->actingAs($customer)->post('/shop/orders', [
             'quantities' => [$product->id => 1],
+            'table_size' => 2,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
             'payment_method' => 'gcash',
             'payment_reference' => '12345',
-        ])->assertSessionHasErrors('payment_reference');
+        ])->assertSessionHasErrors(['payment_reference', 'payment_proof']);
 
         $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('reservations', 0);
+        $this->assertSame(5, $product->fresh()->stock);
+    }
+
+    public function test_customer_can_complete_gcash_checkout_with_proof_and_receive_the_order_receipt(): void
+    {
+        Storage::fake('local');
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $product = Product::query()->create(['name' => 'GCash Checkout Product', 'price' => 175, 'stock' => 5, 'active' => true]);
+
+        $this->actingAs($customer)->post('/shop/orders', [
+            'quantities' => [$product->id => 2],
+            'table_size' => 4,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_proof' => $this->fakePng('checkout-proof.png'),
+        ])->assertRedirect(route('shop.orders.show', 1));
+
+        $order = Order::query()->firstOrFail();
+        $reservation = Reservation::query()->where('order_id', $order->id)->firstOrFail();
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'order_id' => $order->id,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_status' => 'pending',
+        ]);
+        $this->assertNotNull($reservation->payment_proof_path);
+        Storage::disk('local')->assertExists($reservation->payment_proof_path);
+
+        $this->get(route('shop.orders.show', $order))
+            ->assertOk()
+            ->assertSee('Order Receipt')
+            ->assertSee('GCash')
+            ->assertSee('1234567890123');
+    }
+
+    public function test_customer_checkout_rolls_back_order_stock_and_uploaded_proof_when_reservation_creation_fails(): void
+    {
+        Storage::fake('local');
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $product = Product::query()->create(['name' => 'Atomic Checkout Product', 'price' => 200, 'stock' => 5, 'active' => true]);
+
+        Reservation::creating(function (): never {
+            throw new RuntimeException('Simulated reservation persistence failure.');
+        });
+
+        try {
+            $this->withoutExceptionHandling()->actingAs($customer)->post('/shop/orders', [
+                'quantities' => [$product->id => 2],
+                'table_size' => 2,
+                'phone' => '09171234567',
+                'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+                'payment_method' => 'gcash',
+                'payment_reference' => '1234567890123',
+                'payment_proof' => $this->fakePng('rollback-proof.png'),
+            ]);
+
+            $this->fail('The simulated reservation failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Simulated reservation persistence failure.', $exception->getMessage());
+        } finally {
+            Reservation::flushEventListeners();
+        }
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+        $this->assertDatabaseCount('reservations', 0);
+        $this->assertDatabaseCount('stock_movements', 0);
+        $this->assertSame(5, $product->fresh()->stock);
+        $this->assertSame([], Storage::disk('local')->allFiles('payment-proofs'));
     }
 
     public function test_cashier_can_confirm_customer_payment_and_connect_it_to_super_admin_sales_reports(): void
@@ -359,6 +413,64 @@ class OrderingTest extends TestCase
             ->assertOk()
             ->assertSee('275.00')
             ->assertSee('GCash · 1 sales');
+    }
+
+    public function test_cashier_collects_the_combined_order_and_table_fee_before_marking_linked_checkout_paid(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $product = Product::query()->create([
+            'name' => 'Combined Payment Meal',
+            'price' => 200,
+            'stock' => 5,
+            'active' => true,
+        ]);
+
+        $this->actingAs($customer)->post('/shop/orders', [
+            'quantities' => [$product->id => 1],
+            'table_size' => 2,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+            'payment_method' => 'cash',
+        ])->assertRedirect(route('shop.orders.show', 1));
+
+        $order = Order::query()->with('reservation')->firstOrFail();
+        $reservation = $order->reservation;
+
+        $this->assertNotNull($reservation);
+        $this->assertSame(350.0, $order->totalDue());
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.confirm-payment', $order), ['cash_received' => 349.99])
+            ->assertSessionHasErrors('cash_received');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_status' => 'pending',
+            'cash_received' => null,
+            'change_due' => null,
+        ]);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'order_id' => $order->id,
+            'payment_status' => 'pending',
+        ]);
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.confirm-payment', $order), ['cash_received' => 400])
+            ->assertRedirect(route('cashier.orders.index'));
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_status' => 'paid',
+            'cash_received' => 400,
+            'change_due' => 50,
+        ]);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'order_id' => $order->id,
+            'payment_status' => 'paid',
+        ]);
     }
 
     public function test_customer_admin_and_super_admin_cannot_confirm_online_order_payments(): void
@@ -485,5 +597,12 @@ class OrderingTest extends TestCase
             ->assertSee('data-shop-category="Drinks"', false)
             ->assertSee('data-shop-scroll="-1"', false)
             ->assertDontSee('data-shop-heading', false);
+    }
+
+    private function fakePng(string $name): UploadedFile
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+
+        return UploadedFile::fake()->createWithContent($name, $png);
     }
 }
