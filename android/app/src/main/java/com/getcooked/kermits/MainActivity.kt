@@ -123,7 +123,7 @@ fun KermitsApp(vm: AppViewModel) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { BrandLogo(Modifier.size(42.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(2.dp)); Spacer(Modifier.width(10.dp)); Text("Hi, ${vm.user?.name?.substringBefore(' ') ?: "there"}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }; if (vm.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) }
             Spacer(Modifier.height(18.dp))
             when (tab) {
-                0 -> MenuScreen(vm, payment, { payment = it }, { message -> orderMessage = message })
+                0 -> MenuScreen(vm, payment, { payment = it }, { message -> orderMessage = message }, onReserve = { tab = 2 })
                 1 -> HistoryScreen("Your orders", vm.orders.map { "#${it.id}  ${money(it.total)}  ${it.payment_status}" }, onClick = { vm.loadOrder(it) { selectedOrder = it } })
                 2 -> ReservationScreen(vm, onDetail = { id -> vm.loadReservation(id) { selectedReservation = it } }) { message -> orderMessage = message }
                 else -> { Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(22.dp)); OutlinedButton(onClick = { vm.logout() }) { Text("Sign out") } }
@@ -210,10 +210,10 @@ private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 @Composable
-private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit) {
+private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit, onReserve: () -> Unit) {
     var query by remember { mutableStateOf("") }
     val filtered = vm.products.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
-    Text("Today's menu", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Today's menu", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); OutlinedButton(onClick = onReserve, shape = RoundedCornerShape(10.dp)) { Text("Reserve") } }
     Text("Prepared fresh for every guest.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(14.dp)); OutlinedTextField(query, { query = it }, placeholder = { Text("Search menu") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
     vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(120.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
