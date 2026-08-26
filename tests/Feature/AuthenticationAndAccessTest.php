@@ -16,7 +16,7 @@ class AuthenticationAndAccessTest extends TestCase
     {
         foreach ([
             User::ROLE_SUPER_ADMIN => '/dashboard',
-            User::ROLE_ADMIN => '/dashboard',
+            User::ROLE_ADMIN => '/',
             User::ROLE_CASHIER => '/cashier',
             User::ROLE_CUSTOMER => '/shop',
         ] as $role => $destination) {
@@ -217,14 +217,17 @@ class AuthenticationAndAccessTest extends TestCase
         $this->actingAs($customer)->get('/book')->assertOk();
     }
 
-    public function test_admin_and_cashier_permissions_are_separated(): void
+    public function test_only_super_admin_can_access_administrative_pages(): void
     {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
 
-        $this->actingAs($admin)->get('/dashboard')->assertOk();
-        $this->actingAs($admin)->get('/reports')->assertOk();
-        $this->actingAs($admin)->get('/inventory')->assertOk();
+        foreach (['/dashboard', '/customers', '/reports', '/inventory', '/products', '/reservations'] as $path) {
+            $this->actingAs($superAdmin)->get($path)->assertOk();
+            $this->actingAs($admin)->get($path)->assertForbidden();
+        }
+
         $this->actingAs($admin)->get('/cashier')->assertForbidden();
 
         $this->actingAs($cashier)->get('/cashier')->assertOk();

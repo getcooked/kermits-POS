@@ -38,19 +38,19 @@ class CustomerHistoryTest extends TestCase
         $this->actingAs($admin)->get('/history')->assertForbidden();
     }
 
-    public function test_admin_status_change_is_recorded_in_customer_timeline(): void
+    public function test_super_admin_status_change_is_recorded_in_customer_timeline(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $reservation = Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-TIMELINE', 'type' => 'table', 'table_size' => 2, 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
 
-        $this->actingAs($admin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'confirmed'])->assertRedirect();
+        $this->actingAs($superAdmin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'confirmed'])->assertRedirect();
 
-        $this->assertDatabaseHas('reservation_status_histories', ['reservation_id' => $reservation->id, 'from_status' => 'pending', 'to_status' => 'confirmed', 'changed_by' => $admin->id]);
+        $this->assertDatabaseHas('reservation_status_histories', ['reservation_id' => $reservation->id, 'from_status' => 'pending', 'to_status' => 'confirmed', 'changed_by' => $superAdmin->id]);
         $this->actingAs($customer)->get('/history')->assertOk()->assertSee('Confirmed')->assertSee('Updated by admin');
     }
 
-    public function test_admin_and_super_admin_can_view_a_selected_customer_history(): void
+    public function test_only_super_admin_can_view_a_selected_customer_history(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $other = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -59,12 +59,12 @@ class CustomerHistoryTest extends TestCase
         Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-SELECTED', 'type' => 'table', 'table_size' => 4, 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 4, 'status' => 'pending']);
         Reservation::query()->create(['user_id' => $other->id, 'reference' => 'KRM-NOT-SELECTED', 'type' => 'table', 'table_size' => 2, 'customer_name' => $other->name, 'email' => $other->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
 
-        foreach ([$admin, $superAdmin] as $staff) {
-            $this->actingAs($staff)->get('/customers/'.$customer->id.'/history')
-                ->assertOk()
-                ->assertSee('KRM-SELECTED')
-                ->assertDontSee('KRM-NOT-SELECTED');
-        }
+        $this->actingAs($superAdmin)->get('/customers/'.$customer->id.'/history')
+            ->assertOk()
+            ->assertSee('KRM-SELECTED')
+            ->assertDontSee('KRM-NOT-SELECTED');
+
+        $this->actingAs($admin)->get('/customers/'.$customer->id.'/history')->assertForbidden();
     }
 
     public function test_customer_and_cashier_cannot_view_staff_customer_history(): void

@@ -13,12 +13,12 @@ class InventoryAndProductsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_stock_adjustment_is_audited(): void
+    public function test_super_admin_stock_adjustment_is_audited(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $product = Product::query()->create(['name' => 'Inventory Item', 'price' => 20, 'stock' => 5, 'active' => true]);
 
-        $this->actingAs($admin)->post('/inventory/'.$product->id, [
+        $this->actingAs($superAdmin)->post('/inventory/'.$product->id, [
             'type' => 'stock_in',
             'quantity' => 4,
             'note' => 'Delivery',
@@ -27,18 +27,18 @@ class InventoryAndProductsTest extends TestCase
         $this->assertSame(9, $product->fresh()->stock);
         $this->assertDatabaseHas('stock_movements', [
             'product_id' => $product->id,
-            'user_id' => $admin->id,
+            'user_id' => $superAdmin->id,
             'stock_before' => 5,
             'stock_after' => 9,
         ]);
     }
 
-    public function test_stock_out_cannot_exceed_available_stock(): void
+    public function test_super_admin_stock_out_cannot_exceed_available_stock(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $product = Product::query()->create(['name' => 'Inventory Item', 'price' => 20, 'stock' => 2, 'active' => true]);
 
-        $this->actingAs($admin)->post('/inventory/'.$product->id, [
+        $this->actingAs($superAdmin)->post('/inventory/'.$product->id, [
             'type' => 'stock_out',
             'quantity' => 3,
         ])->assertSessionHasErrors('quantity');
@@ -47,11 +47,10 @@ class InventoryAndProductsTest extends TestCase
         $this->assertDatabaseCount('stock_movements', 0);
     }
 
-    public function test_super_admin_and_admin_can_create_products_and_update_menu_pictures(): void
+    public function test_super_admin_can_create_products_and_update_menu_pictures(): void
     {
         Storage::fake('public');
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $this->actingAs($superAdmin)->post('/products', [
             'name' => 'Manual Product',
@@ -62,8 +61,8 @@ class InventoryAndProductsTest extends TestCase
         ])->assertRedirect();
 
         $product = Product::query()->where('name', 'Manual Product')->firstOrFail();
-        $this->actingAs($admin)->get('/products')->assertOk();
-        $this->actingAs($admin)->put('/products/'.$product->id, [
+        $this->actingAs($superAdmin)->get('/products')->assertOk();
+        $this->actingAs($superAdmin)->put('/products/'.$product->id, [
             'name' => $product->name,
             'description' => $product->description,
             'price' => $product->price,
@@ -73,29 +72,70 @@ class InventoryAndProductsTest extends TestCase
         ])->assertRedirect();
 
         Storage::disk('public')->assertExists($product->fresh()->image_path);
-        $this->actingAs($admin)->post('/products', [
-            'name' => 'Admin Product',
+        $this->actingAs($superAdmin)->post('/products', [
+            'name' => 'Super Admin Product',
             'category' => 'Drinks',
-            'description' => 'Created by an administrator',
+            'description' => 'Created by a super administrator',
             'price' => 75,
             'stock' => 8,
             'active' => 1,
         ])->assertRedirect();
 
-        $this->assertDatabaseHas('products', ['name' => 'Admin Product']);
-        $this->actingAs($admin)->delete('/products/'.$product->id)->assertForbidden();
+        $this->assertDatabaseHas('products', ['name' => 'Super Admin Product']);
     }
 
-    public function test_admin_and_super_admin_can_search_products_by_name_or_category(): void
+    public function test_admin_cannot_access_super_admin_product_or_inventory_routes(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $product = Product::query()->create([
+            'name' => 'Protected Product',
+            'category' => 'Drinks',
+            'price' => 120,
+            'stock' => 5,
+            'active' => true,
+        ]);
+
+        $this->actingAs($admin)->get('/products')->assertForbidden();
+        $this->actingAs($admin)->get('/inventory')->assertForbidden();
+        $this->actingAs($admin)->post('/products', [
+            'name' => 'Unauthorized Product',
+            'category' => 'Drinks',
+            'price' => 75,
+            'stock' => 8,
+            'active' => 1,
+        ])->assertForbidden();
+        $this->actingAs($admin)->put('/products/'.$product->id, [
+            'name' => 'Unauthorized Update',
+            'category' => $product->category,
+            'price' => $product->price,
+            'stock' => $product->stock,
+            'active' => 1,
+        ])->assertForbidden();
+        $this->actingAs($admin)->post('/inventory/'.$product->id, [
+            'type' => 'stock_in',
+            'quantity' => 4,
+            'note' => 'Unauthorized delivery',
+        ])->assertForbidden();
+        $this->actingAs($admin)->delete('/products/'.$product->id)->assertForbidden();
+
+        $this->assertDatabaseMissing('products', ['name' => 'Unauthorized Product']);
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'name' => 'Protected Product',
+            'stock' => 5,
+        ]);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_super_admin_can_search_products_by_name_or_category(): void
+    {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
         $latte = Product::query()->create(['name' => 'Iced Spanish Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
         $almondRoca = Product::query()->create(['name' => 'Almond Roca', 'category' => 'Starters', 'price' => 260, 'stock' => 10]);
         $celebrationSlice = Product::query()->create(['name' => 'Celebration Slice', 'category' => 'Junior Size Cake', 'price' => 150, 'stock' => 10]);
 
-        $this->actingAs($admin)
+        $this->actingAs($superAdmin)
             ->get('/products?search=Spanish')
             ->assertOk()
             ->assertSee('Iced Spanish Latte')
@@ -117,14 +157,13 @@ class InventoryAndProductsTest extends TestCase
             ->assertDontSee(route('products.update', $almondRoca), false);
     }
 
-    public function test_new_categories_are_immediately_searchable_and_available_in_catalogs(): void
+    public function test_new_categories_created_by_super_admin_are_immediately_searchable_and_available_in_catalogs(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
-        $this->actingAs($admin)->post('/products', [
+        $this->actingAs($superAdmin)->post('/products', [
             'name' => 'Seasonal Cooler',
             'category' => 'Seasonal   Cold Drinks',
             'description' => 'A newly added menu category.',
@@ -138,7 +177,7 @@ class InventoryAndProductsTest extends TestCase
             'category' => 'Seasonal Cold Drinks',
         ]);
 
-        $this->actingAs($admin)
+        $this->actingAs($superAdmin)
             ->get('/products?search=Drinks+Seasonal+Cold')
             ->assertOk()
             ->assertSee('Seasonal Cooler')
@@ -163,9 +202,8 @@ class InventoryAndProductsTest extends TestCase
             ->assertSee('data-shop-category="Seasonal Cold Drinks"', false);
     }
 
-    public function test_editing_a_product_category_moves_it_across_all_catalogs(): void
+    public function test_super_admin_editing_a_product_category_moves_it_across_all_catalogs(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -188,7 +226,7 @@ class InventoryAndProductsTest extends TestCase
             'active' => true,
         ]);
 
-        $this->actingAs($admin)->put('/products/'.$product->id, [
+        $this->actingAs($superAdmin)->put('/products/'.$product->id, [
             'name' => $product->name,
             'category' => 'Pasta',
             'description' => $product->description,
@@ -204,7 +242,7 @@ class InventoryAndProductsTest extends TestCase
             'active' => true,
         ]);
 
-        $this->actingAs($admin)->get('/products')
+        $this->actingAs($superAdmin)->get('/products')
             ->assertOk()
             ->assertSee('data-search-value="Pasta"', false)
             ->assertDontSee('data-search-value="Old Specials"', false);
@@ -230,7 +268,7 @@ class InventoryAndProductsTest extends TestCase
             ->assertDontSee('Old Specials');
     }
 
-    public function test_add_product_form_is_collapsed_until_needed_and_reopens_after_validation_errors(): void
+    public function test_super_admin_add_product_form_is_collapsed_until_needed_and_reopens_after_validation_errors(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
