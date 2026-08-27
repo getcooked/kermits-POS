@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -30,10 +31,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import retrofit2.HttpException
 import retrofit2.converter.moshi.MoshiConverterFactory
 import com.squareup.moshi.Moshi
 import java.util.Locale
@@ -94,9 +98,66 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var registrationMessage by mutableStateOf<String?>(null); private set
     val signedIn get() = store.token != null
     init { if (signedIn) refresh() }
-    fun login(login: String, password: String) = run { busy = true; error = null; viewModelScope.launch { try { val response = api.login(LoginRequest(login.trim(), password)); if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect."; return@launch }; val result = response.body()?.data ?: error("Empty login response"); store.token = result.token; user = result.user; try { load() } catch (_: Exception) { error = "Signed in, but the latest menu could not be loaded." } } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection." } finally { busy = false } } }
+    fun login(login: String, password: String) {
+        if (busy || login.isBlank() || password.isBlank()) return
+        busy = true
+        error = null
+        viewModelScope.launch {
+            try {
+                val response = api.login(LoginRequest(login.trim(), password))
+                if (!response.isSuccessful) {
+                    error = apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
+                    return@launch
+                }
+                val result = response.body()?.data
+                if (result == null) {
+                    error = "Kermit's returned an incomplete sign-in response. Please try again."
+                    return@launch
+                }
+                store.token = result.token
+                user = result.user
+                try {
+                    load()
+                } catch (_: Exception) {
+                    error = "Signed in, but the latest menu could not be loaded. Pull down to refresh when you are online."
+                }
+            } catch (_: Exception) {
+                error = "Unable to reach Kermit's. Check your internet connection and try again."
+            } finally {
+                busy = false
+            }
+        }
+    }
     fun logout() = viewModelScope.launch { runCatching { api.logout() }; store.clear(); user = null; products = emptyList(); orders = emptyList(); reservations = emptyList() }
-    fun refresh() = viewModelScope.launch { busy = true; error = null; try { val catalog = api.products().data; products = catalog.products; gcashQrUrl = catalog.gcash_qr_url } catch (_: Exception) { error = "Could not load the latest menu" }; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] }; busy = false }
+    fun refresh() = viewModelScope.launch {
+        busy = true
+        error = null
+        try {
+            // Validate a persisted token first. Previously an expired token kept the
+            // app on its signed-in screen, making the login form inaccessible.
+            user = api.me()["data"] ?: throw IllegalStateException("Missing account data")
+            val catalog = api.products().data
+            products = catalog.products
+            gcashQrUrl = catalog.gcash_qr_url
+            runCatching { orders = api.orders().data }
+            runCatching { reservations = api.reservations().data }
+        } catch (exception: HttpException) {
+            if (exception.code() == 401) {
+                store.clear()
+                user = null
+                products = emptyList()
+                orders = emptyList()
+                reservations = emptyList()
+                error = "Your session has expired. Please log in again."
+            } else {
+                error = "Could not load the latest menu."
+            }
+        } catch (_: Exception) {
+            error = "Could not load the latest menu. Check your internet connection."
+        } finally {
+            busy = false
+        }
+    }
     private suspend fun load() { val catalog = api.products().data; products = catalog.products; gcashQrUrl = catalog.gcash_qr_url; runCatching { orders = api.orders().data }; runCatching { reservations = api.reservations().data }; runCatching { user = user ?: api.me()["data"] } }
     fun sendCode(email: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.sendRegistrationCode(SendCodeRequest(email.trim().lowercase())); check(response.isSuccessful); registrationMessage = "Verification code sent to ${email.trim()}"; done(response.body()?.data?.challenge) } catch (_: Exception) { error = "Could not send the verification code"; done(null) } finally { busy = false } }
     fun verifyCode(challenge: String, email: String, code: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.verifyRegistrationCode(VerifyCodeRequest(challenge, email.trim().lowercase(), code)); check(response.isSuccessful); done(response.body()?.data?.registration_token) } catch (_: Exception) { error = "The verification code is invalid or expired"; done(null) } finally { busy = false } }
@@ -229,7 +290,7 @@ private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> U
 
 @Composable
 private fun BrandPanel(modifier: Modifier) {
-    Column(modifier.background(Color(0xFF171817)).padding(horizontal = 28.dp, vertical = 30.dp)) {
+    Column(modifier.background(Brush.linearGradient(listOf(Color(0xFF131413), Color(0xFF1C1E1A), Color(0xFF30332B)))).padding(horizontal = 28.dp, vertical = 30.dp)) {
         BrandLogo(Modifier.size(84.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(6.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
             Text("RESTAURANT POS", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
@@ -244,16 +305,18 @@ private fun BrandPanel(modifier: Modifier) {
 
 @Composable
 private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, modifier: Modifier) {
+    val canLogIn = !vm.busy && login.isNotBlank() && password.isNotBlank()
+    val submitLogin = { if (canLogIn) vm.login(login, password) }
     Column(modifier.background(Color(0xFFF7F7F1)).verticalScroll(rememberScrollState()).padding(horizontal = 26.dp, vertical = 34.dp), verticalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).align(Alignment.CenterHorizontally)) {
             Text("WELCOME BACK", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp)); Text("Log in to your account", color = Color(0xFF202124), fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(7.dp)); Text("Enter your details to continue to Kermit’s.", color = Color(0xFF687286), fontSize = 15.sp)
             Spacer(Modifier.height(28.dp))
-            OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submitLogin() }), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
-            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = false, onCheckedChange = null); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Your sign-in stays secure on this device", color = Color(0xFF687286), fontSize = 13.sp); Text("Customer app", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(15.dp)); Button(onClick = { vm.login(login, password) }, enabled = !vm.busy && login.isNotBlank() && password.isNotBlank(), shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
             Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { Text("New customer? ", color = Color(0xFF687286), fontSize = 12.sp); TextButton(onClick = onRegister, contentPadding = PaddingValues(0.dp)) { Text("Create an account", color = Color(0xFF626B00), fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
         }
