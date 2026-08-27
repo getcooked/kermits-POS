@@ -11,5 +11,14 @@ class SessionStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
     var token: String? get() = prefs.getString("token", null); set(value) = prefs.edit().putString("token", value).apply()
+    val keepsSession: Boolean get() = prefs.getBoolean("keep_signed_in", false)
+
+    fun saveSession(token: String, keepSignedIn: Boolean) {
+        prefs.edit()
+            .putString("token", token)
+            .putBoolean("keep_signed_in", keepSignedIn)
+            .apply()
+    }
+
     fun clear() = prefs.edit().clear().apply()
 }
