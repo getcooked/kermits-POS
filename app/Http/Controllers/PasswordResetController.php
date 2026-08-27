@@ -82,6 +82,8 @@ class PasswordResetController extends Controller
                 $user->forceFill([
                     'password' => Hash::make($password),
                     'remember_token' => Str::random(60),
+                    // Receiving and using the reset link proves ownership of this email.
+                    'email_verified_at' => $user->email_verified_at ?: now(),
                 ])->save();
 
                 DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();

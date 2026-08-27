@@ -3,12 +3,14 @@
 use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\MobileCatalogController;
 use App\Http\Controllers\Api\MobileOrderController;
+use App\Http\Controllers\Api\MobilePasswordResetController;
 use App\Http\Controllers\Api\MobileRegistrationController;
 use App\Http\Controllers\Api\MobileReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::post('/login', [MobileAuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/password/forgot', [MobilePasswordResetController::class, 'store'])->middleware('throttle:3,1');
     Route::post('/register/email', [MobileRegistrationController::class, 'sendCode'])->middleware('throttle:3,1');
     Route::post('/register/email/verify', [MobileRegistrationController::class, 'verifyCode'])->middleware('throttle:6,1');
     Route::post('/register', [MobileRegistrationController::class, 'register'])->middleware('throttle:3,1');
