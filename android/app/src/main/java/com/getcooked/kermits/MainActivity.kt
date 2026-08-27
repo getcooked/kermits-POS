@@ -99,6 +99,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
     val signedIn get() = store.token != null
+    fun clearError() { error = null }
     init {
         if (store.token != null && store.keepsSession) refresh() else store.clear()
     }
@@ -184,6 +185,25 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             done(challenge)
         } catch (_: Exception) {
             error = "Could not contact Kermit's to send the code. Check your internet connection and try again."
+            done(null)
+        } finally {
+            busy = false
+        }
+    }
+    fun requestPasswordReset(email: String, done: (String?) -> Unit) = viewModelScope.launch {
+        if (busy) return@launch
+        busy = true
+        error = null
+        try {
+            val response = api.forgotPassword(ForgotPasswordRequest(email.trim().lowercase()))
+            if (!response.isSuccessful) {
+                error = apiError(response.errorBody()?.string()) ?: "The reset request could not be sent. Please try again."
+                done(null)
+                return@launch
+            }
+            done(response.body()?.message ?: "If that customer account exists, a password reset link has been sent.")
+        } catch (_: Exception) {
+            error = "Could not contact Kermit's. Check your connection and try again."
             done(null)
         } finally {
             busy = false
@@ -276,13 +296,18 @@ fun KermitsApp(vm: AppViewModel) {
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var registering by remember { mutableStateOf(false) }
+    var recoveringPassword by remember { mutableStateOf(false) }
     var tab by remember { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
     var selectedReservation by remember { mutableStateOf<Reservation?>(null) }
     if (!vm.signedIn) {
-        if (registering) RegistrationScreen(vm, onBack = { registering = false }) else LoginScreen(vm, login, { login = it }, password, { password = it }, onRegister = { registering = true })
+        when {
+            recoveringPassword -> PasswordRecoveryScreen(vm, onBack = { recoveringPassword = false })
+            registering -> RegistrationScreen(vm, onBack = { registering = false })
+            else -> LoginScreen(vm, login, { login = it }, password, { password = it }, onRegister = { vm.clearError(); registering = true }, onForgotPassword = { vm.clearError(); recoveringPassword = true })
+        }
         return
     }
     Scaffold(containerColor = Color(0xFFF0F0F0), bottomBar = { NavigationBar(containerColor = Color(0xFF202124)) { listOf("Menu", "Orders", "Reservations", "Account").forEachIndexed { index, label -> NavigationBarItem(selected = tab == index, onClick = { tab = index }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF202124), selectedTextColor = Color.White, indicatorColor = Color(0xFFB5C019), unselectedIconColor = Color(0xFFB7BAB5), unselectedTextColor = Color(0xFFB7BAB5)), icon = { Icon(listOf(Icons.Default.Home, Icons.Default.ReceiptLong, Icons.Default.CalendarMonth, Icons.Default.Person)[index], label) }, label = { Text(label) }) } } }) { padding ->
@@ -304,15 +329,15 @@ fun KermitsApp(vm: AppViewModel) {
 }
 
 @Composable
-private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit) {
+private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, onForgotPassword: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFF5F5EF))) {
         val wide = maxWidth >= 600.dp
         if (wide) Row(Modifier.fillMaxSize()) {
             BrandPanel(Modifier.weight(0.96f).fillMaxHeight())
-            LoginForm(vm, login, setLogin, password, setPassword, onRegister, Modifier.weight(1.04f).fillMaxHeight())
+            LoginForm(vm, login, setLogin, password, setPassword, onRegister, onForgotPassword, Modifier.weight(1.04f).fillMaxHeight())
         } else Column(Modifier.fillMaxSize()) {
             BrandPanel(Modifier.fillMaxWidth().heightIn(min = 205.dp, max = 270.dp))
-            LoginForm(vm, login, setLogin, password, setPassword, onRegister, Modifier.fillMaxWidth().weight(1f))
+            LoginForm(vm, login, setLogin, password, setPassword, onRegister, onForgotPassword, Modifier.fillMaxWidth().weight(1f))
         }
     }
 }
@@ -333,7 +358,7 @@ private fun BrandPanel(modifier: Modifier) {
 }
 
 @Composable
-private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, modifier: Modifier) {
+private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, onForgotPassword: () -> Unit, modifier: Modifier) {
     var keepSignedIn by remember { mutableStateOf(true) }
     var passwordVisible by remember { mutableStateOf(false) }
     val canLogIn = !vm.busy && login.isNotBlank() && password.isNotBlank()
@@ -347,9 +372,35 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
             OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submitLogin() }), trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (passwordVisible) "Hide password" else "Show password") } }, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
-            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it }); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; Text("Customer app", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it }); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
             Spacer(Modifier.height(15.dp)); Button(onClick = submitLogin, enabled = canLogIn, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
             Spacer(Modifier.height(18.dp)); TextButton(onClick = onRegister, modifier = Modifier.fillMaxWidth()) { Text("New customer? Create an account", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+@Composable
+private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
+    var email by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf<String?>(null) }
+    val validEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).padding(horizontal = 26.dp, vertical = 28.dp)) {
+        TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+        Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).weight(1f).align(Alignment.CenterHorizontally), verticalArrangement = Arrangement.Center) {
+            BrandLogo(Modifier.size(72.dp).align(Alignment.CenterHorizontally).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
+            Spacer(Modifier.height(22.dp))
+            Text("RESET PASSWORD", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("Recover your account", color = Color(0xFF202124), fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
+            Text("Enter the email address used by your customer account. We’ll email you a secure reset link.", color = Color(0xFF687286), fontSize = 14.sp, lineHeight = 21.sp)
+            Spacer(Modifier.height(24.dp))
+            OutlinedTextField(email, { email = it; message = null }, label = { Text("Email address") }, placeholder = { Text("name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { if (validEmail && !vm.busy) vm.requestPasswordReset(email) { message = it } }), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
+            message?.let { Text(it, color = Color(0xFF626B00), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 12.dp)) }
+            Spacer(Modifier.height(18.dp))
+            Button(onClick = { vm.requestPasswordReset(email) { message = it } }, enabled = validEmail && !vm.busy, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Text(if (vm.busy) "Sending..." else "Send reset link", fontWeight = FontWeight.Bold) }
         }
     }
 }

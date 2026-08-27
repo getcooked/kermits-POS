@@ -13,6 +13,8 @@ data class LoginRequest(val login: String, val password: String, val device_name
 @JsonClass(generateAdapter = true)
 data class SendCodeRequest(val email: String)
 @JsonClass(generateAdapter = true)
+data class ForgotPasswordRequest(val email: String)
+@JsonClass(generateAdapter = true)
 data class VerifyCodeRequest(val challenge: String, val email: String, val code: String)
 @JsonClass(generateAdapter = true)
 data class RegisterRequest(val registration_token: String, val name: String, val username: String, val email: String, val phone: String, val password: String, val password_confirmation: String)
@@ -53,6 +55,7 @@ fun String.formPart(): RequestBody = toRequestBody("text/plain".toMediaType())
 
 interface KermitsApi {
     @POST("login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+    @POST("password/forgot") suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ApiError>
     @POST("register/email") suspend fun sendRegistrationCode(@Body request: SendCodeRequest): Response<SendCodeResponse>
     @POST("register/email/verify") suspend fun verifyRegistrationCode(@Body request: VerifyCodeRequest): Response<VerifyCodeResponse>
     @POST("register") suspend fun register(@Body request: RegisterRequest): Response<Map<String, User>>
