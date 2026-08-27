@@ -32,7 +32,22 @@ class MobileApiTest extends TestCase
         $this->assertDatabaseMissing('mobile_api_tokens', ['token_hash' => $plainToken]);
 
         $this->postJson('/api/v1/login', ['login' => $admin->email, 'password' => 'MobilePassword123!'])
-            ->assertUnprocessable();
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'This mobile app is for customer accounts. Please use the website for staff access.');
+    }
+
+    public function test_unverified_customers_are_told_to_verify_before_mobile_login(): void
+    {
+        $customer = User::factory()->unverified()->create([
+            'role' => User::ROLE_CUSTOMER,
+            'password' => 'MobilePassword123!',
+        ]);
+
+        $this->postJson('/api/v1/login', [
+            'login' => $customer->email,
+            'password' => 'MobilePassword123!',
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Please verify your Gmail address before signing in.');
     }
 
     public function test_mobile_token_protects_endpoints_and_can_be_revoked(): void

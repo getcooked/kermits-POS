@@ -20,8 +20,14 @@ class MobileAuthController extends Controller
         ]);
         $field = filter_var($validated['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
         $user = User::query()->where($field, $validated['login'])->first();
-        if (! $user || ! $user->hasRole(User::ROLE_CUSTOMER) || ! $user->email_verified_at || ! Hash::check($validated['password'], $user->password)) {
+        if (! $user || ! Hash::check($validated['password'], $user->password)) {
             return response()->json(['message' => 'The username/email or password is incorrect.'], 422);
+        }
+        if (! $user->hasRole(User::ROLE_CUSTOMER)) {
+            return response()->json(['message' => 'This mobile app is for customer accounts. Please use the website for staff access.'], 422);
+        }
+        if (! $user->email_verified_at) {
+            return response()->json(['message' => 'Please verify your Gmail address before signing in.'], 422);
         }
 
         MobileApiToken::query()->where('expires_at', '<=', now())->delete();
