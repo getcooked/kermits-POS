@@ -201,7 +201,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             registrationMessage = "Verification code sent to $normalizedEmail"
             done(challenge)
         } catch (_: Exception) {
-            error = "Could not contact Kermit's to send the code. Check your internet connection and try again."
+            error = "Could not reach Kermit's server. Make sure this phone and the restaurant computer use the same Wi-Fi, then try again."
             done(null)
         } finally {
             busy = false
