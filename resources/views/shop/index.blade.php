@@ -33,7 +33,7 @@
                         <div>
                             <h3>{{ $product->name }}</h3>
                             <p>{{ $product->description }}</p>
-                            <div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span>{{ $product->stock }} available</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}">+</button>
+                            <div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span>{{ $product->stock }} available</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}"><i class="bi bi-cart"></i></button>
                         </div>
                     </article>
                     @endforeach
