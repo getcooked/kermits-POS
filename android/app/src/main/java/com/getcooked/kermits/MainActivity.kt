@@ -6,6 +6,7 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -23,12 +24,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -353,7 +354,7 @@ fun KermitsApp(vm: AppViewModel) {
     var password by remember { mutableStateOf("") }
     var registering by remember { mutableStateOf(false) }
     var recoveringPassword by remember { mutableStateOf(false) }
-    var tab by remember(vm.signedIn) { mutableIntStateOf(0) }
+    var tab by rememberSaveable(vm.signedIn) { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
@@ -366,7 +367,11 @@ fun KermitsApp(vm: AppViewModel) {
         }
         return
     }
-    Scaffold(containerColor = Color(0xFFEFEFEF), topBar = { CustomerTopBar(tab, { tab = it }, vm::logout) }) { padding ->
+    BackHandler(enabled = tab != 0) { tab = 0 }
+    Scaffold(
+        containerColor = Color(0xFFEFEFEF),
+        bottomBar = { CustomerBottomBar(tab) { tab = it } },
+    ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp)) {
             if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = Color(0xFFB5C019), trackColor = Color.Transparent)
             orderMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
@@ -443,22 +448,34 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
 }
 
 @Composable
-private fun CustomerTopBar(selected: Int, select: (Int) -> Unit, logout: () -> Unit) {
-    Surface(color = Color(0xFFF4F5EE), contentColor = Color(0xFF171817), shadowElevation = 3.dp) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val showAccountButton = this.maxWidth >= 380.dp
-            Row(Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                BrandLogo(Modifier.size(42.dp).clickable { select(3) }.background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(2.dp))
-                Spacer(Modifier.width(6.dp))
-                listOf("Menu" to 0, "History" to 1, "Reserve" to 2).forEach { (label, index) ->
-                    TextButton(onClick = { select(index) }, colors = ButtonDefaults.textButtonColors(contentColor = if (selected == index) Color.White else Color(0xFF171817)), contentPadding = PaddingValues(horizontal = 3.dp)) {
-                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = if (selected == index) Modifier.background(Color(0xFF202124), RoundedCornerShape(9.dp)).padding(horizontal = 8.dp, vertical = 9.dp) else Modifier.padding(horizontal = 5.dp, vertical = 9.dp))
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                if (showAccountButton) IconButton(onClick = { select(3) }) { Icon(Icons.Default.Person, "Account", tint = if (selected == 3) Color(0xFF737D00) else Color(0xFF171817)) }
-                IconButton(onClick = logout) { Icon(Icons.Default.Logout, "Log out", tint = Color(0xFF171817)) }
-            }
+private fun CustomerBottomBar(selected: Int, select: (Int) -> Unit) {
+    val destinations = listOf(
+        Triple("Menu", Icons.Default.Home, 0),
+        Triple("History", Icons.AutoMirrored.Filled.ReceiptLong, 1),
+        Triple("Reserve", Icons.Default.CalendarMonth, 2),
+        Triple("Account", Icons.Default.Person, 3),
+    )
+
+    NavigationBar(
+        containerColor = Color(0xFF202124),
+        contentColor = Color.White,
+        tonalElevation = 10.dp,
+    ) {
+        destinations.forEach { (label, icon, index) ->
+            NavigationBarItem(
+                selected = selected == index,
+                onClick = { select(index) },
+                icon = { Icon(icon, contentDescription = null) },
+                label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color(0xFF202124),
+                    selectedTextColor = Color.White,
+                    indicatorColor = Color(0xFFB5C019),
+                    unselectedIconColor = Color(0xFFB7BAB5),
+                    unselectedTextColor = Color(0xFFB7BAB5),
+                ),
+            )
         }
     }
 }
