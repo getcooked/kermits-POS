@@ -5,24 +5,37 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\MobileApiToken;
 use App\Models\User;
+use App\Services\LoginAttemptLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class MobileAuthController extends Controller
 {
-    public function login(Request $request): JsonResponse
+    public function login(Request $request, LoginAttemptLimiter $loginAttempts): JsonResponse
     {
         $validated = $request->validate([
             'login' => ['required', 'string', 'max:160'],
             'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:100'],
         ]);
-        $field = filter_var($validated['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
-        $user = User::query()->where($field, $validated['login'])->first();
+        $login = trim($validated['login']);
+
+        if ($loginAttempts->isLocked($request, $login)) {
+            return $this->lockoutResponse($request, $loginAttempts, $login);
+        }
+
+        $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $user = User::query()->where($field, $login)->first();
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
+            if ($loginAttempts->recordFailure($request, $login)) {
+                return $this->lockoutResponse($request, $loginAttempts, $login);
+            }
+
             return response()->json(['message' => 'The username/email or password is incorrect.'], 422);
         }
+
+        $loginAttempts->clear($request, $login);
         if (! $user->hasRole(User::ROLE_CUSTOMER)) {
             return response()->json(['message' => 'This mobile app is for customer accounts. Please use the website for staff access.'], 422);
         }
@@ -63,5 +76,18 @@ class MobileAuthController extends Controller
     private function userData(User $user): array
     {
         return $user->only(['id', 'name', 'username', 'email', 'phone', 'role']);
+    }
+
+    private function lockoutResponse(
+        Request $request,
+        LoginAttemptLimiter $loginAttempts,
+        string $login,
+    ): JsonResponse {
+        $retryAfter = $loginAttempts->secondsRemaining($request, $login);
+
+        return response()->json([
+            'message' => "Too many login attempts. Try again in {$retryAfter} seconds.",
+            'retry_after' => $retryAfter,
+        ], 429)->header('Retry-After', (string) $retryAfter);
     }
 }

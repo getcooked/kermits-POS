@@ -264,4 +264,61 @@ class AuthenticationAndAccessTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_web_login_shows_an_inline_thirty_second_lockout_after_five_failures(): void
+    {
+        $this->freezeSecond();
+        $customer = User::factory()->create([
+            'email' => 'web.lockout@example.com',
+            'password' => 'CorrectPassword123!',
+            'role' => User::ROLE_CUSTOMER,
+        ]);
+        $invalidCredentials = [
+            'email' => $customer->email,
+            'password' => 'IncorrectPassword123!',
+        ];
+
+        for ($attempt = 1; $attempt <= 4; $attempt++) {
+            $this->from(route('login'))->post(route('login.store'), $invalidCredentials)
+                ->assertRedirect(route('login'))
+                ->assertSessionHasErrors([
+                    'email' => 'The username/email or password is incorrect.',
+                ])
+                ->assertSessionMissing('login_retry_after');
+        }
+
+        $this->from(route('login'))->post(route('login.store'), $invalidCredentials)
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors([
+                'email' => 'Too many login attempts. Try again in 30 seconds.',
+            ])
+            ->assertSessionHas('login_retry_after', 30);
+
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('id="login-lockout"', false)
+            ->assertSee('data-retry-after="30"', false)
+            ->assertSee('Too many login attempts. Try again in')
+            ->assertDontSee('Too Many Requests');
+
+        $this->travel(29)->seconds();
+
+        $this->from(route('login'))->post(route('login.store'), [
+            'email' => $customer->email,
+            'password' => 'CorrectPassword123!',
+        ])->assertRedirect(route('login'))
+            ->assertSessionHasErrors([
+                'email' => 'Too many login attempts. Try again in 1 seconds.',
+            ])
+            ->assertSessionHas('login_retry_after', 1);
+        $this->assertGuest();
+
+        $this->travel(1)->seconds();
+
+        $this->from(route('login'))->post(route('login.store'), [
+            'email' => $customer->email,
+            'password' => 'CorrectPassword123!',
+        ])->assertRedirect('/shop');
+        $this->assertAuthenticatedAs($customer);
+    }
 }

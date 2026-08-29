@@ -33,7 +33,7 @@ Route::post('/seeder', [WebSeederController::class, 'store'])
 
 Route::middleware('guest')->controller(AuthController::class)->group(function (): void {
     Route::get('/login', 'create')->name('login');
-    Route::post('/login', 'store')->middleware('throttle:5,1')->name('login.store');
+    Route::post('/login', 'store')->name('login.store');
     Route::get('/register', 'register')->name('register');
     Route::post('/register/email', 'sendRegistrationCode')->middleware('throttle:3,1')->name('register.email');
     Route::post('/register/email/verify', 'verifyRegistrationCode')->middleware('throttle:6,1')->name('register.email.verify');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterCustomerRequest;
 use App\Models\User;
+use App\Services\LoginAttemptLimiter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -104,18 +105,28 @@ class AuthController extends Controller
         return redirect()->route('shop');
     }
 
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request, LoginAttemptLimiter $loginAttempts): RedirectResponse
     {
         $login = $request->string('email')->trim()->toString();
+
+        if ($loginAttempts->isLocked($request, $login)) {
+            return $this->lockoutResponse($request, $loginAttempts, $login);
+        }
+
         $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
         $credentials = [$field => $login, 'password' => $request->validated('password')];
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            if ($loginAttempts->recordFailure($request, $login)) {
+                return $this->lockoutResponse($request, $loginAttempts, $login);
+            }
+
             return back()->withErrors([
                 'email' => 'The username/email or password is incorrect.',
             ])->onlyInput('email');
         }
 
+        $loginAttempts->clear($request, $login);
         $request->session()->regenerate();
 
         return redirect()->intended($request->user()->homeRoute());
@@ -128,5 +139,21 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login')->with('status', 'You have been logged out.');
+    }
+
+    private function lockoutResponse(
+        LoginRequest $request,
+        LoginAttemptLimiter $loginAttempts,
+        string $login,
+    ): RedirectResponse {
+        $retryAfter = $loginAttempts->secondsRemaining($request, $login);
+
+        return redirect()->route('login')
+            ->withErrors(['email' => "Too many login attempts. Try again in {$retryAfter} seconds."])
+            ->withInput([
+                'email' => $login,
+                'remember' => $request->boolean('remember'),
+            ])
+            ->with('login_retry_after', $retryAfter);
     }
 }

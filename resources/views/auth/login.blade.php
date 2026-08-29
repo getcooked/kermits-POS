@@ -15,10 +15,11 @@
                 <h2 id="login-title">Log in to your account</h2>
                 <p class="muted">Enter your details to continue to Kermit’s.</p>
                 @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
-                <form method="POST" action="{{ route('login.store') }}">@csrf
-                    <div class="field"><label for="email">Username or email address</label><input class="control" id="email" name="email" type="text" value="{{ old('email') }}" autocomplete="username" placeholder="Username or name@gmail.com" required autofocus>@error('email')<p class="error">{{ $message }}</p>@enderror</div>
+                @php($loginRetryAfter = max(0, (int) session('login_retry_after', 0)))
+                <form id="login-form" method="POST" action="{{ route('login.store') }}" data-retry-after="{{ $loginRetryAfter }}">@csrf
+                    <div class="field"><label for="email">Username or email address</label><input class="control" id="email" name="email" type="text" value="{{ old('email') }}" autocomplete="username" placeholder="Username or name@gmail.com" required autofocus>@error('email')@if($loginRetryAfter > 0)<p class="error" id="login-lockout" role="status" aria-live="polite">Too many login attempts. Try again in <span id="login-retry-seconds">{{ $loginRetryAfter }}</span> seconds.</p>@else<p class="error">{{ $message }}</p>@endif @enderror</div>
                     <div class="field"><label for="password">Password</label><input class="control" id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>@error('password')<p class="error">{{ $message }}</p>@enderror</div>
-                    <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1"> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div><button class="login-button" type="submit">Log in <span>&rarr;</span></button>
+                    <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1" @checked(old('remember'))> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div><button class="login-button" id="login-submit" type="submit"><span id="login-submit-label">{{ $loginRetryAfter > 0 ? "Try again in {$loginRetryAfter}s" : 'Log in' }}</span> <span>&rarr;</span></button>
                     <p style="text-align:center;margin:18px 0 0;color:#687286">New customer? <a href="{{ route('register') }}">Create an account</a></p>
                 </form>
             </div>
@@ -129,6 +130,11 @@
 
     .login-button:hover {
         background: #30322e
+    }
+
+    .login-button:disabled {
+        cursor: not-allowed;
+        opacity: .58
     }
 
     @media(max-width:760px) {
@@ -398,5 +404,42 @@
         }
     }
 </style>
+
+@if($loginRetryAfter > 0)
+<script>
+    (() => {
+        const form = document.getElementById('login-form');
+        const button = document.getElementById('login-submit');
+        const label = document.getElementById('login-submit-label');
+        const lockout = document.getElementById('login-lockout');
+        const seconds = document.getElementById('login-retry-seconds');
+        const retryAfter = Number(form?.dataset.retryAfter ?? 0);
+        const unlockAt = Date.now() + retryAfter * 1000;
+        let timer = null;
+
+        if (!form || !button || !label || retryAfter <= 0) return;
+
+        button.disabled = true;
+
+        const tick = () => {
+            const remaining = Math.max(0, Math.ceil((unlockAt - Date.now()) / 1000));
+
+            if (remaining <= 0) {
+                button.disabled = false;
+                label.textContent = 'Log in';
+                if (lockout) lockout.textContent = 'You can try logging in again now.';
+                if (timer !== null) clearInterval(timer);
+                return;
+            }
+
+            label.textContent = `Try again in ${remaining}s`;
+            if (seconds) seconds.textContent = String(remaining);
+        };
+
+        tick();
+        timer = setInterval(tick, 1000);
+    })();
+</script>
+@endif
 
 @endsection

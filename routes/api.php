@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\MobileReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
-    Route::post('/login', [MobileAuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/login', [MobileAuthController::class, 'login']);
     Route::post('/password/forgot', [MobilePasswordResetController::class, 'store'])->middleware('throttle:3,1');
     Route::post('/register/email', [MobileRegistrationController::class, 'sendCode'])->middleware('throttle:3,1');
     Route::post('/register/email/verify', [MobileRegistrationController::class, 'verifyCode'])->middleware('throttle:6,1');
