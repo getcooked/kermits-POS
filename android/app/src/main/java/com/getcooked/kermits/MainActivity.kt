@@ -110,10 +110,10 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var busy by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
-    val signedIn get() = store.token != null
+    var signedIn by mutableStateOf(store.token != null && store.keepsSession); private set
     fun clearError() { error = null }
     init {
-        if (store.token != null && store.keepsSession) refresh() else store.clear()
+        if (signedIn) refresh() else store.clear()
     }
     fun login(login: String, password: String, keepSignedIn: Boolean) {
         if (busy || login.isBlank() || password.isBlank()) return
@@ -133,6 +133,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 }
                 store.saveSession(result.token, keepSignedIn)
                 user = result.user
+                signedIn = true
                 try {
                     load()
                 } catch (_: Exception) {
@@ -145,7 +146,15 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             }
         }
     }
-    fun logout() = viewModelScope.launch { runCatching { api.logout() }; store.clear(); user = null; products = emptyList(); orders = emptyList(); reservations = emptyList() }
+    fun logout() = viewModelScope.launch {
+        runCatching { api.logout() }
+        store.clear()
+        user = null
+        products = emptyList()
+        orders = emptyList()
+        reservations = emptyList()
+        signedIn = false
+    }
     fun refresh() = viewModelScope.launch {
         busy = true
         error = null
@@ -161,6 +170,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 products = emptyList()
                 orders = emptyList()
                 reservations = emptyList()
+                signedIn = false
                 error = "Your session has expired. Please log in again."
             } else {
                 error = "Could not load the latest menu."
@@ -322,7 +332,7 @@ fun KermitsApp(vm: AppViewModel) {
     var password by remember { mutableStateOf("") }
     var registering by remember { mutableStateOf(false) }
     var recoveringPassword by remember { mutableStateOf(false) }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember(vm.signedIn) { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
     var orderMessage by remember { mutableStateOf<String?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
