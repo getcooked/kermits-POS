@@ -2054,7 +2054,7 @@
         });
         dialog.addEventListener('close', () => opener?.focus());
 
-        const reopenStep = @json($errors - > hasAny(['payment_method', 'payment_reference', 'payment_proof']) ? 'payment' : ($errors - > any() ? 'reservation' : null));
+        const reopenStep = @json($errors->hasAny(['payment_method', 'payment_reference', 'payment_proof']) ? 'payment' : ($errors->any() ? 'reservation' : null));
         if (reopenStep) requestAnimationFrame(() => openCheckout(reopenStep, true));
         else setStep('reservation');
     })();
