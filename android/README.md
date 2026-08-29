@@ -13,14 +13,14 @@ cd android
 ./gradlew assembleRelease
 ```
 
-To build an installable, debug-signed native APK and publish that exact artifact to Laravel's `/download-app` route, run:
+To build an installable APK that is locked to the production HTTPS API and publish that exact artifact to Laravel's `/download-app` route, run:
 
 ```powershell
 cd android
 ./gradlew :app:publishDownloadApk
 ```
 
-The task copies `app/build/outputs/apk/debug/app-debug.apk` to `storage/app/releases/kermits.apk`. Laravel continues to serve it as `Kermits-Restaurant.apk`.
+The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/app/releases/kermits.apk`. The dedicated `download` build never inherits `debug.api.base.url` from `local.properties`, so a private development address cannot leak into the distributed app. Laravel continues to serve it as `Kermits-Restaurant.apk`.
 
 ## Included customer flow
 

@@ -53,6 +53,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -64,6 +65,10 @@ import retrofit2.Retrofit
 import retrofit2.HttpException
 import retrofit2.converter.moshi.MoshiConverterFactory
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.JsonDataException
+import com.squareup.moshi.JsonEncodingException
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -75,9 +80,9 @@ class MainActivity : ComponentActivity() {
         val store = SessionStore(this)
         val log = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         val clientBuilder = OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(25, TimeUnit.SECONDS)
+            .callTimeout(35, TimeUnit.SECONDS)
             .addInterceptor { chain ->
             chain.proceed(chain.request().newBuilder().apply { store.token?.let { header("Authorization", "Bearer $it") }; header("Accept", "application/json") }.build())
         }
@@ -123,7 +128,11 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             try {
                 val response = api.login(LoginRequest(login.trim(), password))
                 if (!response.isSuccessful) {
-                    error = apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
+                    error = when {
+                        response.code() == 429 -> "Too many login attempts. Please wait one minute and try again."
+                        response.code() >= 500 -> "Kermit's server is temporarily unavailable. Please try again shortly."
+                        else -> apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
+                    }
                     return@launch
                 }
                 val result = response.body()?.data
@@ -136,11 +145,23 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 signedIn = true
                 try {
                     load()
+                } catch (exception: CancellationException) {
+                    throw exception
                 } catch (_: Exception) {
                     error = "Signed in, but the latest menu could not be loaded. Pull down to refresh when you are online."
                 }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: JsonDataException) {
+                error = "Kermit's returned an invalid sign-in response. Please update the app and try again."
+            } catch (_: JsonEncodingException) {
+                error = "Kermit's returned an invalid sign-in response. Please update the app and try again."
+            } catch (_: SocketTimeoutException) {
+                error = "Kermit's server took too long to respond. Please try again."
+            } catch (_: IOException) {
+                error = "Kermit's server could not be reached. Please check that you have the latest app and try again."
             } catch (_: Exception) {
-                error = "Unable to reach Kermit's. Check your internet connection and try again."
+                error = "Sign-in could not be completed. Please try again."
             } finally {
                 busy = false
             }

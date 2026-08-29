@@ -13,6 +13,7 @@ val localProperties = Properties().apply {
         file.inputStream().use(::load)
     }
 }
+val productionApiBaseUrl = "https://kermits-pos.com/api/v1/"
 val debugApiBaseUrl = localProperties.getProperty("debug.api.base.url", "https://kermits-pos.com/api/v1/")
 
 android {
@@ -23,10 +24,10 @@ android {
         applicationId = "com.getcooked.kermits"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "API_BASE_URL", "\"https://kermits-pos.com/api/v1/\"")
+        buildConfigField("String", "API_BASE_URL", "\"$productionApiBaseUrl\"")
     }
 
     buildTypes {
@@ -37,6 +38,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("download") {
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isMinifyEnabled = false
+            isShrinkResources = false
+            buildConfigField("String", "API_BASE_URL", "\"$productionApiBaseUrl\"")
         }
     }
 
@@ -79,9 +87,9 @@ dependencies {
 
 tasks.register<Copy>("publishDownloadApk") {
     group = "distribution"
-    description = "Builds the native Kotlin debug APK and publishes it for Laravel's /download-app route."
-    dependsOn("assembleDebug")
-    from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+    description = "Builds the production-endpoint APK and publishes it for Laravel's /download-app route."
+    dependsOn("assembleDownload")
+    from(layout.buildDirectory.file("outputs/apk/download/app-download.apk"))
     into(rootProject.layout.projectDirectory.dir("../storage/app/releases"))
     rename { "kermits.apk" }
 }
