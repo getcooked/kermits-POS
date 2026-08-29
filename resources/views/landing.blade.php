@@ -426,7 +426,7 @@
               }
 
               @media(max-width:900px) {
-                     .nav-links a:not(.book-button) {
+                     .nav-links a:not(.book-button):not(.staff) {
                             display: none
                      }
 
@@ -484,7 +484,13 @@
                      }
 
                      .nav-links .staff {
-                            display: none
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 36px;
+                            padding: 8px 10px;
+                            font-size: 12px;
+                            white-space: nowrap
                      }
 
                      .book-button {
