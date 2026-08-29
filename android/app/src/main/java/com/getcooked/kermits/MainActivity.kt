@@ -570,9 +570,9 @@ private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 @Composable
-private fun DateTimePickerField(value: String, label: String, placeholder: String, onClick: () -> Unit) {
+private fun DateTimePickerField(value: String, label: String, placeholder: String, guidance: String, onClick: () -> Unit) {
     val shape = RoundedCornerShape(11.dp)
-    val accessibilityLabel = if (value.isBlank()) "$label. $placeholder" else "$label. Selected $value"
+    val accessibilityLabel = if (value.isBlank()) listOf(label, placeholder, guidance).joinToString(". ") else "$label. Selected $value"
 
     Box(Modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -580,6 +580,7 @@ private fun DateTimePickerField(value: String, label: String, placeholder: Strin
             onValueChange = {},
             label = { Text(label) },
             placeholder = { Text(placeholder) },
+            supportingText = { Text(guidance) },
             readOnly = true,
             singleLine = true,
             trailingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
@@ -684,7 +685,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                     Spacer(Modifier.height(14.dp))
                     OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone number") }, supportingText = { Text("11 digits starting with 09") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
                     Spacer(Modifier.height(8.dp))
-                    DateTimePickerField(date, "Date and time", "Tap to choose date and time") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
+                    DateTimePickerField(date, "Date and time", "Choose your schedule", "Select a date first, then choose a time") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp)) } }
                     Spacer(Modifier.height(8.dp))
@@ -791,7 +792,7 @@ private fun ActivityCard(title: String, kind: String, status: String, details: L
     Text("Complete the details below. We will confirm your request after review.", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
     Row(Modifier.horizontalScroll(rememberScrollState())) { FilterChip(selected = type == "table", onClick = { type = "table" }, label = { Text("Table") }, modifier = Modifier.padding(end = 8.dp)); FilterChip(selected = type == "exclusive", onClick = { type = "exclusive" }, label = { Text("Exclusive venue") }) }
     Spacer(Modifier.height(10.dp)); OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
-    DateTimePickerField(date, "Preferred date and time", "Tap to choose date and time") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; Spacer(Modifier.height(10.dp))
+    DateTimePickerField(date, "Choose your schedule", "Select date and time", "Tap to choose a date, then choose a time.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; Spacer(Modifier.height(10.dp))
     if (type == "table") {
         Text("Table size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp)) } }
     } else {
