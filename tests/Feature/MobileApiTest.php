@@ -50,6 +50,62 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('message', 'Please verify your Gmail address before signing in.');
     }
 
+    public function test_mobile_login_returns_retry_details_for_a_thirty_second_lockout(): void
+    {
+        $this->freezeSecond();
+        $customer = User::factory()->create([
+            'email' => 'mobile.lockout@example.com',
+            'password' => 'CorrectMobilePassword123!',
+            'role' => User::ROLE_CUSTOMER,
+        ]);
+        $invalidCredentials = [
+            'login' => $customer->email,
+            'password' => 'IncorrectMobilePassword123!',
+            'device_name' => 'Lockout test phone',
+        ];
+
+        for ($attempt = 1; $attempt <= 4; $attempt++) {
+            $this->postJson('/api/v1/login', $invalidCredentials)
+                ->assertUnprocessable()
+                ->assertExactJson([
+                    'message' => 'The username/email or password is incorrect.',
+                ]);
+        }
+
+        $this->postJson('/api/v1/login', $invalidCredentials)
+            ->assertStatus(429)
+            ->assertHeader('Retry-After', '30')
+            ->assertExactJson([
+                'message' => 'Too many login attempts. Try again in 30 seconds.',
+                'retry_after' => 30,
+            ]);
+
+        $this->travel(29)->seconds();
+
+        $this->postJson('/api/v1/login', [
+            'login' => $customer->email,
+            'password' => 'CorrectMobilePassword123!',
+            'device_name' => 'Lockout test phone',
+        ])->assertStatus(429)
+            ->assertHeader('Retry-After', '1')
+            ->assertExactJson([
+                'message' => 'Too many login attempts. Try again in 1 seconds.',
+                'retry_after' => 1,
+            ]);
+        $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $customer->id]);
+
+        $this->travel(1)->seconds();
+
+        $response = $this->postJson('/api/v1/login', [
+            'login' => $customer->email,
+            'password' => 'CorrectMobilePassword123!',
+            'device_name' => 'Lockout test phone',
+        ])->assertOk()
+            ->assertJsonPath('data.user.id', $customer->id);
+
+        $this->assertNotEmpty($response->json('data.token'));
+    }
+
     public function test_mobile_token_protects_endpoints_and_can_be_revoked(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER, 'password' => 'MobilePassword123!']);
