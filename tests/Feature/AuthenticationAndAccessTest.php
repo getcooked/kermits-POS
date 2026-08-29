@@ -35,6 +35,11 @@ class AuthenticationAndAccessTest extends TestCase
         }
     }
 
+    public function test_guest_can_view_the_login_page_without_redirecting_to_home(): void
+    {
+        $this->get('/login')->assertOk()->assertSee('Log in to your account');
+    }
+
     public function test_customer_registration_cannot_choose_a_staff_role(): void
     {
         $this->withSession([
