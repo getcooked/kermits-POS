@@ -86,8 +86,11 @@ Route::middleware('auth')->group(function (): void {
             });
     });
 
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('role:super_admin,admin')
+        ->name('dashboard');
+
     Route::middleware('role:super_admin')->group(function (): void {
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{customer}/history', [CustomerController::class, 'show'])->name('customers.show');
         Route::get('/reports', [ReportController::class, 'index'])->name('reports');
@@ -142,6 +145,6 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::get('/receipts/{order}', [ReportController::class, 'receipt'])
-        ->middleware('role:super_admin,cashier,customer')
+        ->middleware('role:super_admin,admin,cashier,customer')
         ->name('receipts.show');
 });

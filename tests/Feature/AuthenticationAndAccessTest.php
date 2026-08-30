@@ -16,7 +16,7 @@ class AuthenticationAndAccessTest extends TestCase
     {
         foreach ([
             User::ROLE_SUPER_ADMIN => '/dashboard',
-            User::ROLE_ADMIN => '/',
+            User::ROLE_ADMIN => '/dashboard',
             User::ROLE_CASHIER => '/cashier',
             User::ROLE_CUSTOMER => '/shop',
         ] as $role => $destination) {
@@ -33,6 +33,25 @@ class AuthenticationAndAccessTest extends TestCase
 
             $this->post('/logout')->assertRedirect('/login');
         }
+    }
+
+    public function test_admin_login_goes_directly_to_dashboard_even_with_a_stale_intended_url(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'direct.admin@example.com',
+            'password' => 'AdminPassword123!',
+            'role' => User::ROLE_ADMIN,
+        ]);
+
+        $this->withSession(['url.intended' => '/shop'])
+            ->post('/login', [
+                'email' => $admin->email,
+                'password' => 'AdminPassword123!',
+            ])->assertRedirect('/dashboard')
+            ->assertSessionMissing('url.intended');
+
+        $this->assertAuthenticatedAs($admin);
+        $this->get('/login')->assertRedirect('/dashboard');
     }
 
     public function test_guest_can_view_the_login_page_without_redirecting_to_home(): void
@@ -222,13 +241,20 @@ class AuthenticationAndAccessTest extends TestCase
         $this->actingAs($customer)->get('/book')->assertOk();
     }
 
-    public function test_only_super_admin_can_access_administrative_pages(): void
+    public function test_admin_gets_a_read_only_dashboard_while_operational_pages_stay_super_admin_only(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
 
-        foreach (['/dashboard', '/customers', '/reports', '/inventory', '/products', '/reservations', '/activity-logs'] as $path) {
+        $this->actingAs($admin)->get('/dashboard')
+            ->assertOk()
+            ->assertSee(route('dashboard'), false)
+            ->assertDontSee(route('reports'), false)
+            ->assertDontSee(route('inventory.index'), false)
+            ->assertDontSee(route('activity-logs.index'), false);
+
+        foreach (['/customers', '/reports', '/inventory', '/products', '/reservations', '/activity-logs'] as $path) {
             $this->actingAs($superAdmin)->get($path)->assertOk();
             $this->actingAs($admin)->get($path)->assertForbidden();
         }
@@ -258,6 +284,20 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee(route('activity-logs.index'), false)
             ->assertSee(route('settings.payment.edit'), false)
             ->assertSee(route('customers.index'), false);
+    }
+
+    public function test_admin_can_open_a_paid_receipt_link_from_the_dashboard(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $order = Order::query()->create([
+            'user_id' => $cashier->id,
+            'total' => 350,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+        ]);
+
+        $this->actingAs($admin)->get(route('receipts.show', $order))->assertOk();
     }
 
     public function test_invalid_credentials_are_rejected(): void
@@ -313,7 +353,7 @@ class AuthenticationAndAccessTest extends TestCase
             'password' => 'CorrectPassword123!',
         ])->assertRedirect(route('login'))
             ->assertSessionHasErrors([
-                'email' => 'Too many login attempts. Try again in 1 seconds.',
+                'email' => 'Too many login attempts. Try again in 1 second.',
             ])
             ->assertSessionHas('login_retry_after', 1);
         $this->assertGuest();

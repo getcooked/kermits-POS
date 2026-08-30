@@ -5,7 +5,7 @@
 - Passwords are hashed by Laravel before storage.
 - Login regenerates the session; logout invalidates it and regenerates the CSRF token.
 - Public registration always assigns the customer role.
-- Role middleware protects customer and cashier routes, while all administrative web routes require the super-admin role.
+- Role middleware protects customer and cashier routes. The dashboard permits read-only admin access, while operational administrative routes require the super-admin role.
 - Login, registration, and public reservation submissions are rate-limited.
 - Laravel CSRF protection covers state-changing web forms.
 - Reservation confirmation links are temporary and cryptographically signed.

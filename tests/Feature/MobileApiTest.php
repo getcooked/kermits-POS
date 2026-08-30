@@ -89,7 +89,7 @@ class MobileApiTest extends TestCase
         ])->assertStatus(429)
             ->assertHeader('Retry-After', '1')
             ->assertExactJson([
-                'message' => 'Too many login attempts. Try again in 1 seconds.',
+                'message' => 'Too many login attempts. Try again in 1 second.',
                 'retry_after' => 1,
             ]);
         $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $customer->id]);
