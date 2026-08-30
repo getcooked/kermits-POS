@@ -8,7 +8,7 @@ A Laravel capstone project for restaurant sales, inventory, customer ordering, a
 | --- | --- |
 | Customer | Shop, own orders, table/food/exclusive reservations |
 | Cashier | Point of sale and staff receipts |
-| Admin | No administrative web pages |
+| Admin | Read-only dashboard overview and paid sale receipts |
 | Super admin | Dashboard, customers, inventory, reports, reservations, product management, and POS |
 
 Public registration always creates a **customer** account. Staff roles must be assigned through an authorized administrative process or database seeder.

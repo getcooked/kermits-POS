@@ -43,7 +43,7 @@ class AdminPasswordManagementTest extends TestCase
 
         $this->post('/logout');
         $this->post('/login', ['email' => $admin->email, 'password' => 'NewPassword456!'])
-            ->assertRedirect('/');
+            ->assertRedirect('/dashboard');
     }
 
     public function test_only_super_admin_can_manage_admin_passwords(): void

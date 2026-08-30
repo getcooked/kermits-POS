@@ -84,9 +84,10 @@ class MobileAuthController extends Controller
         string $login,
     ): JsonResponse {
         $retryAfter = $loginAttempts->secondsRemaining($request, $login);
+        $unit = $retryAfter === 1 ? 'second' : 'seconds';
 
         return response()->json([
-            'message' => "Too many login attempts. Try again in {$retryAfter} seconds.",
+            'message' => "Too many login attempts. Try again in {$retryAfter} {$unit}.",
             'retry_after' => $retryAfter,
         ], 429)->header('Retry-After', (string) $retryAfter);
     }

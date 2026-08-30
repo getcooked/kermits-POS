@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -65,6 +66,8 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -135,22 +138,32 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
     var signedIn by mutableStateOf(store.token != null && store.keepsSession); private set
+    var loginCooldownSeconds by mutableIntStateOf(0); private set
+    var loginCooldownReason by mutableStateOf<String?>(null); private set
+    private var loginCooldownDeadlineMillis = 0L
+    private var loginCooldownJob: Job? = null
     fun clearError() { error = null }
     init {
         if (signedIn) refresh() else store.clear()
     }
     fun login(login: String, password: String, keepSignedIn: Boolean) {
-        if (busy || login.isBlank() || password.isBlank()) return
+        if (busy || loginCooldownIsActive() || login.isBlank() || password.isBlank()) return
         busy = true
         error = null
         viewModelScope.launch {
             try {
                 val response = api.login(LoginRequest(login.trim(), password))
                 if (!response.isSuccessful) {
-                    error = when {
-                        response.code() == 429 -> "Too many login attempts. Please wait one minute and try again."
-                        response.code() >= 500 -> "Kermit's server is temporarily unavailable. Please try again shortly."
-                        else -> apiError(response.errorBody()?.string()) ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
+                    val parsedError = parseApiError(response.errorBody()?.string())
+                    when {
+                        response.code() == 429 -> {
+                            val retryAfter = parsedError?.retry_after?.takeIf { it > 0 }
+                                ?: response.headers()["Retry-After"]?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+                                ?: DEFAULT_LOGIN_COOLDOWN_SECONDS
+                            startLoginCooldown(retryAfter, apiErrorMessage(parsedError))
+                        }
+                        response.code() >= 500 -> error = "Kermit's server is temporarily unavailable. Please try again shortly."
+                        else -> error = apiErrorMessage(parsedError) ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
                     }
                     return@launch
                 }
@@ -185,6 +198,42 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 busy = false
             }
         }
+    }
+    private fun loginCooldownIsActive(): Boolean {
+        if (loginCooldownDeadlineMillis <= 0L) return false
+        if (SystemClock.elapsedRealtime() < loginCooldownDeadlineMillis) return true
+
+        loginCooldownJob?.cancel()
+        finishLoginCooldown()
+        return false
+    }
+    private fun startLoginCooldown(seconds: Int, message: String?) {
+        loginCooldownJob?.cancel()
+        val durationSeconds = seconds.coerceAtLeast(1)
+        loginCooldownDeadlineMillis = SystemClock.elapsedRealtime() + durationSeconds.toLong() * 1_000L
+        loginCooldownSeconds = durationSeconds
+        loginCooldownReason = message
+            ?.replace(LOGIN_COOLDOWN_SUFFIX, "")
+            ?.trim()
+            ?.trimEnd('.')
+            ?.takeIf { it.isNotBlank() }
+            ?: "Too many login attempts"
+        error = null
+        loginCooldownJob = viewModelScope.launch {
+            while (true) {
+                val remainingMillis = loginCooldownDeadlineMillis - SystemClock.elapsedRealtime()
+                if (remainingMillis <= 0L) break
+                loginCooldownSeconds = ((remainingMillis + 999L) / 1_000L).toInt()
+                delay(minOf(remainingMillis, 1_000L))
+            }
+            finishLoginCooldown()
+        }
+    }
+    private fun finishLoginCooldown() {
+        loginCooldownDeadlineMillis = 0L
+        loginCooldownSeconds = 0
+        loginCooldownReason = null
+        loginCooldownJob = null
     }
     fun logout() = viewModelScope.launch {
         runCatching { api.deletePushInstallation() }
@@ -341,7 +390,12 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection."; done(false) } finally { busy = false }
     }
     companion object {
-        private fun apiError(body: String?): String? = body?.let { runCatching { Moshi.Builder().build().adapter(ApiError::class.java).fromJson(it) }.getOrNull() }?.let { apiError -> apiError.message ?: apiError.errors?.values?.flatten()?.firstOrNull() }
+        private const val DEFAULT_LOGIN_COOLDOWN_SECONDS = 30
+        private val LOGIN_COOLDOWN_SUFFIX = Regex("""\s*Try again in\s+\d+\s+seconds?\.?\s*$""", RegexOption.IGNORE_CASE)
+        private val API_ERROR_ADAPTER = Moshi.Builder().build().adapter(ApiError::class.java)
+        private fun parseApiError(body: String?): ApiError? = body?.let { runCatching { API_ERROR_ADAPTER.fromJson(it) }.getOrNull() }
+        private fun apiErrorMessage(apiError: ApiError?): String? = apiError?.message ?: apiError?.errors?.values?.flatten()?.firstOrNull()
+        private fun apiError(body: String?): String? = apiErrorMessage(parseApiError(body))
         fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -480,7 +534,14 @@ private fun BrandPanel(modifier: Modifier) {
 private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, onForgotPassword: () -> Unit, modifier: Modifier) {
     var keepSignedIn by remember { mutableStateOf(true) }
     var passwordVisible by remember { mutableStateOf(false) }
-    val canLogIn = !vm.busy && login.isNotBlank() && password.isNotBlank()
+    val cooldownSeconds = vm.loginCooldownSeconds
+    val loginError = if (cooldownSeconds > 0) {
+        val unit = if (cooldownSeconds == 1) "second" else "seconds"
+        "${vm.loginCooldownReason ?: "Too many login attempts"}. Try again in $cooldownSeconds $unit."
+    } else {
+        vm.error
+    }
+    val canLogIn = !vm.busy && cooldownSeconds == 0 && login.isNotBlank() && password.isNotBlank()
     val submitLogin = { if (canLogIn) vm.login(login, password, keepSignedIn) }
     Column(modifier.background(Color(0xFFF7F7F1)).padding(horizontal = 26.dp, vertical = 34.dp), verticalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).align(Alignment.CenterHorizontally)) {
@@ -490,9 +551,9 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
             Spacer(Modifier.height(28.dp))
             OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submitLogin() }), trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (passwordVisible) "Hide password" else "Show password") } }, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
-            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
+            loginError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it }); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
-            Spacer(Modifier.height(15.dp)); Button(onClick = submitLogin, enabled = canLogIn, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(if (vm.busy) "Signing in..." else "Log in", fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
+            Spacer(Modifier.height(15.dp)); Button(onClick = submitLogin, enabled = canLogIn, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(when { vm.busy -> "Signing in..."; cooldownSeconds > 0 -> "Try again in ${cooldownSeconds}s"; else -> "Log in" }, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
             Spacer(Modifier.height(18.dp)); TextButton(onClick = onRegister, modifier = Modifier.fillMaxWidth()) { Text("New customer? Create an account", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
     }

@@ -129,7 +129,15 @@ class AuthController extends Controller
         $loginAttempts->clear($request, $login);
         $request->session()->regenerate();
 
-        return redirect()->intended($request->user()->homeRoute());
+        $user = $request->user();
+
+        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN)) {
+            $request->session()->forget('url.intended');
+
+            return redirect()->to($user->homeRoute());
+        }
+
+        return redirect()->intended($user->homeRoute());
     }
 
     public function destroy(Request $request): RedirectResponse
@@ -147,9 +155,10 @@ class AuthController extends Controller
         string $login,
     ): RedirectResponse {
         $retryAfter = $loginAttempts->secondsRemaining($request, $login);
+        $unit = $retryAfter === 1 ? 'second' : 'seconds';
 
         return redirect()->route('login')
-            ->withErrors(['email' => "Too many login attempts. Try again in {$retryAfter} seconds."])
+            ->withErrors(['email' => "Too many login attempts. Try again in {$retryAfter} {$unit}."])
             ->withInput([
                 'email' => $login,
                 'remember' => $request->boolean('remember'),

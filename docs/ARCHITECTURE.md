@@ -37,7 +37,7 @@ Public booking form -> throttled submission -> validated reservation -> signed c
 
 ## Role boundary
 
-Customer, cashier, and super-admin routes are separate route groups. Regular admin accounts have no administrative page access. Navigation visibility is only a convenience; authorization is enforced by server-side role middleware on every protected route.
+Customer, cashier, admin, and super-admin routes are separated by server-side role middleware. Admin accounts receive a read-only dashboard overview; operational and account-management pages remain restricted to the super-admin. Navigation visibility is only a convenience; authorization is enforced on every protected route.
 
 ## Development rules
 

@@ -33,7 +33,11 @@ data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
 data class LoginResponse(val data: LoginData)
 @JsonClass(generateAdapter = true)
-data class ApiError(val message: String? = null, val errors: Map<String, List<String>>? = null)
+data class ApiError(
+    val message: String? = null,
+    val errors: Map<String, List<String>>? = null,
+    val retry_after: Int? = null,
+)
 @JsonClass(generateAdapter = true)
 data class CatalogData(val products: List<Product>, val gcash_qr_url: String?)
 @JsonClass(generateAdapter = true)
