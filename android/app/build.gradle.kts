@@ -7,6 +7,11 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val firebaseConfigPresent = file("google-services.json").isFile
+if (firebaseConfigPresent) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) {
@@ -24,10 +29,11 @@ android {
         applicationId = "com.getcooked.kermits"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", "\"$productionApiBaseUrl\"")
+        buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigPresent.toString())
     }
 
     buildTypes {
@@ -62,8 +68,11 @@ android {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val firebaseBom = platform("com.google.firebase:firebase-bom:34.18.0")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    implementation(firebaseBom)
+    implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")

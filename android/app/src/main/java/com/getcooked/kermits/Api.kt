@@ -50,6 +50,14 @@ data class SendCodeResponse(val data: SendCodeData)
 data class VerifyCodeData(val registration_token: String, val email: String, val expires_in: Int)
 @JsonClass(generateAdapter = true)
 data class VerifyCodeResponse(val data: VerifyCodeData)
+@JsonClass(generateAdapter = true)
+data class PushInstallationRequest(
+    val identifier: String,
+    val provider: String = "fcm",
+    val identifier_kind: String = "fid",
+    val platform: String = "android",
+    val app_version: String = BuildConfig.VERSION_NAME,
+)
 
 fun String.formPart(): RequestBody = toRequestBody("text/plain".toMediaType())
 
@@ -61,6 +69,8 @@ interface KermitsApi {
     @POST("register") suspend fun register(@Body request: RegisterRequest): Response<Map<String, User>>
     @GET("me") suspend fun me(): Map<String, User>
     @POST("logout") suspend fun logout(): Response<Unit>
+    @PUT("push-installation") suspend fun registerPushInstallation(@Body request: PushInstallationRequest): Response<Unit>
+    @DELETE("push-installation") suspend fun deletePushInstallation(): Response<Unit>
     @GET("products") suspend fun products(): CatalogResponse
     @GET("orders") suspend fun orders(): ListOrdersResponse
     @GET("orders/{order}") suspend fun order(@Path("order") id: Int): Response<Map<String, Order>>

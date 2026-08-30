@@ -60,6 +60,16 @@ class User extends Authenticatable
         return $this->hasMany(Reservation::class);
     }
 
+    public function pushInstallations(): HasMany
+    {
+        return $this->hasMany(MobilePushInstallation::class);
+    }
+
+    public function mobileApiTokens(): HasMany
+    {
+        return $this->hasMany(MobileApiToken::class);
+    }
+
     public function hasRole(string ...$roles): bool
     {
         return in_array($this->role, $roles, true);

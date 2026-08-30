@@ -1,10 +1,14 @@
 package com.getcooked.kermits
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
@@ -57,18 +61,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
 import retrofit2.HttpException
-import retrofit2.converter.moshi.MoshiConverterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.JsonEncodingException
@@ -77,26 +78,39 @@ import java.net.SocketTimeoutException
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
+    private var reservationUpdateId by mutableStateOf<Int?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        reservationUpdateId = intent.reservationUpdateId()
         val store = SessionStore(this)
-        val log = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
-        val clientBuilder = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
-            .callTimeout(35, TimeUnit.SECONDS)
-            .addInterceptor { chain ->
-            chain.proceed(chain.request().newBuilder().apply { store.token?.let { header("Authorization", "Bearer $it") }; header("Accept", "application/json") }.build())
+        val api = ApiClient.create(store)
+        PushNotifications.createChannel(this)
+        setContent {
+            KermitsTheme {
+                KermitsApp(
+                    ViewModelProvider(this, AppViewModel.factory(api, store))[AppViewModel::class.java],
+                    store,
+                    reservationUpdateId,
+                    onReservationUpdateConsumed = { reservationUpdateId = null },
+                )
+            }
         }
-        if (BuildConfig.DEBUG) clientBuilder.addInterceptor(log)
-        val client = clientBuilder.build()
-        val api = Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL).client(client).addConverterFactory(MoshiConverterFactory.create()).build().create(KermitsApi::class.java)
-        setContent { KermitsTheme { KermitsApp(ViewModelProvider(this, AppViewModel.factory(api, store))[AppViewModel::class.java]) } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        reservationUpdateId = intent.reservationUpdateId()
     }
 }
+
+private fun Intent?.reservationUpdateId(): Int? = this
+    ?.takeIf { it.action == "com.getcooked.kermits.OPEN_RESERVATION_UPDATE" }
+    ?.getIntExtra("reservation_id", -1)
+    ?.takeIf { it > 0 }
 
 private val BRAND_LOGO_URL = BuildConfig.API_BASE_URL.substringBefore("/api/").trimEnd('/') + "/kermits-logo.jpg"
 
@@ -145,7 +159,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                     error = "Kermit's returned an incomplete sign-in response. Please try again."
                     return@launch
                 }
-                store.saveSession(result.token, keepSignedIn)
+                store.saveSession(result.token, keepSignedIn, result.user.id)
                 user = result.user
                 signedIn = true
                 try {
@@ -173,6 +187,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         }
     }
     fun logout() = viewModelScope.launch {
+        runCatching { api.deletePushInstallation() }
         runCatching { api.logout() }
         store.clear()
         user = null
@@ -188,6 +203,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             // Validate a persisted token first. Previously an expired token kept the
             // app on its signed-in screen, making the login form inaccessible.
             user = api.me()["data"] ?: throw IllegalStateException("Missing account data")
+            store.userId = user?.id
             load()
         } catch (exception: HttpException) {
             if (exception.code() == 401) {
@@ -353,7 +369,16 @@ private fun BrandLogo(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun KermitsApp(vm: AppViewModel) {
+fun KermitsApp(
+    vm: AppViewModel,
+    store: SessionStore,
+    reservationUpdateId: Int?,
+    onReservationUpdateConsumed: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var registering by remember { mutableStateOf(false) }
@@ -363,6 +388,28 @@ fun KermitsApp(vm: AppViewModel) {
     var orderMessage by remember { mutableStateOf<String?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
     var selectedReservation by remember { mutableStateOf<Reservation?>(null) }
+    LaunchedEffect(vm.signedIn) {
+        if (vm.signedIn) {
+            PushNotifications.sync(context)
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+                PushNotifications.shouldRequestPermission(context, store)
+            ) {
+                store.notificationPermissionRequested = true
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            PushNotifications.clearShownNotifications(context)
+        }
+    }
+    LaunchedEffect(vm.signedIn, reservationUpdateId) {
+        if (vm.signedIn && reservationUpdateId != null) {
+            tab = 1
+            vm.loadReservation(reservationUpdateId) { selectedReservation = it }
+            onReservationUpdateConsumed()
+        }
+    }
     if (!vm.signedIn) {
         when {
             recoveringPassword -> PasswordRecoveryScreen(vm, onBack = { recoveringPassword = false })

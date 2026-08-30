@@ -80,6 +80,10 @@ class CustomerController extends Controller
                 ]);
             }
 
+            // Revoking the mobile sessions also cascades to their push installations,
+            // preventing notifications after a customer account is deleted.
+            $customer->mobileApiTokens()->delete();
+
             $customer->forceFill([
                 'name' => 'Deleted Customer #'.$customer->id,
                 'username' => $deletedIdentity,
