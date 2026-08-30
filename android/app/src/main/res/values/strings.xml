@@ -1,1 +1,5 @@
-<resources><string name="app_name">Kermits</string></resources>
+<resources>
+    <string name="app_name">Kermits</string>
+    <string name="reservation_updates_channel_name">Reservation updates</string>
+    <string name="reservation_updates_channel_description">Status, payment, and schedule updates for your reservations</string>
+</resources>

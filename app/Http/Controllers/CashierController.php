@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CashierCheckoutRequest;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Reservation;
 use App\Models\StockMovement;
 use App\Models\SystemSetting;
 use App\Services\OrderService;
+use App\Services\ReservationPushNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,14 +47,18 @@ class CashierController extends Controller
         ]);
     }
 
-    public function updateCustomerOrder(Request $request, Order $order): RedirectResponse
-    {
+    public function updateCustomerOrder(
+        Request $request,
+        Order $order,
+        ReservationPushNotifier $reservationPushes,
+    ): RedirectResponse {
         $validated = $request->validate([
             'quantities' => ['required', 'array'],
             'quantities.*' => ['required', 'integer', 'min:0', 'max:22'],
         ]);
 
-        DB::transaction(function () use ($order, $validated, $request): void {
+        $itemsChanged = false;
+        DB::transaction(function () use ($order, $validated, $request, &$itemsChanged): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensurePendingCustomerOrder($lockedOrder);
             $items = $lockedOrder->items()->lockForUpdate()->get();
@@ -76,6 +82,7 @@ class CashierController extends Controller
                 }
 
                 if ($difference !== 0) {
+                    $itemsChanged = true;
                     $product->update(['stock' => $product->stock - $difference]);
                     StockMovement::query()->create([
                         'product_id' => $product->id,
@@ -101,6 +108,13 @@ class CashierController extends Controller
 
             $lockedOrder->update(['total' => $totalCents / 100]);
         }, attempts: 3);
+
+        if ($itemsChanged) {
+            $reservation = Reservation::query()->where('order_id', $order->id)->first();
+            if ($reservation) {
+                $reservationPushes->notify($reservation, ['items']);
+            }
+        }
 
         return redirect()->route('cashier.orders.review', $order)->with('status', 'Order review saved.');
     }

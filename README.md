@@ -55,7 +55,7 @@ Current verified baseline: **100 tests, 612 assertions**, with no known Composer
 
 ## Mobile API readiness
 
-The versioned customer API is available under `/api/v1` and supports customer login/logout, profile details, the live product catalog, ordering, order history, reservations, and reservation history. Mobile access tokens are hashed in the database, expire after 30 days, and are limited to five active devices per customer.
+The versioned customer API is available under `/api/v1` and supports customer login/logout, profile details, the live product catalog, ordering, order history, reservations, reservation history, and authenticated FCM installation registration. Mobile access tokens are hashed in the database, expire after 30 days, and are limited to five active devices per customer. Firebase installation IDs are encrypted at rest and removed with their mobile sessions.
 
 The `/download-app` endpoint serves the native Kotlin + Jetpack Compose APK from `storage/app/releases/kermits.apk`. From `android/`, run `./gradlew :app:publishDownloadApk` to compile the native project and replace the downloadable artifact.
 
@@ -65,9 +65,10 @@ Before connecting an Android build to production, deploy the latest code and run
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan optimize:clear
+php artisan queue:work --tries=5
 ```
 
-Set `APP_URL=https://kermits-pos.com` so API image and payment URLs use the public HTTPS domain. The first Android release can use existing verified customer accounts. Native registration/email verification, password reset, and dedicated printable-receipt endpoints should be added if those workflows must happen entirely inside the app.
+Set `APP_URL=https://kermits-pos.com` so API image and payment URLs use the public HTTPS domain. Reservation push delivery also requires `FCM_PROJECT_ID`, an external `GOOGLE_APPLICATION_CREDENTIALS` service-account JSON path, `android/app/google-services.json` at build time, and a continuously supervised Laravel queue worker. See `android/README.md` for activation steps.
 
 ## Production notes
 

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\FcmMessageSender;
+use App\Models\Reservation;
+use App\Observers\ReservationObserver;
+use App\Services\GoogleFcmMessageSender;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -13,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(FcmMessageSender::class, GoogleFcmMessageSender::class);
     }
 
     /**
@@ -21,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Reservation::observe(ReservationObserver::class);
+
         Password::defaults(fn (): Password => Password::min(12)
             ->mixedCase()
             ->letters()

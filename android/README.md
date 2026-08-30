@@ -29,15 +29,35 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 - Live product catalog with stock-aware cart
 - Cash or GCash order submission
 - Order history and reservation history
+- Push notifications for reservation status, payment, schedule, detail, and linked-order updates
 - HTTPS-only release default, shrinking, resource optimization, and debug-only HTTP logging
 - Web-aligned customer UI with circular Kermit's branding, dark navigation, search, category filters, menu cards, and cart summary
+
+## Enable reservation push notifications
+
+Push delivery uses Firebase Cloud Messaging (FCM). The project intentionally builds with push disabled when Firebase configuration is absent, so local builds never require production credentials.
+
+1. In Firebase, register an Android app with package name `com.getcooked.kermits`.
+2. Download that app's `google-services.json` into `android/app/google-services.json`, then rebuild the APK. This file is ignored by Git in this repository.
+3. Create a server-side Google service account that can send FCM messages. Store its JSON file outside the repository and outside the public web root.
+4. On the Laravel server, set `FCM_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS` to the Firebase project ID and the absolute service-account JSON path.
+5. Deploy dependencies and the migration, clear cached configuration, and keep a queue worker supervised:
+
+```powershell
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan optimize:clear
+php artisan queue:work --tries=5
+```
+
+Android 13 and newer asks the signed-in customer for notification permission. The server stores Firebase installation IDs encrypted, sends only reservation identifiers/status metadata, and removes installations rejected by FCM.
 
 ## Release checklist
 
 1. Deploy the Laravel API and set its public `APP_URL` to the HTTPS production domain.
 2. Confirm API throttling, mail delivery, backups, and storage permissions in production.
 3. Add a real app signing key through Android Studio or CI; do not commit it.
-4. Run `assembleRelease`, install the signed artifact on a clean device, and exercise login, ordering, logout, and history flows against staging.
+4. Add `google-services.json`, run `assembleRelease`, install the signed artifact on a clean device, and exercise login, reservation updates, push permission, notification taps, logout, ordering, and history flows against staging.
 5. Add Crashlytics or an equivalent crash reporting service before publishing.
 
 The build requires JDK 17 or newer and an Android SDK with API 35. Android Studio's bundled runtime is suitable when `JAVA_HOME` points to a complete installation.

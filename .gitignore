@@ -17,6 +17,7 @@
 /public/hot
 /storage/*.key
 /storage/pail
+/android/app/google-services.json
 Homestead.json
 Homestead.yaml
 Thumbs.db
