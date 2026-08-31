@@ -86,7 +86,9 @@ class MobilePushNotificationTest extends TestCase
             return $job->installationId === $installation->id
                 && $job->reservationId === $reservation->id
                 && $job->status === 'confirmed'
-                && $job->changedFields === ['status'];
+                && $job->changedFields === ['status']
+                && $job->title === 'Reservation accepted'
+                && $job->body === "Your reservation {$reservation->reference} was accepted by the admin.";
         });
         Queue::assertPushed(SendReservationUpdatedPush::class, 1);
     }
@@ -140,6 +142,14 @@ class MobilePushNotificationTest extends TestCase
 
         $this->assertSame('invalid-installation', $sender->installationId);
         $this->assertSame('reservation.updated', $sender->data['type']);
+        $this->assertSame('event-123', $sender->data['event_id']);
+        $this->assertSame((string) $reservation->id, $sender->data['reservation_id']);
+        $this->assertSame($reservation->reference, $sender->data['reference']);
+        $this->assertSame('confirmed', $sender->data['status']);
+        $this->assertSame('pending', $sender->data['payment_status']);
+        $this->assertSame('status', $sender->data['changed_fields']);
+        $this->assertSame('Reservation Confirmed', $sender->data['title']);
+        $this->assertSame('Your reservation was confirmed.', $sender->data['body']);
         $this->assertSame((string) $customer->id, $sender->data['user_id']);
         $this->assertArrayNotHasKey('customer_name', $sender->data);
         $this->assertArrayNotHasKey('email', $sender->data);

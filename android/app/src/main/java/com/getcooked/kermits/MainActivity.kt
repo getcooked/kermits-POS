@@ -440,7 +440,7 @@ fun KermitsApp(
     var recoveringPassword by remember { mutableStateOf(false) }
     var tab by rememberSaveable(vm.signedIn) { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
-    var orderMessage by remember { mutableStateOf<String?>(null) }
+    var submissionMessage by remember { mutableStateOf<String?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
     var selectedReservation by remember { mutableStateOf<Reservation?>(null) }
     LaunchedEffect(vm.signedIn) {
@@ -473,6 +473,19 @@ fun KermitsApp(
         }
         return
     }
+    submissionMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { submissionMessage = null },
+            icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null) },
+            title = { Text("Request submitted") },
+            text = { Text(message) },
+            confirmButton = {
+                Button(onClick = { submissionMessage = null }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
     BackHandler(enabled = tab != 0) { tab = 0 }
     Scaffold(
         containerColor = Color(0xFFEFEFEF),
@@ -480,14 +493,13 @@ fun KermitsApp(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp)) {
             if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = Color(0xFFB5C019), trackColor = Color.Transparent)
-            orderMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when (tab) {
-                    0 -> MenuScreen(vm, payment, { payment = it }, { message -> orderMessage = message }, onReserve = { tab = 2 })
+                    0 -> MenuScreen(vm, payment, { payment = it }, { message -> submissionMessage = message }, onReserve = { tab = 2 })
                     1 -> CustomerHistoryScreen(vm, onOrder = { vm.loadOrder(it) { selectedOrder = it } }, onReservation = { vm.loadReservation(it) { selectedReservation = it } }, onReserve = { tab = 2 })
-                    2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { ReservationScreen(vm, onDetail = { id -> vm.loadReservation(id) { selectedReservation = it } }) { message -> orderMessage = message } }
+                    2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { ReservationScreen(vm, onDetail = { id -> vm.loadReservation(id) { selectedReservation = it } }) { message -> submissionMessage = message } }
                     else -> AccountScreen(vm)
                 }
             }
@@ -743,11 +755,13 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     var tableSize by remember { mutableStateOf("4") }
     var notes by remember { mutableStateOf("") }
     var paymentReference by remember { mutableStateOf("") }
-    var proofUri by remember { mutableStateOf<Uri?>(null) }
+    var proofUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val calendar = remember { Calendar.getInstance() }
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
-    val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> proofUri = uri }
+    val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { proofUri = it }
+    }
     val cartSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val categories = remember(vm.products) { listOf("All") + vm.products.mapNotNull { it.category }.distinct() }
     val filtered = remember(vm.products, category, query) {
@@ -985,14 +999,20 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
                             OutlinedTextField(paymentReference, { paymentReference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
                             Spacer(Modifier.height(8.dp))
-                            OutlinedButton(onClick = { proofPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(proofUri?.lastPathSegment ?: "Attach payment proof") }
+                            PaymentProofAttachment(
+                                proofUri = proofUri,
+                                onChoose = { proofPicker.launch("image/*") },
+                                onRemove = { proofUri = null },
+                            )
                         }
                         Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = {
                                 vm.placeOrder(context, CheckoutDetails(phone, date, tableSize, payment, paymentReference, notes, proofUri)) { ok ->
-                                    setMessage(if (ok) "Order and table request submitted." else "Order could not be submitted.")
                                     if (ok) {
+                                        setMessage("Order and table request submitted.")
+                                        paymentReference = ""
+                                        proofUri = null
                                         checkingOut = false
                                         cartOpen = false
                                     }
@@ -1004,6 +1024,60 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
                         ) { Text(if (vm.busy) "Submitting..." else "Confirm payment & view receipt", fontWeight = FontWeight.Bold) }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentProofAttachment(
+    proofUri: Uri?,
+    onChoose: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    if (proofUri == null) {
+        OutlinedButton(onClick = onChoose, modifier = Modifier.fillMaxWidth()) {
+            Text("Attach payment proof")
+        }
+        return
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8DCD2)),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Text("Attached payment proof", fontWeight = FontWeight.ExtraBold)
+            Text(
+                "Check the image before submitting. You can replace or remove it if it is incorrect.",
+                color = Color(0xFF6E746B),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(top = 3.dp, bottom = 10.dp),
+            )
+            AsyncImage(
+                model = proofUri,
+                contentDescription = "Selected GCash payment proof preview",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Color(0xFFF0F1EC)),
+                contentScale = ContentScale.Fit,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = onChoose, modifier = Modifier.weight(1f)) {
+                    Text("Replace image")
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onRemove) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -1086,7 +1160,7 @@ private fun ActivityCard(title: String, kind: String, status: String, details: L
 @Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { TextButton(onClick = close) { Text("Close") } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
 @Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
     var type by remember { mutableStateOf("table") }; var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; var guests by remember { mutableStateOf("20") }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var payment by remember { mutableStateOf("cash") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
-    val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance() }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> proofUri = uri }
+    val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance() }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
     val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
     val reservationFee = if (type == "table") mapOf("1" to 100.0, "2" to 150.0, "4" to 250.0, "8" to 450.0, "12" to 650.0)[size] ?: 250.0 else 5000.0
     val canPay = payment == "cash" || (reference.length == 13 && proofUri != null)
@@ -1115,8 +1189,31 @@ private fun ActivityCard(title: String, kind: String, status: String, details: L
     OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(reservationFee + selectedFoodTotal), fontWeight = FontWeight.Bold) }
     Spacer(Modifier.height(8.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }) }
-    if (payment == "gcash") { vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }; OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { proofPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(proofUri?.lastPathSegment ?: "Attach payment proof") } }
-    Spacer(Modifier.height(16.dp)); Button(onClick = { vm.placeReservation(context, type, phone, date, size, guests, notes, foodRequest, menuItems, payment, reference, proofUri) { ok -> if (ok) { menuItems = emptyMap(); setMessage("Reservation request submitted.") } else setMessage("Reservation could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && (type == "table" || (guests.toIntOrNull() ?: 0) in 1..300) && canPay, modifier = Modifier.fillMaxWidth()) { Text(if (vm.busy) "Submitting..." else "Request reservation") }
+    if (payment == "gcash") {
+        vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
+        OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        PaymentProofAttachment(
+            proofUri = proofUri,
+            onChoose = { proofPicker.launch("image/*") },
+            onRemove = { proofUri = null },
+        )
+    }
+    Spacer(Modifier.height(16.dp))
+    Button(
+        onClick = {
+            vm.placeReservation(context, type, phone, date, size, guests, notes, foodRequest, menuItems, payment, reference, proofUri) { ok ->
+                if (ok) {
+                    menuItems = emptyMap()
+                    reference = ""
+                    proofUri = null
+                    setMessage("Reservation request submitted.")
+                }
+            }
+        },
+        enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && (type == "table" || (guests.toIntOrNull() ?: 0) in 1..300) && canPay,
+        modifier = Modifier.fillMaxWidth(),
+    ) { Text(if (vm.busy) "Submitting..." else "Request reservation") }
     Spacer(Modifier.height(26.dp)); Text("Recent reservations", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp))
     if (vm.reservations.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else vm.reservations.forEach { reservation ->
         ListItem(headlineContent = { Text("#${reservation.id}  ${reservation.reference}  ${reservation.status}  ${money(reservation.total_amount)}") }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { onDetail(reservation.id) })

@@ -52,9 +52,12 @@ class ReservationPushNotifier
         $reference = (string) $reservation->reference;
 
         if (in_array('status', $changedFields, true)) {
-            $status = ucfirst((string) $reservation->status);
-
-            return ["Reservation {$status}", "Reservation {$reference} is now ".strtolower($status).'.'];
+            return match ((string) $reservation->status) {
+                'confirmed' => ['Reservation accepted', "Your reservation {$reference} was accepted by the admin."],
+                'completed' => ['Reservation completed', "Your reservation {$reference} was marked as completed."],
+                'cancelled' => ['Reservation cancelled', "Your reservation {$reference} was cancelled."],
+                default => ['Reservation updated', "Reservation {$reference} has a new status."],
+            };
         }
 
         if (in_array('payment_status', $changedFields, true)) {
