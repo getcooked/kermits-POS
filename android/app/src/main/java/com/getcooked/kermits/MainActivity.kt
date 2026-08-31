@@ -1139,6 +1139,11 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
     var activityTab by remember { mutableIntStateOf(0) }
     val activeReservations = remember(vm.reservations) { vm.reservations.count { it.status in listOf("pending", "confirmed") } }
     val paidOrders = remember(vm.orders) { vm.orders.count { it.payment_status == "paid" } }
+    val reservationGroups = remember(vm.reservations) {
+        vm.reservations
+            .sortedByDescending { reservationHistorySortKey(it.reservation_at) }
+            .groupBy { reservationHistoryDay(it.reservation_at) }
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
         item(key = "history-head") {
             Text("MY ACTIVITY", color = Color(0xFF777F00), fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.ExtraBold)
@@ -1170,8 +1175,23 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
         }
         if (activityTab == 0) {
             if (vm.reservations.isEmpty()) item(key = "empty-reservations") { HistoryEmpty("No reservations yet.", "Start a reservation from the menu or Reserve page.") }
-            items(vm.reservations, key = { "reservation-${it.id}" }) { reservation ->
-                ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservation.reservation_at, "TYPE" to if (reservation.type == "table") "${reservation.table_size}-seater table" else "Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
+            reservationGroups.forEach { (date, reservations) ->
+                item(key = "reservation-date-$date") {
+                    Text(
+                        date,
+                        color = Color(0xFF34382D),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 7.dp, bottom = 9.dp)
+                            .background(Color(0xFFE8EADF), RoundedCornerShape(7.dp))
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                    )
+                }
+                items(reservations, key = { "reservation-${it.id}" }) { reservation ->
+                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to receiptDate(reservation.reservation_at), "TYPE" to if (reservation.type == "table") "${reservation.table_size}-seater table" else "Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
+                }
             }
         } else {
             if (vm.orders.isEmpty()) item(key = "empty-orders") { HistoryEmpty("No purchases yet.", "Your completed menu orders will appear here.") }
@@ -1416,6 +1436,15 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     }
 }
 private val receiptDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a", Locale.US)
+private val reservationHistoryDateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US)
+
+private fun reservationHistoryDay(value: String): String = runCatching {
+    OffsetDateTime.parse(value).format(reservationHistoryDateFormatter)
+}.getOrDefault(value.substringBefore('T').substringBefore(' '))
+
+private fun reservationHistorySortKey(value: String): String = runCatching {
+    OffsetDateTime.parse(value).toLocalDate().toString()
+}.getOrDefault(value)
 
 private fun receiptDate(value: String?): String {
     if (value.isNullOrBlank()) return "Not available"
