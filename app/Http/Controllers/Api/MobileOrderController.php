@@ -115,6 +115,9 @@ class MobileOrderController extends Controller
         return [
             'id' => $order->id, 'total' => (float) $order->total, 'payment_method' => $order->payment_method,
             'payment_status' => $order->payment_status, 'payment_reference' => $order->payment_reference,
+            'cash_received' => $order->cash_received !== null ? (float) $order->cash_received : null,
+            'change_due' => $order->change_due !== null ? (float) $order->change_due : null,
+            'total_due' => $order->totalDue(),
             'created_at' => $order->created_at?->toIso8601String(),
             'reservation' => $order->reservation ? [
                 'id' => $order->reservation->id, 'reference' => $order->reservation->reference,

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\User;
@@ -132,11 +133,27 @@ class MobileApiTest extends TestCase
         $orderId = $this->withToken($token)->postJson('/api/v1/orders', [
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
             'payment_method' => 'cash',
-        ])->assertCreated()->assertJsonPath('data.total', 500)->json('data.id');
+        ])->assertCreated()
+            ->assertJsonPath('data.total', 500)
+            ->assertJsonPath('data.total_due', 500)
+            ->assertJsonPath('data.cash_received', null)
+            ->assertJsonPath('data.change_due', null)
+            ->json('data.id');
 
         $this->assertDatabaseHas('products', ['id' => $product->id, 'stock' => 3]);
         $this->withToken($token)->getJson('/api/v1/orders')
             ->assertOk()->assertJsonPath('data.0.id', $orderId);
+
+        Order::query()->findOrFail($orderId)->update([
+            'payment_status' => 'paid',
+            'cash_received' => 600,
+            'change_due' => 100,
+        ]);
+        $this->withToken($token)->getJson('/api/v1/orders/'.$orderId)
+            ->assertOk()
+            ->assertJsonPath('data.total_due', 500)
+            ->assertJsonPath('data.cash_received', 600)
+            ->assertJsonPath('data.change_due', 100);
 
         $otherToken = $this->login($other);
         $this->withToken($otherToken)->getJson('/api/v1/orders/'.$orderId)->assertForbidden();
@@ -208,6 +225,9 @@ class MobileApiTest extends TestCase
         ], ['Accept' => 'application/json'])
             ->assertCreated()
             ->assertJsonPath('data.total', 600)
+            ->assertJsonPath('data.total_due', 850)
+            ->assertJsonPath('data.cash_received', null)
+            ->assertJsonPath('data.change_due', null)
             ->assertJsonPath('data.payment_reference', '1234567890123')
             ->assertJsonPath('data.reservation.table_size', 4)
             ->assertJsonPath('data.reservation.status', 'pending')

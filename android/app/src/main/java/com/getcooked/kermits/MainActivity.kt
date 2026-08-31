@@ -49,6 +49,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -56,6 +57,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.runtime.*
@@ -79,6 +82,8 @@ import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.JsonEncodingException
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -334,7 +339,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun loadReservation(id: Int, done: (Reservation?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.reservation(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this reservation"; done(null) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
-    fun placeOrder(context: Context, details: CheckoutDetails, done: (Boolean) -> Unit) = viewModelScope.launch {
+    fun placeOrder(context: Context, details: CheckoutDetails, done: (Order?) -> Unit) = viewModelScope.launch {
         busy = true
         error = null
         try {
@@ -354,16 +359,33 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             val response = api.createOrder(parts, proof)
             if (!response.isSuccessful) {
                 error = apiError(response.errorBody()?.string()) ?: "Order details are invalid."
-                done(false)
+                done(null)
+                return@launch
+            }
+            val order = response.body()?.get("data")
+            if (order == null) {
+                cart = emptyMap()
+                error = "The order was received, but its receipt could not be loaded. Check History before trying again."
+                done(null)
+                viewModelScope.launch {
+                    runCatching { api.orders().data }.getOrNull()?.let { orders = it }
+                    runCatching { api.reservations().data }.getOrNull()?.let { reservations = it }
+                }
                 return@launch
             }
             cart = emptyMap()
-            orders = api.orders().data
-            reservations = api.reservations().data
-            done(true)
+            orders = listOf(order) + orders.filterNot { it.id == order.id }
+            order.reservation?.let { reservation ->
+                reservations = listOf(reservation) + reservations.filterNot { it.id == reservation.id }
+            }
+            done(order)
+            viewModelScope.launch {
+                runCatching { api.orders().data }.getOrNull()?.let { orders = it }
+                runCatching { api.reservations().data }.getOrNull()?.let { reservations = it }
+            }
         } catch (_: Exception) {
             error = "Unable to reach Kermit's. Check your internet connection."
-            done(false)
+            done(null)
         } finally {
             busy = false
         }
@@ -442,6 +464,7 @@ fun KermitsApp(
     var payment by remember { mutableStateOf("cash") }
     var submissionMessage by remember { mutableStateOf<String?>(null) }
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
+    var selectedOrderWasJustSubmitted by remember { mutableStateOf(false) }
     var selectedReservation by remember { mutableStateOf<Reservation?>(null) }
     LaunchedEffect(vm.signedIn) {
         if (vm.signedIn) {
@@ -497,15 +520,37 @@ fun KermitsApp(
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when (tab) {
-                    0 -> MenuScreen(vm, payment, { payment = it }, { message -> submissionMessage = message }, onReserve = { tab = 2 })
-                    1 -> CustomerHistoryScreen(vm, onOrder = { vm.loadOrder(it) { selectedOrder = it } }, onReservation = { vm.loadReservation(it) { selectedReservation = it } }, onReserve = { tab = 2 })
+                    0 -> MenuScreen(
+                        vm = vm,
+                        payment = payment,
+                        setPayment = { payment = it },
+                        onOrderSubmitted = { order ->
+                            selectedOrderWasJustSubmitted = true
+                            selectedOrder = order
+                        },
+                        onReserve = { tab = 2 },
+                    )
+                    1 -> CustomerHistoryScreen(vm, onOrder = {
+                        selectedOrderWasJustSubmitted = false
+                        vm.loadOrder(it) { order -> selectedOrder = order }
+                    }, onReservation = { vm.loadReservation(it) { selectedReservation = it } }, onReserve = { tab = 2 })
                     2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { ReservationScreen(vm, onDetail = { id -> vm.loadReservation(id) { selectedReservation = it } }) { message -> submissionMessage = message } }
                     else -> AccountScreen(vm)
                 }
             }
         }
     }
-    selectedOrder?.let { order -> DetailDialog("Order #${order.id}", "${money(order.total)} · ${order.payment_status}", order.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" } + listOf("Payment: ${order.payment_method}${order.payment_reference?.let { " · Ref $it" } ?: ""}") + (order.reservation?.let { reservation -> listOf("Table: ${reservation.table_size}-seater", "Schedule: ${reservation.reservation_at}", "Reservation fee: ${money(reservation.total_amount)}") } ?: emptyList())) { selectedOrder = null } }
+    selectedOrder?.let { order ->
+        OrderReceiptDialog(
+            order = order,
+            customerName = vm.user?.name.orEmpty(),
+            wasJustSubmitted = selectedOrderWasJustSubmitted,
+            close = {
+                selectedOrder = null
+                selectedOrderWasJustSubmitted = false
+            },
+        )
+    }
     selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservation.reservation_at, "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
 }
 
@@ -745,7 +790,7 @@ private fun showDateTimePicker(context: Context, calendar: Calendar, dateFormat:
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit, onReserve: () -> Unit) {
+private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, onOrderSubmitted: (Order) -> Unit, onReserve: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("All") }
     var cartOpen by rememberSaveable { mutableStateOf(false) }
@@ -1008,13 +1053,13 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = {
-                                vm.placeOrder(context, CheckoutDetails(phone, date, tableSize, payment, paymentReference, notes, proofUri)) { ok ->
-                                    if (ok) {
-                                        setMessage("Order and table request submitted.")
+                                vm.placeOrder(context, CheckoutDetails(phone, date, tableSize, payment, paymentReference, notes, proofUri)) { order ->
+                                    if (order != null) {
                                         paymentReference = ""
                                         proofUri = null
                                         checkingOut = false
                                         cartOpen = false
+                                        onOrderSubmitted(order)
                                     }
                                 }
                             },
@@ -1131,7 +1176,7 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
         } else {
             if (vm.orders.isEmpty()) item(key = "empty-orders") { HistoryEmpty("No purchases yet.", "Your completed menu orders will appear here.") }
             items(vm.orders, key = { "order-${it.id}" }) { order ->
-                ActivityCard(title = "Order #${order.id}", kind = "Purchase", status = order.payment_status, details = listOf("DATE" to (order.created_at ?: "—"), "PAYMENT" to order.payment_method.uppercase(), "TOTAL" to money(order.total)), onClick = { onOrder(order.id) })
+                ActivityCard(title = "Order #${order.id}", kind = "Purchase", status = order.payment_status, details = listOf("DATE" to receiptDate(order.created_at), "PAYMENT" to order.payment_method.uppercase(), "TOTAL DUE" to money(order.total_due)), actionLabel = "View receipt", onClick = { onOrder(order.id) })
             }
         }
     }
@@ -1140,7 +1185,7 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
 @Composable private fun HistoryMetric(label: String, value: Int, modifier: Modifier = Modifier) { Row(modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(label, color = Color(0xFF687064), fontSize = 12.sp); Text(value.toString(), fontSize = 20.sp, fontWeight = FontWeight.Black) } }
 
 @Composable
-private fun ActivityCard(title: String, kind: String, status: String, details: List<Pair<String, String>>, onClick: () -> Unit) {
+private fun ActivityCard(title: String, kind: String, status: String, details: List<Pair<String, String>>, actionLabel: String = "View details", onClick: () -> Unit) {
     Surface(Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onClick), shape = RoundedCornerShape(8.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -1151,8 +1196,159 @@ private fun ActivityCard(title: String, kind: String, status: String, details: L
             }
             HorizontalDivider(Modifier.padding(vertical = 13.dp), color = Color(0xFFE3E5DD))
             details.forEach { (label, value) -> Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = Color(0xFF767C72), fontSize = 10.sp, fontWeight = FontWeight.Bold); Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) } }
-            Text("View details", color = Color(0xFF626B00), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.End).padding(top = 10.dp))
+            Text(actionLabel, color = Color(0xFF626B00), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.End).padding(top = 10.dp))
         }
+    }
+}
+
+@Composable
+private fun OrderReceiptDialog(
+    order: Order,
+    customerName: String,
+    wasJustSubmitted: Boolean,
+    close: () -> Unit,
+) {
+    val isPaid = order.payment_status.equals("paid", ignoreCase = true)
+    val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
+    val paymentMessage = when {
+        isPaid -> "Payment confirmed."
+        order.payment_method == "gcash" -> "Payment submitted — awaiting verification."
+        else -> "Payment due at the counter."
+    }
+
+    Dialog(
+        onDismissRequest = close,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(horizontal = 16.dp).widthIn(max = 560.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFFF8F7F1),
+            shadowElevation = 12.dp,
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(20.dp),
+                ) {
+                    item(key = "receipt-header") {
+                        if (wasJustSubmitted) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFE8F4E9),
+                            ) {
+                                Text(
+                                    "Order and table request submitted.",
+                                    color = Color(0xFF257342),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(12.dp),
+                                )
+                            }
+                        }
+                        Text("KERMIT'S", color = Color(0xFF747D00), fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Black)
+                        Text(
+                            if (isPaid) "OFFICIAL RECEIPT" else "ORDER RECEIPT",
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(top = 4.dp).semantics { heading() },
+                        )
+                        Text("#${String.format(Locale.US, "%06d", order.id)}", color = Color(0xFF687064), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                            shape = RoundedCornerShape(9.dp),
+                            color = if (isPaid) Color(0xFFE5F4E9) else Color(0xFFFFF2CC),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(if (isPaid) "PAID" else "PAYMENT PENDING", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                Text(paymentMessage, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
+                            }
+                        }
+                        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
+                            ReceiptLine("Date", receiptDate(order.created_at))
+                            ReceiptLine("Customer", customerName.ifBlank { "Customer" })
+                            ReceiptLine("Payment", paymentLabel)
+                            ReceiptLine("Payment status", if (isPaid) "Paid" else "Pending")
+                            order.payment_reference?.let { ReceiptLine("GCash reference", it) }
+                        }
+                        Text("ITEMS", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Black)
+                        HorizontalDivider(color = Color(0xFFCBD0C3), modifier = Modifier.padding(top = 8.dp))
+                    }
+
+                    items(order.items, key = { item -> "receipt-item-${item.product_id}" }) { item ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(item.name, fontWeight = FontWeight.ExtraBold)
+                                Text("${item.quantity} × ${money(item.unit_price)}", color = Color(0xFF6E746B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                            }
+                            Text(money(item.subtotal), fontWeight = FontWeight.Bold)
+                        }
+                        HorizontalDivider(color = Color(0xFFE1E4DB))
+                    }
+
+                    item(key = "receipt-totals") {
+                        Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                            ReceiptLine("Food subtotal", money(order.total))
+                            order.reservation?.let { reservation ->
+                                ReceiptLine("Reservation fee", money(reservation.total_amount))
+                            }
+                            HorizontalDivider(color = Color(0xFFCBD0C3), modifier = Modifier.padding(vertical = 8.dp))
+                            ReceiptLine(if (isPaid) "Total paid" else "Total due", money(order.total_due), emphasized = true)
+                            order.cash_received?.let { ReceiptLine("Cash received", money(it)) }
+                            order.change_due?.let { ReceiptLine("Change", money(it)) }
+                        }
+                    }
+
+                    order.reservation?.let { reservation ->
+                        item(key = "receipt-reservation") {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                                shape = RoundedCornerShape(11.dp),
+                                color = Color.White,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8DCD2)),
+                            ) {
+                                Column(Modifier.padding(13.dp)) {
+                                    Text("TABLE REQUEST", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Black)
+                                    ReceiptLine("Reference", reservation.reference)
+                                    ReceiptLine("Schedule", receiptDate(reservation.reservation_at))
+                                    ReceiptLine("Table", "${reservation.table_size ?: reservation.guests ?: 0} seats")
+                                    ReceiptLine("Status", reservation.status.replaceFirstChar { it.uppercase() })
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "receipt-note") {
+                        Text(
+                            if (isPaid) "Thank you for your purchase!" else "This confirms your order request. It becomes an official receipt after payment is verified.",
+                            color = Color(0xFF6E746B),
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 4.dp),
+                        )
+                    }
+                }
+                HorizontalDivider(color = Color(0xFFD8DCD2))
+                Button(
+                    onClick = close,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).height(50.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
+                ) { Text("Close receipt", fontWeight = FontWeight.ExtraBold) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReceiptLine(label: String, value: String, emphasized: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = if (emphasized) 5.dp else 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(label, color = if (emphasized) Color(0xFF171817) else Color(0xFF6E746B), fontSize = if (emphasized) 16.sp else 12.sp, fontWeight = if (emphasized) FontWeight.Black else FontWeight.Medium, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        Text(value, fontSize = if (emphasized) 18.sp else 12.sp, fontWeight = if (emphasized) FontWeight.Black else FontWeight.Bold)
     }
 }
 
@@ -1219,6 +1415,14 @@ private fun ActivityCard(title: String, kind: String, status: String, details: L
         ListItem(headlineContent = { Text("#${reservation.id}  ${reservation.reference}  ${reservation.status}  ${money(reservation.total_amount)}") }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { onDetail(reservation.id) })
     }
 }
+private val receiptDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a", Locale.US)
+
+private fun receiptDate(value: String?): String {
+    if (value.isNullOrBlank()) return "Not available"
+
+    return runCatching { OffsetDateTime.parse(value).format(receiptDateFormatter) }.getOrDefault(value)
+}
+
 private fun money(value: Double) = "₱${String.format(Locale.US, "%,.2f", value)}"
 
 private fun Uri.toMultipart(context: Context, fieldName: String): MultipartBody.Part? {

@@ -154,11 +154,7 @@
                             <span>{{ $order->created_at->format('h:i A') }}</span>
                             <div>
                                 <a class="secondary-action" href="{{ route('shop.orders.show', $order) }}">View order</a>
-                                @if($order->payment_status === 'paid')
-                                    <a href="{{ route('receipts.show', $order) }}">Print receipt</a>
-                                @else
-                                    <a href="{{ route('shop.orders.show', $order) }}">Print order</a>
-                                @endif
+                                <a href="{{ route('receipts.show', $order) }}">View receipt</a>
                             </div>
                         </div>
                     </article>

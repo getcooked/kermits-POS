@@ -198,7 +198,7 @@ class ReportController extends Controller
 
     public function receipt(Order $order): View
     {
-        abort_unless($order->payment_status === 'paid', 404);
+        abort_unless(in_array($order->payment_status, ['pending', 'paid'], true), 404);
         $user = request()->user();
         $userId = $user?->id;
 
@@ -210,7 +210,7 @@ class ReportController extends Controller
         );
 
         return view('receipts.show', [
-            'order' => $order->load(['user', 'customer', 'items.product']),
+            'order' => $order->load(['user', 'customer', 'items.product', 'reservation']),
         ]);
     }
 }

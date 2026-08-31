@@ -31,6 +31,7 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 - Persistent top-right cart with item badge and in-place checkout sheet
 - GCash payment-proof preview with replace and remove controls before submission
 - Immediate submission confirmation popup for mobile orders and reservations
+- Cash and GCash order receipts available after checkout and from purchase history
 - Cash or GCash order submission
 - Order history and reservation history
 - Push notifications for reservation status, payment, schedule, detail, and linked-order updates

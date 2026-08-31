@@ -1,14 +1,18 @@
 @extends('layouts.app')
-@section('title', 'Receipt #'.$order->id)
+@section('title', ($order->payment_status === 'paid' ? 'Receipt #' : 'Order Receipt #').$order->id)
 @section('content')
 @php
     $viewer = auth()->user();
+    $isPaid = $order->payment_status === 'paid';
     $isCustomerReceipt = $viewer?->hasRole(\App\Models\User::ROLE_CUSTOMER);
-    $backRoute = $isCustomerReceipt
-        ? route('customer.history')
-        : ($viewer?->hasRole(\App\Models\User::ROLE_CASHIER, \App\Models\User::ROLE_SUPER_ADMIN)
-            ? route('cashier')
-            : route('reports'));
+    $reservation = $order->reservation;
+    $reservationCharge = (float) ($reservation?->total_amount ?? 0);
+    $totalDue = $order->totalDue();
+    $backRoute = match (true) {
+        $isCustomerReceipt => route('customer.history'),
+        $viewer?->hasRole(\App\Models\User::ROLE_SUPER_ADMIN) => route('reports'),
+        default => route('cashier'),
+    };
 @endphp
 <div class="{{ $isCustomerReceipt ? 'customer-receipt-shell' : 'admin-shell receipt-shell' }}">
     @unless($isCustomerReceipt)
@@ -18,7 +22,10 @@
     <main class="{{ $isCustomerReceipt ? 'customer-receipt-workspace' : 'admin-workspace' }}">
         <div class="receipt-wrap">
             <header class="receipt-page-head">
-                <div><p>TRANSACTION COMPLETE</p><h1>Receipt #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</h1></div>
+                <div>
+                    <p>{{ $isPaid ? 'TRANSACTION COMPLETE' : 'PAYMENT PENDING' }}</p>
+                    <h1>{{ $isPaid ? 'Official Receipt' : 'Order Receipt' }} #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</h1>
+                </div>
                 <a class="logout" href="{{ $backRoute }}">Back</a>
             </header>
 
@@ -27,15 +34,24 @@
             <article class="receipt-card">
                 <div class="receipt-brand">
                     <img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's">
-                    <div><strong>KERMIT'S</strong><span>Official Receipt</span></div>
+                    <div><strong>KERMIT'S</strong><span>{{ $isPaid ? 'Official Receipt' : 'Order Receipt' }}</span></div>
                 </div>
 
                 <dl class="receipt-meta">
-                    <div><dt>Receipt</dt><dd>#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</dd></div>
+                    <div><dt>{{ $isPaid ? 'Receipt' : 'Order' }}</dt><dd>#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</dd></div>
                     <div><dt>Date</dt><dd>{{ $order->created_at->format('M d, Y h:i A') }}</dd></div>
                     <div><dt>Customer</dt><dd>{{ $order->customer?->name ?? ($order->user?->hasRole(\App\Models\User::ROLE_CUSTOMER) ? $order->user->name : 'Walk-in Customer') }}</dd></div>
                     <div><dt>Cashier</dt><dd>{{ $order->user?->hasRole(\App\Models\User::ROLE_CASHIER, \App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_SUPER_ADMIN) ? $order->user->name : 'Online order' }}</dd></div>
-                    <div><dt>Payment</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
+                    <div><dt>Payment method</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
+                    <div><dt>Payment status</dt><dd>{{ ucfirst($order->payment_status) }}</dd></div>
+                    @if($order->payment_reference)
+                        <div><dt>GCash reference</dt><dd>{{ $order->payment_reference }}</dd></div>
+                    @endif
+                    @if($reservation)
+                        <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>
+                        <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }}</dd></div>
+                        <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at?->format('M d, Y h:i A') ?? 'Not scheduled' }}</dd></div>
+                    @endif
                 </dl>
 
                 <div class="receipt-items">
@@ -45,19 +61,29 @@
                 </div>
 
                 <div class="receipt-totals">
-                    <strong><span>Total</span><b>&#8369;{{ number_format($order->total, 2) }}</b></strong>
+                    <span>Food subtotal <b>&#8369;{{ number_format($order->total, 2) }}</b></span>
+                    @if($reservation)
+                        <span>Reservation fee <b>&#8369;{{ number_format($reservationCharge, 2) }}</b></span>
+                    @endif
+                    <strong><span>{{ $isPaid ? 'Total paid' : 'Total due' }}</span><b>&#8369;{{ number_format($totalDue, 2) }}</b></strong>
                     @if($order->cash_received !== null)
                         <span>Cash received <b>&#8369;{{ number_format($order->cash_received, 2) }}</b></span>
                         <span>Change <b>&#8369;{{ number_format($order->change_due, 2) }}</b></span>
-                    @elseif($order->payment_reference)
-                        <span>GCash reference <b>{{ $order->payment_reference }}</b></span>
                     @endif
                 </div>
-                <p class="receipt-note">Thank you for your purchase!</p>
+                <p class="receipt-note">
+                    @if($isPaid)
+                        Thank you for your purchase. This is your official payment receipt.
+                    @elseif($order->payment_method === 'gcash')
+                        Your GCash payment is awaiting verification. This order receipt is not proof of completed payment.
+                    @else
+                        Present this order receipt and pay &#8369;{{ number_format($totalDue, 2) }} at the counter. Your official receipt will be available after payment is confirmed.
+                    @endif
+                </p>
             </article>
 
             <div class="receipt-actions">
-                <button class="button" type="button" id="print-receipt">Print receipt</button>
+                <button class="button" type="button" id="print-receipt">{{ $isPaid ? 'Print official receipt' : 'Print order receipt' }}</button>
                 <a class="logout" href="{{ $backRoute }}">Back</a>
             </div>
             <p class="print-help" id="print-help" hidden>If the print dialog did not open, press Ctrl + P.</p>
