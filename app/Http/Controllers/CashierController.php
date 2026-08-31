@@ -169,7 +169,9 @@ class CashierController extends Controller
             $lockedOrder->reservation?->update(['payment_status' => 'paid']);
         }, attempts: 3);
 
-        return redirect()->route('cashier.orders.index')->with('status', 'Complete order payment confirmed. Admin sales dashboards are now updated.');
+        return redirect()
+            ->route('receipts.show', $order)
+            ->with('status', 'Payment confirmed. The official receipt is ready to print.');
     }
 
     private function ensurePendingCustomerOrder(Order $order): void
