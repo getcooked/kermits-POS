@@ -28,6 +28,7 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 - Inline 30-second cooldown after five failed credential attempts
 - Encrypted bearer-token persistence and logout/revocation
 - Live product catalog with stock-aware cart
+- Persistent top-right cart with item badge and in-place checkout sheet
 - Cash or GCash order submission
 - Order history and reservation history
 - Push notifications for reservation status, payment, schedule, detail, and linked-order updates

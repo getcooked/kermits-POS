@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.Alignment
@@ -730,11 +731,13 @@ private fun showDateTimePicker(context: Context, calendar: Calendar, dateFormat:
     }.show()
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, setMessage: (String) -> Unit, onReserve: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("All") }
-    var checkingOut by remember { mutableStateOf(false) }
+    var cartOpen by rememberSaveable { mutableStateOf(false) }
+    var checkingOut by rememberSaveable { mutableStateOf(false) }
     var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }
     var date by remember { mutableStateOf("") }
     var tableSize by remember { mutableStateOf("4") }
@@ -745,6 +748,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     val calendar = remember { Calendar.getInstance() }
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
     val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> proofUri = uri }
+    val cartSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val categories = remember(vm.products) { listOf("All") + vm.products.mapNotNull { it.category }.distinct() }
     val filtered = remember(vm.products, category, query) {
         vm.products.filter { product ->
@@ -753,65 +757,256 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
         }
     }
     val productsById = remember(vm.products) { vm.products.associateBy(Product::id) }
+    val cartProducts = remember(vm.products, vm.cart) { vm.products.filter { it.id in vm.cart } }
+    val cartItemCount = vm.cart.values.sum()
     val cartTotal = vm.cart.entries.sumOf { (productId, quantity) -> productsById[productId]?.price?.times(quantity) ?: 0.0 }
     val canPay = payment == "cash" || (paymentReference.length == 13 && proofUri != null)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
-    item(key = "menu-header") { Column {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Menu", fontSize = 30.sp, fontWeight = FontWeight.Black); Button(onClick = onReserve, shape = RoundedCornerShape(10.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF202124)), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { Text("Reserve", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold) } }
-    Spacer(Modifier.height(14.dp)); OutlinedTextField(query, { query = it }, placeholder = { Text("Search products", fontWeight = FontWeight.SemiBold) }, leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF5E5968)) }, singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = Color(0xFFB5C019), unfocusedBorderColor = Color.Transparent), modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(50.dp))
-    Spacer(Modifier.height(14.dp)); Row(Modifier.horizontalScroll(rememberScrollState())) { categories.forEach { value -> MenuCategoryButton(selected = category == value, label = value, onClick = { category = value }) } }
-    Spacer(Modifier.height(10.dp))
-    } }
-    filtered.groupBy { it.category ?: "Favorites" }.forEach { (category, categoryProducts) ->
-        item(key = "category-$category") { Text(category, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color(0xFF171817), modifier = Modifier.padding(vertical = 10.dp)) }
-        items(categoryProducts, key = Product::id) { product ->
-            Surface(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(12.dp), color = Color.White) { Column {
-                if (product.image_url != null) AsyncImage(remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).size(900, 426).crossfade(true).build() }, product.name, Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp).height(128.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) else Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp).height(128.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFE9ECD4)), contentAlignment = Alignment.Center) { Text(product.name.take(1), color = Color(0xFF747D00), fontSize = 42.sp, fontWeight = FontWeight.Bold) }
-                Column(Modifier.padding(12.dp)) {
-                    Text(product.name, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(product.description.orEmpty(), maxLines = 2, color = Color(0xFF6D746B), fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 5.dp))
-                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column { Text(money(product.price), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold); Text("${product.stock} available", color = Color(0xFF596273), fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-                        Row(verticalAlignment = Alignment.CenterVertically) { val quantity = vm.cart[product.id] ?: 0; if (quantity > 0) { IconButton(onClick = { vm.remove(product) }, Modifier.size(34.dp)) { Icon(Icons.Default.Remove, "Remove", Modifier.size(18.dp)) }; Text(quantity.toString(), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp)) }; IconButton(onClick = { vm.add(product) }, enabled = quantity < product.stock, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Add, "Add", Modifier.size(19.dp)) } }
-                    }
-                }
-            } }
-        }
+
+    LaunchedEffect(vm.cart.isEmpty()) {
+        if (vm.cart.isEmpty()) checkingOut = false
     }
-    if (vm.cart.isNotEmpty()) {
-        item(key = "cart-checkout") { Surface(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp), color = Color(0xFFF8F7F1), contentColor = Color(0xFF171817), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDDE0D6))) {
-            Column(Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${vm.cart.values.sum()} item(s) in your order", fontWeight = FontWeight.Bold); Text(money(cartTotal)) }
-                if (!checkingOut) {
-                    Spacer(Modifier.height(10.dp))
-                    Button(onClick = { checkingOut = true }, shape = RoundedCornerShape(50.dp), modifier = Modifier.fillMaxWidth().height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5800F0), contentColor = Color.White)) { Text("Place Order", fontWeight = FontWeight.ExtraBold) }
-                } else {
-                    Spacer(Modifier.height(12.dp))
-                    Text("ORDER CHECKOUT", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Reserve a table", fontSize = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp, bottom = 3.dp))
-                    Text("Your selected food is already in the order, so only the table details are needed here.", color = Color(0xFF6E746B), fontSize = 12.sp, lineHeight = 18.sp)
-                    Spacer(Modifier.height(14.dp))
-                    OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone number") }, supportingText = { Text("11 digits starting with 09") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
-                    Spacer(Modifier.height(8.dp))
-                    DateTimePickerField(date, "Date and time", "Choose your schedule", "Select a date first, then choose a time") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp)) } }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
-                    Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") }) }
-                    if (payment == "gcash") {
-                        vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
-                        OutlinedTextField(paymentReference, { paymentReference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { proofPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(proofUri?.lastPathSegment ?: "Attach payment proof") }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Menu", fontSize = 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+            Button(
+                onClick = onReserve,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF202124)),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Text("Reserve", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(Modifier.width(10.dp))
+            BadgedBox(
+                badge = {
+                    if (cartItemCount > 0) {
+                        Badge(
+                            modifier = Modifier.clearAndSetSemantics { },
+                            containerColor = Color(0xFFB5C019),
+                            contentColor = Color(0xFF171817),
+                        ) {
+                            Text(if (cartItemCount > 99) "99+" else cartItemCount.toString())
+                        }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { vm.placeOrder(context, CheckoutDetails(phone, date, tableSize, payment, paymentReference, notes, proofUri)) { ok -> setMessage(if (ok) "Order and table request submitted." else "Order could not be submitted.") } }, enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && canPay, shape = RoundedCornerShape(11.dp), modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White)) { Text(if (vm.busy) "Submitting..." else "Confirm payment & view receipt", fontWeight = FontWeight.Bold) }
+                },
+            ) {
+                FilledIconButton(
+                    onClick = { cartOpen = true },
+                    modifier = Modifier.semantics {
+                        contentDescription = when (cartItemCount) {
+                            0 -> "Cart, empty"
+                            1 -> "Cart, 1 item"
+                            else -> "Cart, $cartItemCount items"
+                        }
+                    },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = Color(0xFF5800F0),
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    Icon(Icons.Default.ShoppingCart, contentDescription = null)
                 }
             }
-        } }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
+            item(key = "menu-filters") {
+                Column {
+                    OutlinedTextField(
+                        query,
+                        { query = it },
+                        placeholder = { Text("Search products", fontWeight = FontWeight.SemiBold) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF5E5968)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = Color(0xFFB5C019),
+                            unfocusedBorderColor = Color.Transparent,
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(50.dp),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        categories.forEach { value ->
+                            MenuCategoryButton(selected = category == value, label = value, onClick = { category = value })
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
+            filtered.groupBy { it.category ?: "Favorites" }.forEach { (categoryName, categoryProducts) ->
+                item(key = "category-$categoryName") {
+                    Text(categoryName, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color(0xFF171817), modifier = Modifier.padding(vertical = 10.dp))
+                }
+                items(categoryProducts, key = Product::id) { product ->
+                    Surface(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(12.dp), color = Color.White) {
+                        Column {
+                            if (product.image_url != null) {
+                                AsyncImage(
+                                    remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).size(900, 426).crossfade(true).build() },
+                                    product.name,
+                                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp).height(128.dp).clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            } else {
+                                Box(
+                                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp).height(128.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFE9ECD4)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(product.name.take(1), color = Color(0xFF747D00), fontSize = 42.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Column(Modifier.padding(12.dp)) {
+                                Text(product.name, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                                Text(product.description.orEmpty(), maxLines = 2, color = Color(0xFF6D746B), fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 5.dp))
+                                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Column {
+                                        Text(money(product.price), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                                        Text("${product.stock} available", color = Color(0xFF596273), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        val quantity = vm.cart[product.id] ?: 0
+                                        if (quantity > 0) {
+                                            IconButton(onClick = { vm.remove(product) }, Modifier.size(34.dp)) { Icon(Icons.Default.Remove, "Remove", Modifier.size(18.dp)) }
+                                            Text(quantity.toString(), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
+                                        }
+                                        IconButton(onClick = { vm.add(product) }, enabled = quantity < product.stock, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Add, "Add", Modifier.size(19.dp)) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
+
+    if (cartOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { cartOpen = false },
+            sheetState = cartSheetState,
+            containerColor = Color(0xFFF8F7F1),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+            ) {
+                item(key = "cart-title") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("YOUR CART", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
+                            Text(if (checkingOut) "Checkout" else "Your order", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(onClick = { cartOpen = false }) { Text("Close") }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                if (vm.cart.isEmpty()) {
+                    item(key = "empty-cart") {
+                        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White) {
+                            Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFF747D00), modifier = Modifier.size(36.dp))
+                                Text("Your cart is empty", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                                Text("Add an item from the menu to start an order.", color = Color(0xFF6E746B), fontSize = 13.sp, modifier = Modifier.padding(top = 5.dp))
+                                OutlinedButton(onClick = { cartOpen = false }, modifier = Modifier.padding(top = 16.dp)) { Text("Browse menu") }
+                            }
+                        }
+                    }
+                } else if (!checkingOut) {
+                    items(cartProducts, key = { product -> "cart-${product.id}" }) { product ->
+                        val quantity = vm.cart[product.id] ?: 0
+                        Surface(Modifier.fillMaxWidth().padding(bottom = 10.dp), shape = RoundedCornerShape(12.dp), color = Color.White) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(product.name, fontWeight = FontWeight.ExtraBold)
+                                    Text("${money(product.price)} each · ${money(product.price * quantity)}", color = Color(0xFF6E746B), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                                }
+                                IconButton(
+                                    onClick = { vm.remove(product) },
+                                    modifier = Modifier.semantics { contentDescription = "Decrease ${product.name} quantity" },
+                                ) { Icon(Icons.Default.Remove, contentDescription = null) }
+                                Text(quantity.toString(), fontWeight = FontWeight.Bold)
+                                IconButton(
+                                    onClick = { vm.add(product) },
+                                    enabled = quantity < product.stock,
+                                    modifier = Modifier.semantics { contentDescription = "Increase ${product.name} quantity" },
+                                ) { Icon(Icons.Default.Add, contentDescription = null) }
+                            }
+                        }
+                    }
+                    item(key = "cart-summary") {
+                        HorizontalDivider(color = Color(0xFFDDE0D6), modifier = Modifier.padding(vertical = 6.dp))
+                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("$cartItemCount ${if (cartItemCount == 1) "item" else "items"}", fontWeight = FontWeight.Bold)
+                            Text(money(cartTotal), fontSize = 19.sp, fontWeight = FontWeight.Black)
+                        }
+                        Button(
+                            onClick = { checkingOut = true },
+                            shape = RoundedCornerShape(50.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5800F0), contentColor = Color.White),
+                        ) { Text("Place Order", fontWeight = FontWeight.ExtraBold) }
+                    }
+                } else {
+                    item(key = "checkout-form") {
+                        TextButton(onClick = { checkingOut = false }, contentPadding = PaddingValues(0.dp)) { Text("← Back to cart") }
+                        Text("Reserve a table", fontSize = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp, bottom = 3.dp))
+                        Text("Your selected food is already in the order, so only the table details are needed here.", color = Color(0xFF6E746B), fontSize = 12.sp, lineHeight = 18.sp)
+                        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Order total", fontWeight = FontWeight.Bold)
+                            Text(money(cartTotal), fontWeight = FontWeight.Black)
+                        }
+                        Spacer(Modifier.height(14.dp))
+                        OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone number") }, supportingText = { Text("11 digits starting with 09") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
+                        Spacer(Modifier.height(8.dp))
+                        DateTimePickerField(date, "Date and time", "Choose your schedule", "Select a date first, then choose a time") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                            listOf("1", "2", "4", "8", "12").forEach { value ->
+                                FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp))
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
+                        Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Payment:")
+                            Spacer(Modifier.width(8.dp))
+                            FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") })
+                            Spacer(Modifier.width(6.dp))
+                            FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") })
+                        }
+                        if (payment == "gcash") {
+                            vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
+                            OutlinedTextField(paymentReference, { paymentReference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(onClick = { proofPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text(proofUri?.lastPathSegment ?: "Attach payment proof") }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                vm.placeOrder(context, CheckoutDetails(phone, date, tableSize, payment, paymentReference, notes, proofUri)) { ok ->
+                                    setMessage(if (ok) "Order and table request submitted." else "Order could not be submitted.")
+                                    if (ok) {
+                                        checkingOut = false
+                                        cartOpen = false
+                                    }
+                                }
+                            },
+                            enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && canPay,
+                            shape = RoundedCornerShape(11.dp),
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
+                        ) { Text(if (vm.busy) "Submitting..." else "Confirm payment & view receipt", fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
     }
 }
 

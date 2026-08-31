@@ -80,7 +80,7 @@ class User extends Authenticatable
         return match ($this->role) {
             self::ROLE_CUSTOMER => route('shop'),
             self::ROLE_CASHIER => route('cashier'),
-            self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN => route('dashboard'),
+            self::ROLE_SUPER_ADMIN => route('dashboard'),
             default => route('home'),
         };
     }
