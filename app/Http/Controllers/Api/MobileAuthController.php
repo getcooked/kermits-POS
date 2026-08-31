@@ -53,7 +53,8 @@ class MobileAuthController extends Controller
         ]);
         $oldTokenIds = MobileApiToken::query()
             ->whereBelongsTo($user)
-            ->latest()
+            ->latest('created_at')
+            ->latest('id')
             ->pluck('id')
             ->slice(5);
         MobileApiToken::query()->whereKey($oldTokenIds)->delete();
