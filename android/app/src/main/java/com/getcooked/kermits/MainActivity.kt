@@ -5,12 +5,19 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.print.PrintAttributes
+import android.print.PrintJob
+import android.print.PrintManager
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -1228,6 +1236,7 @@ private fun OrderReceiptDialog(
     wasJustSubmitted: Boolean,
     close: () -> Unit,
 ) {
+    val context = LocalContext.current
     val isPaid = order.payment_status.equals("paid", ignoreCase = true)
     val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
     val paymentMessage = when {
@@ -1349,16 +1358,125 @@ private fun OrderReceiptDialog(
                     }
                 }
                 HorizontalDivider(color = Color(0xFFD8DCD2))
-                Button(
-                    onClick = close,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).height(50.dp),
-                    shape = RoundedCornerShape(11.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
-                ) { Text("Close receipt", fontWeight = FontWeight.ExtraBold) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { printOrderReceipt(context, order, customerName) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(11.dp),
+                    ) { Text("Print receipt", fontWeight = FontWeight.ExtraBold) }
+                    Button(
+                        onClick = close,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(11.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
+                    ) { Text("Close receipt", fontWeight = FontWeight.ExtraBold) }
+                }
             }
         }
     }
 }
+
+private fun printOrderReceipt(context: Context, order: Order, customerName: String) {
+    val activity = context.findActivity() ?: return
+    val webView = WebView(activity).apply {
+        alpha = 0.01f
+        webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                val printManager = activity.getSystemService(Context.PRINT_SERVICE) as? PrintManager ?: return
+                val printJob = printManager.print(
+                    "Kermits-Receipt-${order.id}",
+                    view.createPrintDocumentAdapter("Kermits Receipt #${order.id}"),
+                    PrintAttributes.Builder().build(),
+                )
+                releasePrintedWebView(view, printJob)
+            }
+        }
+    }
+
+    activity.addContentView(webView, ViewGroup.LayoutParams(1, 1))
+    webView.loadDataWithBaseURL(null, receiptPrintHtml(order, customerName), "text/html", "UTF-8", null)
+}
+
+private fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private fun releasePrintedWebView(webView: WebView, printJob: PrintJob) {
+    val release = object : Runnable {
+        override fun run() {
+            if (printJob.isCompleted || printJob.isFailed || printJob.isCancelled) {
+                (webView.parent as? ViewGroup)?.removeView(webView)
+                webView.destroy()
+            } else {
+                webView.postDelayed(this, 1_000)
+            }
+        }
+    }
+    webView.postDelayed(release, 1_000)
+}
+
+private fun receiptPrintHtml(order: Order, customerName: String): String {
+    val isPaid = order.payment_status.equals("paid", ignoreCase = true)
+    val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
+    val reservationRows = order.reservation?.let { reservation ->
+        """
+        <div class="line"><span>Reservation</span><b>${reservation.reference.html()}</b></div>
+        <div class="line"><span>Schedule</span><b>${receiptDate(reservation.reservation_at).html()}</b></div>
+        <div class="line"><span>Table</span><b>${reservation.table_size ?: reservation.guests ?: 0} seats</b></div>
+        <div class="line"><span>Reservation fee</span><b>${money(reservation.total_amount).html()}</b></div>
+        """.trimIndent()
+    }.orEmpty()
+    val paymentReference = order.payment_reference?.let {
+        "<div class=\"line\"><span>GCash reference</span><b>${it.html()}</b></div>"
+    }.orEmpty()
+    val cashRows = buildString {
+        order.cash_received?.let { append("<div class=\"line\"><span>Cash received</span><b>${money(it).html()}</b></div>") }
+        order.change_due?.let { append("<div class=\"line\"><span>Change</span><b>${money(it).html()}</b></div>") }
+    }
+    val items = order.items.joinToString("") { item ->
+        "<div class=\"item\"><span><b>${item.name.html()}</b><small>${item.quantity} × ${money(item.unit_price).html()}</small></span><b>${money(item.subtotal).html()}</b></div>"
+    }
+
+    return """
+        <!doctype html><html><head><meta charset="utf-8"><style>
+        @page { size: 80mm auto; margin: 4mm; }
+        * { box-sizing: border-box; } body { width: 72mm; margin: 0 auto; color: #171817; font: 12px Arial, sans-serif; }
+        h1 { margin: 4px 0; font-size: 21px; } .brand { text-align:center; border-bottom: 1px dashed #9aa096; padding-bottom: 12px; }
+        .brand strong { display:block; letter-spacing: 2px; font-size:16px; } .muted, small { color:#667064; } .meta, .totals { padding:12px 0; }
+        .line, .item { display:flex; justify-content:space-between; gap:12px; padding:3px 0; } .line b { text-align:right; } .items { border-top:1px dashed #9aa096; border-bottom:1px dashed #9aa096; }
+        .item { padding:9px 0; } .item span { display:grid; gap:3px; } .item > b { white-space:nowrap; } .total { border-top:1px solid #222; margin-top:6px; padding-top:8px; font-size:16px; }
+        .note { margin:16px 0 0; text-align:center; color:#667064; line-height:1.45; }
+        </style></head><body>
+        <div class="brand"><strong>KERMIT'S</strong><span>${if (isPaid) "OFFICIAL RECEIPT" else "ORDER RECEIPT"}</span><h1>#${String.format(Locale.US, "%06d", order.id)}</h1></div>
+        <div class="meta">
+          <div class="line"><span>Date</span><b>${receiptDate(order.created_at).html()}</b></div>
+          <div class="line"><span>Customer</span><b>${customerName.ifBlank { "Customer" }.html()}</b></div>
+          <div class="line"><span>Payment</span><b>${paymentLabel.html()}</b></div>
+          <div class="line"><span>Status</span><b>${if (isPaid) "Paid" else "Pending"}</b></div>
+          $paymentReference
+          $reservationRows
+        </div>
+        <div class="items">$items</div>
+        <div class="totals">
+          <div class="line"><span>Food subtotal</span><b>${money(order.total).html()}</b></div>
+          <div class="line total"><b>${if (isPaid) "Total paid" else "Total due"}</b><b>${money(order.total_due).html()}</b></div>
+          $cashRows
+        </div>
+        <p class="note">${if (isPaid) "Thank you for your purchase!" else "Present this order receipt when paying at the counter."}</p>
+        </body></html>
+    """.trimIndent()
+}
+
+private fun String.html(): String = replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
+    .replace("\"", "&quot;")
+    .replace("'", "&#39;")
 
 @Composable
 private fun ReceiptLine(label: String, value: String, emphasized: Boolean = false) {

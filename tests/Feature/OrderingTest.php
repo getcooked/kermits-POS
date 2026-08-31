@@ -458,7 +458,8 @@ class OrderingTest extends TestCase
 
         $this->actingAs($cashier)
             ->patch(route('cashier.orders.confirm-payment', $order), ['cash_received' => 400])
-            ->assertRedirect(route('cashier.orders.index'));
+            ->assertRedirect(route('receipts.show', $order))
+            ->assertSessionHas('status', 'Payment confirmed. The official receipt is ready to print.');
 
         $this->assertDatabaseHas('orders', [
             'id' => $order->id,
