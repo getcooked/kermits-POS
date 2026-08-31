@@ -129,15 +129,7 @@ class AuthController extends Controller
         $loginAttempts->clear($request, $login);
         $request->session()->regenerate();
 
-        $user = $request->user();
-
-        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN)) {
-            $request->session()->forget('url.intended');
-
-            return redirect()->to($user->homeRoute());
-        }
-
-        return redirect()->intended($user->homeRoute());
+        return redirect()->intended($request->user()->homeRoute());
     }
 
     public function destroy(Request $request): RedirectResponse
