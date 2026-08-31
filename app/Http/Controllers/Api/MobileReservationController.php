@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Reservation;
+use App\Services\ReservationSchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,7 @@ class MobileReservationController extends Controller
         return response()->json(['data' => $items]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, ReservationSchedule $schedules): JsonResponse
     {
         $validated = $request->validate([
             'type' => ['required', 'in:table,exclusive'],
@@ -40,15 +41,21 @@ class MobileReservationController extends Controller
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
+        if (! $schedules->isAvailable($validated['reservation_at'])) {
+            throw ValidationException::withMessages([
+                'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
+            ]);
+        }
         $proofPath = $request->hasFile('payment_proof') ? $request->file('payment_proof')->store('payment-proofs', 'local') : null;
 
         try {
-            $reservation = DB::transaction(function () use ($request, $validated, $proofPath): Reservation {
+            $reservation = DB::transaction(function () use ($request, $validated, $proofPath, $schedules): Reservation {
                 $fee = $validated['type'] === 'table' ? self::TABLE_FEES[(int) $validated['table_size']] : self::EXCLUSIVE_FEE;
                 $reservation = Reservation::query()->create([
                     ...collect($validated)->except(['menu_items', 'payment_proof'])->all(),
                     'user_id' => $request->user()->id, 'customer_name' => $request->user()->name,
                     'email' => $request->user()->email, 'reference' => $this->newReference(), 'status' => 'pending',
+                    'reservation_at' => $schedules->normalize($validated['reservation_at']),
                     'guests' => $validated['type'] === 'table' ? $validated['table_size'] : $validated['guests'],
                     'reservation_fee' => $fee, 'food_total' => 0, 'total_amount' => $fee,
                     'payment_status' => 'pending', 'payment_proof_path' => $proofPath,

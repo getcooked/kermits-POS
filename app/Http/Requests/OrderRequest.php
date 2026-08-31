@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ReservationSchedule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class OrderRequest extends FormRequest
 {
@@ -26,6 +28,17 @@ class OrderRequest extends FormRequest
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($this->filled('reservation_at')
+                && ! $validator->errors()->has('reservation_at')
+                && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'))) {
+                $validator->errors()->add('reservation_at', 'This reservation time is no longer available. Please choose another schedule.');
+            }
+        }];
     }
 
     public function selectedQuantities(): array

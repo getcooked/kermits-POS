@@ -332,42 +332,36 @@ class ReservationsTest extends TestCase
         $this->assertSame('pending', $reservation->fresh()->status);
     }
 
-    public function test_super_admin_cannot_approve_more_than_eight_tables_in_the_same_time_slot(): void
+    public function test_customer_cannot_submit_a_reservation_for_an_occupied_schedule(): void
     {
-        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $schedule = now()->addDays(2)->startOfHour();
+        $firstCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $secondCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
-        foreach (range(1, 8) as $number) {
-            Reservation::query()->create([
-                'reference' => 'KRM-FULL-'.$number,
-                'type' => 'table',
-                'table_size' => 4,
-                'customer_name' => 'Customer '.$number,
-                'email' => 'customer'.$number.'@gmail.com',
-                'phone' => '09171234567',
-                'reservation_at' => $schedule,
-                'guests' => 4,
-                'status' => 'confirmed',
-            ]);
-        }
-
-        $pending = Reservation::query()->create([
-            'reference' => 'KRM-WAITING',
+        Reservation::query()->create([
+            'user_id' => $firstCustomer->id,
+            'reference' => 'KRM-TAKEN-SLOT',
             'type' => 'table',
-            'table_size' => 2,
-            'customer_name' => 'Waiting Customer',
-            'email' => 'waiting@gmail.com',
+            'table_size' => 4,
+            'customer_name' => $firstCustomer->name,
+            'email' => $firstCustomer->email,
             'phone' => '09171234567',
             'reservation_at' => $schedule,
-            'guests' => 2,
-            'status' => 'pending',
+            'guests' => 4,
+            'status' => 'confirmed',
         ]);
 
-        $this->actingAs($superAdmin)
-            ->patch('/reservations/'.$pending->id.'/status', ['status' => 'confirmed'])
-            ->assertSessionHasErrors('status');
+        $this->actingAs($secondCustomer)->post('/book', [
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => $secondCustomer->name,
+            'email' => $secondCustomer->email,
+            'phone' => '09171234567',
+            'reservation_at' => $schedule->format('Y-m-d H:i:s'),
+            'payment_method' => 'cash',
+        ])->assertSessionHasErrors('reservation_at');
 
-        $this->assertSame('pending', $pending->fresh()->status);
+        $this->assertDatabaseCount('reservations', 1);
     }
 
     private function fakePng(string $name): UploadedFile

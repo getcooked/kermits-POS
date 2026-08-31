@@ -18,7 +18,7 @@ class CustomerHistoryTest extends TestCase
         $other = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
         Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-MINE', 'type' => 'table', 'table_size' => 4, 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 4, 'status' => 'confirmed']);
-        Reservation::query()->create(['user_id' => $other->id, 'reference' => 'KRM-OTHER', 'type' => 'table', 'table_size' => 2, 'customer_name' => $other->name, 'email' => $other->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
+        Reservation::query()->create(['user_id' => $other->id, 'reference' => 'KRM-OTHER', 'type' => 'table', 'table_size' => 2, 'customer_name' => $other->name, 'email' => $other->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay()->addMinute(), 'guests' => 2, 'status' => 'pending']);
         Order::query()->create(['user_id' => $customer->id, 'total' => 250, 'payment_method' => 'cash', 'payment_status' => 'pending']);
         Order::query()->create(['user_id' => $other->id, 'total' => 999, 'payment_method' => 'cash', 'payment_status' => 'pending']);
 
@@ -57,7 +57,7 @@ class CustomerHistoryTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-SELECTED', 'type' => 'table', 'table_size' => 4, 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 4, 'status' => 'pending']);
-        Reservation::query()->create(['user_id' => $other->id, 'reference' => 'KRM-NOT-SELECTED', 'type' => 'table', 'table_size' => 2, 'customer_name' => $other->name, 'email' => $other->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
+        Reservation::query()->create(['user_id' => $other->id, 'reference' => 'KRM-NOT-SELECTED', 'type' => 'table', 'table_size' => 2, 'customer_name' => $other->name, 'email' => $other->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay()->addMinute(), 'guests' => 2, 'status' => 'pending']);
 
         $this->actingAs($superAdmin)->get('/customers/'.$customer->id.'/history')
             ->assertOk()

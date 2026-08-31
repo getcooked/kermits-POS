@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
 use App\Services\OrderService;
+use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,7 +29,7 @@ class CustomerOrderController extends Controller
         ]);
     }
 
-    public function store(OrderRequest $request, OrderService $orders): RedirectResponse
+    public function store(OrderRequest $request, OrderService $orders, ReservationSchedule $schedules): RedirectResponse
     {
         $paymentMethod = $request->validated('payment_method');
         $paymentReference = $paymentMethod === 'gcash'
@@ -39,7 +40,7 @@ class CustomerOrderController extends Controller
             : null;
 
         try {
-            $order = DB::transaction(function () use ($request, $orders, $paymentMethod, $paymentReference, $proofPath): Order {
+            $order = DB::transaction(function () use ($request, $orders, $paymentMethod, $paymentReference, $proofPath, $schedules): Order {
                 $order = $orders->create(
                     user: $request->user(),
                     quantities: $request->selectedQuantities(),
@@ -60,7 +61,7 @@ class CustomerOrderController extends Controller
                     'customer_name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'phone' => $request->validated('phone'),
-                    'reservation_at' => $request->validated('reservation_at'),
+                    'reservation_at' => $schedules->normalize($request->validated('reservation_at')),
                     'guests' => $tableSize,
                     'reservation_fee' => $reservationFee,
                     'food_total' => 0,

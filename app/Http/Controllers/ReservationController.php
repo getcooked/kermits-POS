@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateReservationStatusRequest;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
+use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,14 +34,14 @@ class ReservationController extends Controller
         ]);
     }
 
-    public function store(StoreReservationRequest $request): RedirectResponse
+    public function store(StoreReservationRequest $request, ReservationSchedule $schedules): RedirectResponse
     {
         $proofPath = $request->hasFile('payment_proof')
             ? $request->file('payment_proof')->store('payment-proofs', 'local')
             : null;
 
         try {
-            $reservation = DB::transaction(function () use ($request, $proofPath): Reservation {
+            $reservation = DB::transaction(function () use ($request, $proofPath, $schedules): Reservation {
                 $reservationFee = $request->validated('type') === 'table'
                     ? self::TABLE_FEES[(int) $request->validated('table_size')]
                     : self::EXCLUSIVE_FEE;
@@ -49,6 +50,7 @@ class ReservationController extends Controller
                     'user_id' => $request->user()->id,
                     'customer_name' => $request->user()->name,
                     'email' => $request->user()->email,
+                    'reservation_at' => $schedules->normalize($request->validated('reservation_at')),
                     'reference' => $this->newReference(),
                     'status' => 'pending',
                     'guests' => $request->validated('type') === 'table'
@@ -178,24 +180,6 @@ class ReservationController extends Controller
         UpdateReservationStatusRequest $request,
         Reservation $reservation,
     ): RedirectResponse {
-        if ($request->validated('status') === 'confirmed' && $reservation->type === 'table') {
-            $overlappingTables = Reservation::query()
-                ->whereKeyNot($reservation->id)
-                ->where('type', 'table')
-                ->where('status', 'confirmed')
-                ->whereBetween('reservation_at', [
-                    $reservation->reservation_at->copy()->subMinutes(119),
-                    $reservation->reservation_at->copy()->addMinutes(119),
-                ])
-                ->count();
-
-            if ($overlappingTables >= 8) {
-                throw ValidationException::withMessages([
-                    'status' => 'All 8 tables are already reserved for this time slot. Choose another schedule before approving.',
-                ]);
-            }
-        }
-
         $previousStatus = $reservation->status;
         DB::transaction(function () use ($request, $reservation, $previousStatus): void {
             $reservation->update([
