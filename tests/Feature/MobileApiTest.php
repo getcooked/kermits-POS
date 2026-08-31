@@ -118,6 +118,28 @@ class MobileApiTest extends TestCase
         $this->withToken($token)->getJson('/api/v1/me')->assertUnauthorized();
     }
 
+    public function test_newest_mobile_token_is_kept_when_multiple_logins_share_the_same_timestamp(): void
+    {
+        $this->freezeSecond();
+        $customer = User::factory()->create([
+            'role' => User::ROLE_CUSTOMER,
+            'password' => 'MobilePassword123!',
+        ]);
+
+        foreach (range(1, 6) as $login) {
+            $latestToken = $this->login($customer);
+        }
+
+        $this->assertDatabaseCount('mobile_api_tokens', 5);
+        $this->assertDatabaseHas('mobile_api_tokens', [
+            'token_hash' => hash('sha256', $latestToken),
+        ]);
+        $this->withToken($latestToken)
+            ->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('data.id', $customer->id);
+    }
+
     public function test_customer_can_load_products_place_an_order_and_view_only_their_history(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER, 'password' => 'MobilePassword123!']);
