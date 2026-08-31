@@ -25,6 +25,7 @@ class CustomerHistoryTest extends TestCase
         $this->actingAs($customer)->get('/history')
             ->assertOk()
             ->assertSee('KRM-MINE')
+            ->assertSee(now()->addDay()->format('l, F j, Y'))
             ->assertSee('250.00')
             ->assertDontSee('KRM-OTHER')
             ->assertDontSee('999.00');

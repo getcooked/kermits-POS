@@ -59,11 +59,15 @@
 
         <div class="history-panel" id="reservations-panel" role="tabpanel" aria-labelledby="reservations-tab" data-history-panel="reservations">
             <div class="panel-heading">
-                <div><h2>Your reservations</h2><p>Newest requests appear first.</p></div>
+                <div><h2>Your reservations</h2><p>Reservations are grouped by their scheduled date.</p></div>
             </div>
 
             <div class="activity-list">
-                @forelse($reservations as $reservation)
+                @forelse($reservations->groupBy(fn ($reservation) => $reservation->reservation_at->toDateString()) as $date => $dateReservations)
+                    <section class="reservation-date-group">
+                        <h3 class="reservation-date-heading"><time datetime="{{ $date }}">{{ $dateReservations->first()->reservation_at->format('l, F j, Y') }}</time></h3>
+                        <div class="reservation-date-list">
+                        @foreach($dateReservations as $reservation)
                     @php
                         $reservationLabel = match ($reservation->status) {
                             'confirmed' => 'Confirmed',
@@ -112,6 +116,9 @@
                             </div>
                         </div>
                     </article>
+                        @endforeach
+                        </div>
+                    </section>
                 @empty
                     <div class="history-empty">
                         <h3>No reservations yet</h3>
@@ -178,6 +185,7 @@
 @media(min-width:901px){.history-page>nav>.history-actions{grid-template-columns:minmax(0,1fr) 42px!important;grid-template-rows:auto auto auto 1fr auto!important;align-items:stretch!important;min-height:0;flex:1}.history-page>nav>.history-actions>a{grid-column:1/-1}.history-page>nav>.history-actions>a.active{background:#34372f!important;box-shadow:inset 4px 0 #b5c019;color:#fff}.history-page>nav>.history-actions>span{grid-row:5!important;grid-column:1;padding:15px 8px 0 12px!important;border-top:1px solid #343630;color:#aeb2a9;font-size:13px;display:flex;align-items:center;min-height:58px}.history-page>nav>.history-actions>form{grid-row:5!important;grid-column:2;margin:0!important;padding-top:15px;border-top:1px solid #343630;display:flex!important;align-items:center;justify-content:flex-end!important}.history-page>nav>.history-actions .logout-icon{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}.history-page>nav>.history-brand{box-sizing:border-box!important;width:100%;min-height:87px;display:flex!important;align-items:center!important;gap:10px!important;padding:4px 8px 28px!important;border-bottom:1px solid #343630!important;color:#fff!important;text-decoration:none!important}.history-page>nav>.history-brand img{width:58px!important;height:58px!important;min-width:58px;object-fit:contain!important;border-radius:50%!important;background:#fff!important}.history-page>nav>.history-brand strong{color:#fff!important;letter-spacing:.1em!important;white-space:nowrap}.history-page>.history-header,.history-page>.history-summary,.history-page>.history-content{grid-column:2}}
 @media(max-width:900px){.history-actions>span{display:none}}
 .history-app-link b{display:none}.history-app-link.disabled{opacity:.55;cursor:default;pointer-events:none}@media(max-width:900px){.history-app-link span{display:none}.history-app-link b{display:inline;font:inherit}}
+.activity-list{gap:18px}.reservation-date-group{display:grid;gap:9px}.reservation-date-heading{margin:0;padding:9px 12px;border-radius:7px;background:#e8eadf;color:#34382d;font-size:14px}.reservation-date-list{display:grid;gap:10px}
 </style>
 
 
