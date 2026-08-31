@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Services\OrderService;
+use App\Services\ReservationSchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ class MobileOrderController extends Controller
         return response()->json(['data' => $orders]);
     }
 
-    public function store(Request $request, OrderService $orders): JsonResponse
+    public function store(Request $request, OrderService $orders, ReservationSchedule $schedules): JsonResponse
     {
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', 'distinct'],
@@ -46,13 +47,18 @@ class MobileOrderController extends Controller
                 'table_size' => 'Add table reservation details before submitting a GCash checkout.',
             ]);
         }
+        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'])) {
+            throw ValidationException::withMessages([
+                'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
+            ]);
+        }
 
         $proofPath = $validated['payment_method'] === 'gcash' && $request->hasFile('payment_proof')
             ? $request->file('payment_proof')->store('payment-proofs', 'local')
             : null;
 
         try {
-            $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation): Order {
+            $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules): Order {
                 $order = $orders->create(
                     user: $request->user(), quantities: $quantities, paymentStatus: 'pending',
                     paymentMethod: $validated['payment_method'], paymentReference: $validated['payment_reference'] ?? null,
@@ -70,7 +76,7 @@ class MobileOrderController extends Controller
                         'customer_name' => $request->user()->name,
                         'email' => $request->user()->email,
                         'phone' => $validated['phone'],
-                        'reservation_at' => $validated['reservation_at'],
+                        'reservation_at' => $schedules->normalize($validated['reservation_at']),
                         'guests' => $tableSize,
                         'reservation_fee' => self::TABLE_FEES[$tableSize],
                         'food_total' => 0,

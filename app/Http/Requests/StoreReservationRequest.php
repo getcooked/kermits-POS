@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Services\ReservationSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -37,6 +38,11 @@ class StoreReservationRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if (! $validator->errors()->has('reservation_at')
+                    && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'))) {
+                    $validator->errors()->add('reservation_at', 'This reservation time is no longer available. Please choose another schedule.');
+                }
+
                 if ($this->input('type') !== 'table') {
                     return;
                 }
