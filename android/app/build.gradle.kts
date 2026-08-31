@@ -29,8 +29,8 @@ android {
         applicationId = "com.getcooked.kermits"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", "\"$productionApiBaseUrl\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigPresent.toString())

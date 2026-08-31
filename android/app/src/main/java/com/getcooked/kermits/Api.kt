@@ -25,7 +25,19 @@ data class Product(val id: Int, val name: String, val category: String?, val des
 @JsonClass(generateAdapter = true)
 data class OrderItem(val product_id: Int, val name: String, val quantity: Int, val unit_price: Double, val subtotal: Double)
 @JsonClass(generateAdapter = true)
-data class Order(val id: Int, val total: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val created_at: String?, val reservation: Reservation?, val items: List<OrderItem> = emptyList())
+data class Order(
+    val id: Int,
+    val total: Double,
+    val total_due: Double = total,
+    val payment_method: String,
+    val payment_status: String,
+    val payment_reference: String?,
+    val cash_received: Double? = null,
+    val change_due: Double? = null,
+    val created_at: String?,
+    val reservation: Reservation?,
+    val items: List<OrderItem> = emptyList(),
+)
 @JsonClass(generateAdapter = true)
 data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList())
 @JsonClass(generateAdapter = true)
