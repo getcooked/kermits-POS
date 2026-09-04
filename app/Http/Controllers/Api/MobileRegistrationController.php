@@ -82,11 +82,18 @@ class MobileRegistrationController extends Controller
     {
         $validated = $request->validate([
             'registration_token' => ['required', 'string', 'size:64'],
-            'name' => ['required', 'string', 'max:120'],
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
+            'name' => ['required', 'string', 'max:30', 'regex:/^\p{L}[\p{L}\p{M}]*(?: \p{L}[\p{L}\p{M}]*)*$/u'],
+            'username' => ['required', 'string', 'min:3', 'max:13', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
-            'phone' => ['required', 'regex:/^09\d{9}$/'],
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'phone' => ['required', 'string', 'size:11', 'regex:/^09[0-9]{9}$/'],
+            'password' => ['required', 'string', 'confirmed', Password::defaults()->max(23)],
+        ], [
+            'name.max' => 'The full name must not be more than 30 characters.',
+            'name.regex' => 'The full name may only contain letters and single spaces.',
+            'username.max' => 'The username must not be more than 13 characters.',
+            'phone.size' => 'The phone number must contain exactly 11 digits.',
+            'phone.regex' => 'The phone number must contain exactly 11 digits and start with 09.',
+            'password.max' => 'The password must not be more than 23 characters.',
         ]);
         $key = $this->registrationKey($validated['registration_token']);
         $verifiedEmail = Cache::get($key);
