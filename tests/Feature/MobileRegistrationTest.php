@@ -32,6 +32,7 @@ class MobileRegistrationTest extends TestCase
     public function test_verified_email_can_create_only_a_customer_account(): void
     {
         $challenge = str_repeat('a', 64);
+        $password = str_repeat('A', 20).'a1!';
         Cache::put('mobile-registration-challenge:'.hash('sha256', $challenge), [
             'email' => 'new.customer@gmail.com',
             'code_hash' => Hash::make('123456'),
@@ -46,12 +47,12 @@ class MobileRegistrationTest extends TestCase
 
         $this->postJson('/api/v1/register', [
             'registration_token' => $token,
-            'name' => 'New Customer',
-            'username' => 'new.customer',
+            'name' => str_repeat('A', 14).' '.str_repeat('B', 15),
+            'username' => str_repeat('u', 13),
             'email' => 'new.customer@gmail.com',
             'phone' => '09171234567',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
+            'password' => $password,
+            'password_confirmation' => $password,
             'role' => User::ROLE_SUPER_ADMIN,
         ])->assertCreated()->assertJsonPath('data.role', User::ROLE_CUSTOMER);
 
@@ -60,6 +61,31 @@ class MobileRegistrationTest extends TestCase
             'role' => User::ROLE_CUSTOMER,
         ]);
         $this->assertNotNull(User::query()->where('email', 'new.customer@gmail.com')->firstOrFail()->email_verified_at);
+    }
+
+    public function test_mobile_registration_rejects_values_outside_the_required_limits(): void
+    {
+        $registrationToken = str_repeat('t', 64);
+        $password = str_repeat('A', 21).'a1!';
+        Cache::put(
+            'mobile-registration-token:'.hash('sha256', $registrationToken),
+            'invalid-limits@gmail.com',
+            now()->addMinutes(15),
+        );
+
+        $this->postJson('/api/v1/register', [
+            'registration_token' => $registrationToken,
+            'name' => str_repeat('A', 31),
+            'username' => str_repeat('u', 14),
+            'email' => 'invalid-limits@gmail.com',
+            'phone' => '0817123456a',
+            'password' => $password,
+            'password_confirmation' => $password,
+        ])->assertUnprocessable()->assertJsonValidationErrors([
+            'name', 'username', 'phone', 'password',
+        ]);
+
+        $this->assertDatabaseMissing('users', ['email' => 'invalid-limits@gmail.com']);
     }
 
     public function test_unverified_email_cannot_create_an_account(): void

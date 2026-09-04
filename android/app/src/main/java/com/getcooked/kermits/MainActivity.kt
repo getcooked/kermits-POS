@@ -705,7 +705,43 @@ private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
 private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
     var email by remember { mutableStateOf("") }; var challenge by remember { mutableStateOf<String?>(null) }; var code by remember { mutableStateOf("") }; var token by remember { mutableStateOf<String?>(null) }
     var name by remember { mutableStateOf("") }; var username by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    var showRegistrationErrors by remember { mutableStateOf(false) }
     val validGmail = email.trim().matches(Regex("^[^@\\s]+@gmail\\.com$", RegexOption.IGNORE_CASE))
+    val normalizedName = name.trim()
+    val nameError = when {
+        normalizedName.isBlank() -> "Enter your full name."
+        name.length > 30 || !normalizedName.matches(Regex("^\\p{L}[\\p{L}\\p{M}]*(?: \\p{L}[\\p{L}\\p{M}]*)*$")) ->
+            "Full name can contain only letters and single spaces, up to 30 characters."
+        else -> null
+    }
+    val usernameError = when {
+        username.isBlank() -> "Enter a username."
+        username.length < 3 -> "Username must contain at least 3 characters."
+        !username.matches(Regex("^[A-Za-z0-9._-]{3,13}$")) -> "Username can use only letters, numbers, dots, underscores, and hyphens, up to 13 characters."
+        else -> null
+    }
+    val phoneError = when {
+        phone.isBlank() -> "Enter your phone number."
+        phone.length != 11 -> "Phone number must contain exactly 11 digits."
+        !phone.startsWith("09") -> "Phone number must start with 09."
+        else -> null
+    }
+    val passwordError = when {
+        password.isBlank() -> "Enter a password."
+        password.length !in 12..23 ||
+            password.none(Char::isUpperCase) ||
+            password.none(Char::isLowerCase) ||
+            !Regex("\\p{N}").containsMatchIn(password) ||
+            !Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(password) ->
+            "Password must be 12-23 characters with uppercase, lowercase, a number, and a symbol."
+        else -> null
+    }
+    val confirmationError = when {
+        confirmation.isBlank() -> "Confirm your password."
+        confirmation != password -> "Passwords do not match."
+        else -> null
+    }
+    val firstRegistrationError = nameError ?: usernameError ?: phoneError ?: passwordError ?: confirmationError
     Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1))) {
         RegistrationBrandPanel(Modifier.fillMaxWidth().height(170.dp))
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp)) {
@@ -715,7 +751,64 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         OutlinedTextField(email, { email = it }, label = { Text("Gmail address") }, placeholder = { Text("name@gmail.com") }, enabled = challenge == null, singleLine = true, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { vm.sendCode(email) { issuedChallenge -> challenge = issuedChallenge } }, enabled = challenge == null && validGmail && !vm.busy, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(if (vm.busy) "Sending..." else "Send code", fontWeight = FontWeight.Bold) }
         if (challenge != null && token == null) { Spacer(Modifier.height(12.dp)); OutlinedTextField(code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("6-digit verification code") }, singleLine = true, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(8.dp)); Button(onClick = { vm.verifyCode(challenge!!, email, code) { verified -> token = verified } }, enabled = code.length == 6 && !vm.busy, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Verify Gmail", fontWeight = FontWeight.Bold) } }
-        if (token != null) { Spacer(Modifier.height(22.dp)); Text("Step 2  Account details", fontWeight = FontWeight.Bold); Spacer(Modifier.height(10.dp)); RegistrationField("Full name", name) { name = it }; RegistrationField("Username", username) { username = it }; RegistrationField("Phone number", phone) { phone = it }; RegistrationField("Password", password, true) { password = it }; RegistrationField("Confirm password", confirmation, true) { confirmation = it }; Spacer(Modifier.height(12.dp)); Button(onClick = { vm.register(RegisterRequest(token!!, name, username, email, phone, password, confirmation)) { ok -> if (ok) onBack() } }, enabled = !vm.busy && name.isNotBlank() && username.length >= 3 && phone.matches(Regex("09\\d{9}")) && password.length >= 12 && password == confirmation, modifier = Modifier.fillMaxWidth()) { Text("Create account") } }
+        if (token != null) {
+            Spacer(Modifier.height(22.dp))
+            Text("Step 2  Account details", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            RegistrationField(
+                label = "Full name",
+                value = name,
+                helperText = "Letters and single spaces only (${name.length}/30)",
+                errorText = nameError.takeIf { showRegistrationErrors },
+                keyboardType = KeyboardType.Text,
+            ) { input -> name = input.filter { it.isLetter() || it == ' ' }.take(30) }
+            RegistrationField(
+                label = "Username",
+                value = username,
+                helperText = "3-13 characters: letters, numbers, dot, underscore, or hyphen (${username.length}/13)",
+                errorText = usernameError.takeIf { showRegistrationErrors },
+                keyboardType = KeyboardType.Ascii,
+            ) { input -> username = input.filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it in "._-" }.take(13) }
+            RegistrationField(
+                label = "Phone number",
+                value = phone,
+                helperText = "Exactly 11 digits, starting with 09 (${phone.length}/11)",
+                errorText = phoneError.takeIf { showRegistrationErrors },
+                keyboardType = KeyboardType.Number,
+            ) { input -> phone = input.filter { it in '0'..'9' }.take(11) }
+            RegistrationField(
+                label = "Password",
+                value = password,
+                helperText = "12-23 characters with uppercase, lowercase, a number, and a symbol (${password.length}/23)",
+                errorText = passwordError.takeIf { showRegistrationErrors },
+                password = true,
+                keyboardType = KeyboardType.Password,
+            ) { input -> password = input.take(23) }
+            RegistrationField(
+                label = "Confirm password",
+                value = confirmation,
+                helperText = "Must exactly match your password (${confirmation.length}/23)",
+                errorText = confirmationError.takeIf { showRegistrationErrors },
+                password = true,
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done,
+            ) { input -> confirmation = input.take(23) }
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    showRegistrationErrors = true
+                    vm.clearError()
+                    if (firstRegistrationError == null) {
+                        vm.register(RegisterRequest(token!!, normalizedName, username, email.trim(), phone, password, confirmation)) { ok -> if (ok) onBack() }
+                    }
+                },
+                enabled = !vm.busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (vm.busy) "Creating account..." else "Create account") }
+            if (showRegistrationErrors && firstRegistrationError != null) {
+                Text(firstRegistrationError, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            }
+        }
         vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }; vm.registrationMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
         }
     }
@@ -733,7 +826,31 @@ private fun RegistrationBrandPanel(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable private fun RegistrationField(label: String, value: String, password: Boolean = false, onChange: (String) -> Unit) { OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = true, visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None, colors = loginFieldColors(), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) }
+@Composable
+private fun RegistrationField(
+    label: String,
+    value: String,
+    helperText: String,
+    errorText: String? = null,
+    password: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Next,
+    onChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        supportingText = { Text(errorText ?: helperText) },
+        isError = errorText != null,
+        singleLine = true,
+        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        colors = loginFieldColors(),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+    )
+}
 
 @Composable
 private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
