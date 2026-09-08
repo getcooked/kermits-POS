@@ -12,6 +12,8 @@ class ReservationObserver implements ShouldHandleEventsAfterCommit
         'status',
         'payment_status',
         'reservation_at',
+        'reservation_end_at',
+        'dining_table_id',
         'type',
         'table_size',
         'guests',

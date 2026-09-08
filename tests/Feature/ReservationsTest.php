@@ -29,7 +29,7 @@ class ReservationsTest extends TestCase
             'customer_name' => 'Booking Customer',
             'email' => 'customer@gmail.com',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'guests' => 4,
             'food_request' => 'Four set meals',
             'notes' => 'Window table',
@@ -53,7 +53,7 @@ class ReservationsTest extends TestCase
             'customer_name' => 'Guest',
             'email' => 'guest@gmail.com',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'guests' => 2,
         ])->assertRedirect('/login');
 
@@ -74,7 +74,7 @@ class ReservationsTest extends TestCase
             'customer_name' => $customer->name,
             'email' => $customer->email,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'guests' => 2,
             'payment_method' => 'cash',
         ])->assertRedirect();
@@ -89,7 +89,7 @@ class ReservationsTest extends TestCase
         $this->actingAs($customer)->post('/book', [
             'type' => 'table',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'guests' => 2,
         ])->assertSessionHasErrors('table_size');
 
@@ -107,7 +107,7 @@ class ReservationsTest extends TestCase
             'customer_name' => $customer->name,
             'email' => $customer->email,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'menu_items' => [$meal->id => 2],
             'payment_method' => 'cash',
         ])->assertRedirect();
@@ -130,7 +130,7 @@ class ReservationsTest extends TestCase
             'customer_name' => $customer->name,
             'email' => $customer->email,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'menu_items' => [],
             'payment_method' => 'cash',
         ])->assertRedirect();
@@ -147,7 +147,7 @@ class ReservationsTest extends TestCase
         $this->actingAs($customer)->post('/book', [
             'type' => 'table', 'table_size' => 4, 'customer_name' => $customer->name,
             'email' => $customer->email, 'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'menu_items' => [$meal->id => 23], 'payment_method' => 'cash',
         ])->assertSessionHasErrors('menu_items.'.$meal->id);
 
@@ -165,7 +165,7 @@ class ReservationsTest extends TestCase
             'customer_name' => $customer->name,
             'email' => $customer->email,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'menu_items' => [$meal->id => 2],
             'payment_method' => 'gcash',
             'payment_reference' => '1234567890123',
@@ -187,7 +187,7 @@ class ReservationsTest extends TestCase
         $this->actingAs($customer)->post('/book', [
             'type' => 'table', 'table_size' => 2, 'customer_name' => $customer->name,
             'email' => $customer->email, 'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'payment_method' => 'gcash', 'payment_reference' => '1234567890123', 'payment_proof' => $this->fakePng('payment.png'),
         ])->assertRedirect();
 
@@ -210,7 +210,7 @@ class ReservationsTest extends TestCase
                 'customer_name' => $customer->name,
                 'email' => $customer->email,
                 'phone' => $invalidPhone,
-                'reservation_at' => now()->addDay()->format('Y-m-d H:i:s'),
+                'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             ])->assertSessionHasErrors('phone');
         }
 
@@ -227,7 +227,7 @@ class ReservationsTest extends TestCase
             'customer_name' => 'Customer',
             'email' => 'customer@example.com',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay(),
+            'reservation_at' => now()->addDay()->setTime(12, 0),
             'guests' => 2,
         ]);
 
@@ -245,7 +245,7 @@ class ReservationsTest extends TestCase
             'customer_name' => 'Customer',
             'email' => 'customer@example.com',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay(),
+            'reservation_at' => now()->addDay()->setTime(12, 0),
             'guests' => 20,
         ]);
 
@@ -270,7 +270,7 @@ class ReservationsTest extends TestCase
             'customer_name' => 'Customer',
             'email' => 'customer@gmail.com',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay(),
+            'reservation_at' => now()->addDay()->setTime(12, 0),
             'guests' => 2,
             'status' => 'pending',
         ]);
@@ -294,7 +294,7 @@ class ReservationsTest extends TestCase
             'customer_name' => 'Viewing Customer',
             'email' => 'viewer@gmail.com',
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay(),
+            'reservation_at' => now()->addDay()->setTime(12, 0),
             'guests' => 4,
             'food_request' => 'No peanuts',
             'status' => 'pending',
@@ -315,7 +315,7 @@ class ReservationsTest extends TestCase
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $reservation = Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-APPROVAL', 'type' => 'table', 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
+        $reservation = Reservation::query()->create(['user_id' => $customer->id, 'reference' => 'KRM-APPROVAL', 'type' => 'table', 'customer_name' => $customer->name, 'email' => $customer->email, 'phone' => '09171234567', 'reservation_at' => now()->addDay()->setTime(12, 0), 'guests' => 2, 'status' => 'pending']);
         $url = URL::temporarySignedRoute('reservations.success', now()->addMinutes(10), ['reference' => $reservation->reference]);
 
         $this->actingAs($customer)->get($url)->assertOk()->assertSee('AWAITING ADMIN APPROVAL')->assertDontSee('Reservation confirmed');
@@ -326,7 +326,7 @@ class ReservationsTest extends TestCase
     public function test_super_admin_cannot_skip_pending_reservation_to_completed(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $reservation = Reservation::query()->create(['reference' => 'KRM-ORDERED', 'type' => 'table', 'customer_name' => 'Customer', 'email' => 'customer@gmail.com', 'phone' => '09171234567', 'reservation_at' => now()->addDay(), 'guests' => 2, 'status' => 'pending']);
+        $reservation = Reservation::query()->create(['reference' => 'KRM-ORDERED', 'type' => 'table', 'customer_name' => 'Customer', 'email' => 'customer@gmail.com', 'phone' => '09171234567', 'reservation_at' => now()->addDay()->setTime(12, 0), 'guests' => 2, 'status' => 'pending']);
 
         $this->actingAs($superAdmin)->patch('/reservations/'.$reservation->id.'/status', ['status' => 'completed'])->assertSessionHasErrors('status');
         $this->assertSame('pending', $reservation->fresh()->status);
@@ -334,7 +334,7 @@ class ReservationsTest extends TestCase
 
     public function test_customer_cannot_submit_a_reservation_for_an_occupied_schedule(): void
     {
-        $schedule = now()->addDays(2)->startOfHour();
+        $schedule = now()->addDays(2)->setTime(12, 0)->startOfHour();
         $firstCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $secondCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 

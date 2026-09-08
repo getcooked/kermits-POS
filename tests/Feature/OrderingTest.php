@@ -180,7 +180,7 @@ class OrderingTest extends TestCase
             'stock' => 5,
             'active' => true,
         ]);
-        $reservationAt = now()->addDay()->startOfMinute();
+        $reservationAt = now()->addDay()->setTime(12, 0)->startOfMinute();
 
         $this->actingAs($customer)->post('/shop/orders', [
             'quantities' => [$product->id => 1],
@@ -260,7 +260,7 @@ class OrderingTest extends TestCase
                 'GCash',
             ], false);
 
-        $this->assertSame(1, substr_count($menu->getContent(), route('reservations.create')));
+        $this->assertSame(1, substr_count($menu->getContent(), 'href="'.route('reservations.create').'"'));
 
         foreach (['/history', '/book'] as $page) {
             $this->actingAs($customer)->get($page)
@@ -280,7 +280,7 @@ class OrderingTest extends TestCase
             'quantities' => [$product->id => 1],
             'table_size' => 2,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
             'payment_method' => 'gcash',
             'payment_reference' => '12345',
         ])->assertSessionHasErrors(['payment_reference', 'payment_proof']);
@@ -300,7 +300,7 @@ class OrderingTest extends TestCase
             'quantities' => [$product->id => 2],
             'table_size' => 4,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
             'payment_method' => 'gcash',
             'payment_reference' => '1234567890123',
             'payment_proof' => $this->fakePng('checkout-proof.png'),
@@ -347,7 +347,7 @@ class OrderingTest extends TestCase
                 'quantities' => [$product->id => 2],
                 'table_size' => 2,
                 'phone' => '09171234567',
-                'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+                'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
                 'payment_method' => 'gcash',
                 'payment_reference' => '1234567890123',
                 'payment_proof' => $this->fakePng('rollback-proof.png'),
@@ -430,7 +430,7 @@ class OrderingTest extends TestCase
             'quantities' => [$product->id => 1],
             'table_size' => 2,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->format('Y-m-d\TH:i'),
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
             'payment_method' => 'cash',
         ])->assertRedirect(route('shop.orders.show', 1));
 
@@ -529,7 +529,7 @@ class OrderingTest extends TestCase
             'customer_name' => $customer->name,
             'email' => $customer->email,
             'phone' => '09171234567',
-            'reservation_at' => now()->addDay(),
+            'reservation_at' => now()->addDay()->setTime(12, 0),
             'guests' => 4,
             'reservation_fee' => 250,
             'food_total' => 0,

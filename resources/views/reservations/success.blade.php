@@ -2,12 +2,12 @@
 @section('title', 'Reservation status')
 @section('content')
 @php
-    $isApproved = in_array($reservation->status, ['confirmed', 'completed'], true);
-    $isCancelled = $reservation->status === 'cancelled';
+    $isApproved = in_array($reservation->booking_status, ['confirmed', 'completed'], true);
+    $isCancelled = $reservation->booking_status === 'cancelled';
 @endphp
 <main class="page"><section class="card reservation-result">
     <img class="logo" src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's">
-    <div class="status-icon {{ $reservation->status }}">{{ $isApproved ? '✓' : ($isCancelled ? '×' : '⌛') }}</div>
+    <div class="status-icon {{ $reservation->booking_status }}">{{ $isApproved ? '✓' : ($isCancelled ? '×' : '⌛') }}</div>
     @if($isApproved)
         <p class="status-label approved">ADMIN APPROVED</p><h1>Reservation confirmed</h1><p class="muted">Your reservation has been approved. We look forward to welcoming you, {{ $reservation->customer_name }}.</p>
     @elseif($isCancelled)
@@ -15,7 +15,7 @@
     @else
         <p class="status-label pending">AWAITING ADMIN APPROVAL</p><h1>Request submitted</h1><p class="muted">Your request is pending. It is not a successful reservation until an admin approves it.</p>
     @endif
-    <div class="reservation-summary"><strong>Reference: {{ $reservation->reference }}</strong><span>{{ str($reservation->type)->replace('_', ' ')->title() }}</span><span>{{ $reservation->reservation_at->format('M d, Y h:i A') }}</span><span>@if($reservation->type === 'table'){{ $reservation->table_size }}-seater table @else{{ $reservation->guests }} guest(s) @endif</span><span>Status: {{ ucfirst($reservation->status) }}</span></div>
+    <div class="reservation-summary"><strong>Reference: {{ $reservation->reference }}</strong><span>{{ str($reservation->type)->replace('_', ' ')->title() }}</span><span>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range.' - '.$reservation->table_label }}</span><span>@if($reservation->type === 'table'){{ $reservation->table_size }}-seater table @else{{ $reservation->guests }} guest(s) @endif</span>@if($reservation->hold_expires_at)<span>Approval deadline: {{ $reservation->hold_expires_at->format('M d, Y h:i A') }}</span>@endif<span>Status: {{ ucfirst($reservation->booking_status) }}</span></div>
     @if($reservation->items->isNotEmpty())<div class="reservation-summary"><strong>Selected food</strong>@foreach($reservation->items as $item)<span>{{ $item->quantity }} × {{ $item->product?->name ?? 'Menu item' }} — &#8369;{{ number_format($item->subtotal,2) }}</span>@endforeach<strong>Estimated total: &#8369;{{ number_format($reservation->items->sum('subtotal'),2) }}</strong></div>@endif
     <div class="reservation-summary"><span>Reservation fee <strong>&#8369;{{ number_format($reservation->reservation_fee,2) }}</strong></span><span>Food total <strong>&#8369;{{ number_format($reservation->food_total,2) }}</strong></span><span>Total <strong>&#8369;{{ number_format($reservation->total_amount,2) }}</strong></span><span>Payment method <strong>{{ $reservation->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }} · {{ ucfirst($reservation->payment_status) }}</strong></span>@if($reservation->payment_method === 'gcash' && $reservation->payment_reference)<span>GCash reference <strong>{{ $reservation->payment_reference }}</strong></span>@endif <a href="{{ route('reservations.show',$reservation) }}">View reservation details</a></div><a class="button" href="{{ route('customer.history') }}">View reservation history</a><a style="display:block;margin-top:12px" href="{{ route('reservations.create') }}">Make another request</a>
 </section></main>

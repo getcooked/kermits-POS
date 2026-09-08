@@ -118,7 +118,7 @@ class ReportController extends Controller
             'stockOut' => $stockOut,
             'reservations' => $reportReservations,
             'reservationCount' => $allReservations->count(),
-            'pendingReservations' => $allReservations->where('status', 'pending')->count(),
+            'pendingReservations' => $allReservations->where('booking_status', 'pending')->count(),
             'approvedReservations' => $allReservations->whereIn('status', ['confirmed', 'completed'])->count(),
             'approvedReservationValue' => $allReservations->whereIn('status', ['confirmed', 'completed'])->sum('total_amount'),
             'topRequestedProducts' => $topRequestedProducts,

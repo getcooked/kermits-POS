@@ -41,6 +41,7 @@ class CustomerOrderController extends Controller
 
         try {
             $order = DB::transaction(function () use ($request, $orders, $paymentMethod, $paymentReference, $proofPath, $schedules): Order {
+                $schedules->lock();
                 $order = $orders->create(
                     user: $request->user(),
                     quantities: $request->selectedQuantities(),
@@ -52,7 +53,7 @@ class CustomerOrderController extends Controller
 
                 $tableSize = (int) $request->validated('table_size');
                 $reservationFee = self::TABLE_FEES[$tableSize];
-                $reservation = Reservation::query()->create([
+                $reservation = $schedules->reserve([
                     'user_id' => $request->user()->id,
                     'order_id' => $order->id,
                     'reference' => $this->newReservationReference(),

@@ -42,10 +42,11 @@ class ReservationController extends Controller
 
         try {
             $reservation = DB::transaction(function () use ($request, $proofPath, $schedules): Reservation {
+                $schedules->lock();
                 $reservationFee = $request->validated('type') === 'table'
                     ? self::TABLE_FEES[(int) $request->validated('table_size')]
                     : self::EXCLUSIVE_FEE;
-                $reservation = Reservation::query()->create([
+                $reservation = $schedules->reserve([
                     ...$request->safe()->except(['menu_items', 'payment_proof']),
                     'user_id' => $request->user()->id,
                     'customer_name' => $request->user()->name,
@@ -151,16 +152,15 @@ class ReservationController extends Controller
     public function index(Request $request): View
     {
         $filters = $request->validate([
-            'status' => ['nullable', 'in:pending,confirmed,completed,cancelled'],
+            'status' => ['nullable', 'in:pending,confirmed,completed,cancelled,rejected,expired'],
             'type' => ['nullable', 'in:table,exclusive'],
         ]);
 
         $reservations = Reservation::query()
-            ->with(['handler', 'items.product'])
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->with(['handler', 'items.product', 'diningTable'])
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->orderBy('reservation_at')
-            ->get();
+            ->get()->when($filters['status'] ?? null, fn ($items, $status) => $items->where('booking_status', $status));
 
         return view('reservations.index', compact('reservations'));
     }
@@ -180,18 +180,7 @@ class ReservationController extends Controller
         UpdateReservationStatusRequest $request,
         Reservation $reservation,
     ): RedirectResponse {
-        $previousStatus = $reservation->status;
-        DB::transaction(function () use ($request, $reservation, $previousStatus): void {
-            $reservation->update([
-                'status' => $request->validated('status'),
-                'handled_by' => $request->user()->id,
-            ]);
-            $reservation->statusHistories()->create([
-                'from_status' => $previousStatus,
-                'to_status' => $reservation->status,
-                'changed_by' => $request->user()->id,
-            ]);
-        });
+        app(ReservationSchedule::class)->changeStatus($reservation, $request->validated('status'), $request->user()->id);
 
         $message = match ($reservation->status) {
             'confirmed' => 'Reservation approved successfully.',

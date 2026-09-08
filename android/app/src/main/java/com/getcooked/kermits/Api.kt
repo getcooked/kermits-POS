@@ -39,7 +39,7 @@ data class Order(
     val items: List<OrderItem> = emptyList(),
 )
 @JsonClass(generateAdapter = true)
-data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList())
+data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val table_number: Int? = null, val reservation_end_at: String? = null, val hold_expires_at: String? = null)
 @JsonClass(generateAdapter = true)
 data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
@@ -77,7 +77,13 @@ data class PushInstallationRequest(
 
 fun String.formPart(): RequestBody = toRequestBody("text/plain".toMediaType())
 
+@JsonClass(generateAdapter = true)
+data class ReservationSlot(val start: String, val end: String, val label: String, val available: Boolean)
+@JsonClass(generateAdapter = true)
+data class ReservationSlotsResponse(val data: List<ReservationSlot>)
+
 interface KermitsApi {
+    @GET("reservation-availability") suspend fun reservationSlots(@Query("date") date: String, @Query("type") type: String, @Query("guests") guests: Int): ReservationSlotsResponse
     @POST("login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     @POST("password/forgot") suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ApiError>
     @POST("register/email") suspend fun sendRegistrationCode(@Body request: SendCodeRequest): Response<SendCodeResponse>

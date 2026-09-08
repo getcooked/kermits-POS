@@ -69,10 +69,12 @@
                         <div class="reservation-date-list">
                         @foreach($dateReservations as $reservation)
                     @php
-                        $reservationLabel = match ($reservation->status) {
+                        $reservationLabel = match ($reservation->booking_status) {
                             'confirmed' => 'Confirmed',
                             'completed' => 'Completed',
                             'cancelled' => 'Cancelled',
+                            'expired' => 'Expired',
+                            'rejected' => 'Rejected',
                             default => 'Awaiting review',
                         };
                         $latestEvent = $reservation->statusHistories->last();
@@ -84,12 +86,12 @@
                                     <span class="activity-kind">{{ $reservation->type === 'table' ? 'Table reservation' : 'Exclusive reservation' }}</span>
                                     <h3>{{ $reservation->reference }}</h3>
                                 </div>
-                                <span class="status {{ $reservation->status }}">{{ $reservationLabel }}</span>
+                                <span class="status {{ $reservation->booking_status }}">{{ $reservationLabel }}</span>
                             </div>
 
                             <dl class="activity-details">
                                 <div><dt>Date</dt><dd>{{ $reservation->reservation_at->format('M d, Y') }}</dd></div>
-                                <div><dt>Time</dt><dd>{{ $reservation->reservation_at->format('h:i A') }}</dd></div>
+                                <div><dt>Table</dt><dd>{{ $reservation->table_label }}</dd></div><div><dt>Time</dt><dd>{{ $reservation->time_range }}</dd></div>
                                 <div><dt>Party</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.' seats' : $reservation->guests.' guests' }}</dd></div>
                                 <div><dt>Total</dt><dd>&#8369;{{ number_format($reservation->total_amount, 2) }}</dd></div>
                             </dl>

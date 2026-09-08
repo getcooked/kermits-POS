@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\MobilePasswordResetController;
 use App\Http\Controllers\Api\MobilePushInstallationController;
 use App\Http\Controllers\Api\MobileRegistrationController;
 use App\Http\Controllers\Api\MobileReservationController;
+use App\Http\Controllers\ReservationAvailabilityController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -25,6 +26,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/orders', [MobileOrderController::class, 'store'])->middleware('throttle:10,1');
         Route::get('/orders/{order}', [MobileOrderController::class, 'show']);
         Route::get('/reservations', [MobileReservationController::class, 'index']);
+        Route::get('/reservation-availability', ReservationAvailabilityController::class);
         Route::post('/reservations', [MobileReservationController::class, 'store'])->middleware('throttle:10,1');
         Route::get('/reservations/{reservation}', [MobileReservationController::class, 'show']);
     });
