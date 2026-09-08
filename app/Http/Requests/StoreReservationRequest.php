@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Rules\ReservationHours;
 use App\Services\ReservationSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -22,7 +23,7 @@ class StoreReservationRequest extends FormRequest
             'customer_name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:160'],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
-            'reservation_at' => ['required', 'date', 'after:now'],
+            'reservation_at' => ['required', 'bail', 'date', 'after:now', new ReservationHours],
             'guests' => ['nullable', 'required_if:type,exclusive', 'integer', 'min:1', 'max:300'],
             'food_request' => ['nullable', 'string', 'max:2000'],
             'menu_items' => ['nullable', 'array'],
@@ -38,8 +39,8 @@ class StoreReservationRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if (! $validator->errors()->has('reservation_at')
-                    && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'))) {
+                if (! $validator->errors()->hasAny(['reservation_at', 'type', 'table_size', 'guests'])
+                    && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'), $this->input('type', 'table'), (int) ($this->input('table_size') ?: $this->input('guests', 1)))) {
                     $validator->errors()->add('reservation_at', 'This reservation time is no longer available. Please choose another schedule.');
                 }
 

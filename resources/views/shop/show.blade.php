@@ -23,7 +23,7 @@
                 @if($reservation)
                     <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>
                     <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }}</dd></div>
-                    <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y h:i A') }}</dd></div>
+                    <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range.' - '.$reservation->table_label }}</dd></div>
                 @endif
                 <div><dt>Payment</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
                 <div><dt>Status</dt><dd>Pending {{ $order->payment_method === 'gcash' ? 'payment verification' : 'counter payment' }}</dd></div>

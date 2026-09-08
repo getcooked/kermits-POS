@@ -14,8 +14,8 @@ class UpdateReservationStatusRequest extends FormRequest
 
     public function rules(): array
     {
-        $allowedStatuses = match ($this->route('reservation')?->status) {
-            'pending' => ['confirmed', 'cancelled'],
+        $allowedStatuses = match ($this->route('reservation')?->booking_status) {
+            'pending' => ['confirmed', 'cancelled', 'rejected'],
             'confirmed' => ['completed', 'cancelled'],
             default => [],
         };

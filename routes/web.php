@@ -9,6 +9,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerHistoryController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DiningTableController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\PublicStorageController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReservationAvailabilityController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\SuperAdminSecurityController;
 use App\Http\Controllers\WebSeederController;
@@ -69,6 +71,7 @@ Route::middleware('auth')->group(function (): void {
         ->name('reservations.receipt');
 
     Route::middleware('role:customer')->group(function (): void {
+        Route::get('/book/availability', ReservationAvailabilityController::class)->name('reservations.availability');
         Route::get('/shop', [CustomerOrderController::class, 'index'])->name('shop');
         Route::post('/shop/orders', [CustomerOrderController::class, 'store'])->name('shop.orders.store');
         Route::get('/shop/orders/{order}', [CustomerOrderController::class, 'show'])->name('shop.orders.show');
@@ -94,6 +97,10 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
         Route::post('/inventory/{product}', [InventoryController::class, 'update'])->name('inventory.update');
         Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
+        Route::get('/tables', [DiningTableController::class, 'index'])->name('tables.index');
+        Route::post('/tables', [DiningTableController::class, 'store'])->name('tables.store');
+        Route::put('/tables/{table}', [DiningTableController::class, 'update'])->name('tables.update');
+        Route::patch('/reservations/{reservation}/table', [DiningTableController::class, 'reassign'])->name('reservations.table');
         Route::patch('/reservations/{reservation}/status', [ReservationController::class, 'updateStatus'])->name('reservations.status');
         Route::get('/crud', [ProductController::class, 'index'])->name('crud.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');

@@ -10,6 +10,7 @@ use App\Models\StockMovement;
 use App\Models\SystemSetting;
 use App\Services\OrderService;
 use App\Services\ReservationPushNotifier;
+use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -138,9 +139,13 @@ class CashierController extends Controller
     public function confirmCustomerPayment(Request $request, Order $order): RedirectResponse
     {
         DB::transaction(function () use ($order, $request): void {
+            app(ReservationSchedule::class)->lock();
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensurePendingCustomerOrder($lockedOrder);
             $lockedOrder->load('reservation');
+            if ($lockedOrder->reservation && ! in_array($lockedOrder->reservation->booking_status, ['pending', 'confirmed', 'completed'])) {
+                throw ValidationException::withMessages(['reservation' => 'This reservation is no longer active. Review its schedule before collecting payment.']);
+            }
             $amountDue = $lockedOrder->totalDue();
 
             if ($lockedOrder->payment_method === 'gcash') {
@@ -148,7 +153,7 @@ class CashierController extends Controller
                     throw ValidationException::withMessages(['payment_reference' => 'A valid 13-digit GCash reference is required.']);
                 }
                 $lockedOrder->update(['payment_status' => 'paid', 'cash_received' => null, 'change_due' => null]);
-                $lockedOrder->reservation?->update(['payment_status' => 'paid']);
+                $lockedOrder->reservation?->update(['payment_status' => 'paid', 'hold_expires_at' => null]);
 
                 return;
             }
@@ -166,7 +171,7 @@ class CashierController extends Controller
                 'cash_received' => $cash,
                 'change_due' => $cash - $amountDue,
             ]);
-            $lockedOrder->reservation?->update(['payment_status' => 'paid']);
+            $lockedOrder->reservation?->update(['payment_status' => 'paid', 'hold_expires_at' => null]);
         }, attempts: 3);
 
         return redirect()

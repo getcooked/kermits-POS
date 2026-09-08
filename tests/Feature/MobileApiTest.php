@@ -210,7 +210,7 @@ class MobileApiTest extends TestCase
 
         $reservationId = $this->withToken($token)->postJson('/api/v1/reservations', [
             'type' => 'table', 'table_size' => 4, 'phone' => '09171234567',
-            'reservation_at' => now()->addDays(2)->toIso8601String(),
+            'reservation_at' => now()->addDays(2)->setTime(12, 0)->toIso8601String(),
             'payment_method' => 'cash', 'notes' => 'Near the window',
         ])->assertCreated()
             ->assertJsonPath('data.total_amount', 250)
@@ -242,7 +242,7 @@ class MobileApiTest extends TestCase
             'payment_proof' => $this->fakePngUpload(),
             'table_size' => 4,
             'phone' => '09170000000',
-            'reservation_at' => now()->addDays(2)->toIso8601String(),
+            'reservation_at' => now()->addDays(2)->setTime(12, 0)->toIso8601String(),
             'notes' => 'Birthday lunch',
         ], ['Accept' => 'application/json'])
             ->assertCreated()

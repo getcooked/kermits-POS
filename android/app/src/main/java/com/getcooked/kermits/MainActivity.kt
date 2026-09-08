@@ -22,6 +22,18 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -157,6 +169,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     private var loginCooldownDeadlineMillis = 0L
     private var loginCooldownJob: Job? = null
     fun clearError() { error = null }
+    suspend fun reservationSlots(date: String, type: String, guests: Int) = api.reservationSlots(date, type, guests).data
     init {
         if (signedIn) refresh() else store.clear()
     }
@@ -523,11 +536,22 @@ fun KermitsApp(
         bottomBar = { CustomerBottomBar(tab) { tab = it } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp)) {
-            if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = Color(0xFFB5C019), trackColor = Color.Transparent)
+            AnimatedVisibility(vm.busy, enter = fadeIn(tween(120)) + expandVertically(tween(140)), exit = fadeOut(tween(100)) + shrinkVertically(tween(140))) {
+                LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = Color(0xFFB5C019), trackColor = Color.Transparent)
+            }
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth().weight(1f)) {
-                when (tab) {
+            AnimatedContent(
+                targetState = tab,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                transitionSpec = {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (fadeIn(tween(210)) + slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { direction * (it / 18) }) togetherWith
+                        (fadeOut(tween(110)) + slideOutHorizontally(tween(190)) { -direction * (it / 24) })
+                },
+                label = "customerDestination",
+            ) { destination ->
+                when (destination) {
                     0 -> MenuScreen(
                         vm = vm,
                         payment = payment,
@@ -559,7 +583,7 @@ fun KermitsApp(
             },
         )
     }
-    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservation.reservation_at, "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
+    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservationScheduleLabel(reservation), reservationTableLabel(reservation), "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
 }
 
 @Composable
@@ -896,6 +920,12 @@ private fun showDateTimePicker(context: Context, calendar: Calendar, dateFormat:
             TimePickerDialog(
                 context,
                 { _, hour, minute ->
+                    if (hour < 8 || hour > 22 || (hour == 22 && minute > 0)) {
+                        android.widget.Toast.makeText(context, "Choose 8:00 AM-10:00 PM. Last booking ends at 11:00 PM.", android.widget.Toast.LENGTH_LONG).show()
+                        return@TimePickerDialog
+                    }
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
                     calendar.set(Calendar.HOUR_OF_DAY, hour)
                     calendar.set(Calendar.MINUTE, minute)
                     onSelected(dateFormat.format(calendar.time))
@@ -927,8 +957,8 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     var paymentReference by remember { mutableStateOf("") }
     var proofUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val calendar = remember { Calendar.getInstance() }
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+    val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }
     val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { proofUri = it }
     }
@@ -1083,7 +1113,9 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("YOUR CART", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
-                            Text(if (checkingOut) "Checkout" else "Your order", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                            AnimatedContent(checkingOut, transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(90)) }, label = "checkoutHeading") { checkout ->
+                                Text(if (checkout) "Checkout" else "Your order", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                         TextButton(onClick = { cartOpen = false }) { Text("Close") }
                     }
@@ -1127,7 +1159,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         HorizontalDivider(color = Color(0xFFDDE0D6), modifier = Modifier.padding(vertical = 6.dp))
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("$cartItemCount ${if (cartItemCount == 1) "item" else "items"}", fontWeight = FontWeight.Bold)
-                            Text(money(cartTotal), fontSize = 19.sp, fontWeight = FontWeight.Black)
+                            CartAmount(cartTotal)
                         }
                         Button(
                             onClick = { checkingOut = true },
@@ -1143,16 +1175,17 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         Text("Your selected food is already in the order, so only the table details are needed here.", color = Color(0xFF6E746B), fontSize = 12.sp, lineHeight = 18.sp)
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Order total", fontWeight = FontWeight.Bold)
-                            Text(money(cartTotal), fontWeight = FontWeight.Black)
+                            CartAmount(cartTotal)
                         }
                         Spacer(Modifier.height(14.dp))
                         OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone number") }, supportingText = { Text("11 digits starting with 09") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
                         Spacer(Modifier.height(8.dp))
-                        DateTimePickerField(date, "Date and time", "Choose your schedule", "Select a date first, then choose a time") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
+                        DateTimePickerField(date, "Date and time", "Choose your schedule", "Open 8 AM-11 PM (Philippine time). Last arrival: 10 PM.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
+                        ReservationSlotChoices(vm, date, "table", tableSize.toIntOrNull() ?: 1) { date = it }
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.horizontalScroll(rememberScrollState())) {
                             listOf("1", "2", "4", "8", "12").forEach { value ->
-                                FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp))
+                                FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("Up to $value guests") }, modifier = Modifier.padding(end = 6.dp))
                             }
                         }
                         Spacer(Modifier.height(8.dp))
@@ -1315,7 +1348,7 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
                     )
                 }
                 items(reservations, key = { "reservation-${it.id}" }) { reservation ->
-                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to receiptDate(reservation.reservation_at), "TYPE" to if (reservation.type == "table") "${reservation.table_size}-seater table" else "Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
+                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservationScheduleLabel(reservation), "TABLE" to reservationTableLabel(reservation), "TYPE" to if (reservation.type == "table") "${reservation.table_size}-seater table" else "Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
                 }
             }
         } else {
@@ -1456,7 +1489,9 @@ private fun OrderReceiptDialog(
                                 Column(Modifier.padding(13.dp)) {
                                     Text("TABLE REQUEST", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Black)
                                     ReceiptLine("Reference", reservation.reference)
-                                    ReceiptLine("Schedule", receiptDate(reservation.reservation_at))
+                                    ReceiptLine("Schedule", reservationScheduleLabel(reservation))
+                                    ReceiptLine("Table", reservationTableLabel(reservation))
+                                    reservation.hold_expires_at?.let { ReceiptLine("Approval deadline", receiptDate(it)) }
                                     ReceiptLine("Table", "${reservation.table_size ?: reservation.guests ?: 0} seats")
                                     ReceiptLine("Status", reservation.status.replaceFirstChar { it.uppercase() })
                                 }
@@ -1543,7 +1578,7 @@ private fun receiptPrintHtml(order: Order, customerName: String): String {
     val reservationRows = order.reservation?.let { reservation ->
         """
         <div class="line"><span>Reservation</span><b>${reservation.reference.html()}</b></div>
-        <div class="line"><span>Schedule</span><b>${receiptDate(reservation.reservation_at).html()}</b></div>
+        <div class="line"><span>Schedule</span><b>${reservationScheduleLabel(reservation).html()}</b></div><div class="line"><span>Table</span><b>${reservationTableLabel(reservation).html()}</b></div>
         <div class="line"><span>Table</span><b>${reservation.table_size ?: reservation.guests ?: 0} seats</b></div>
         <div class="line"><span>Reservation fee</span><b>${money(reservation.total_amount).html()}</b></div>
         """.trimIndent()
@@ -1611,7 +1646,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
 @Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { TextButton(onClick = close) { Text("Close") } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
 @Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
     var type by remember { mutableStateOf("table") }; var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; var guests by remember { mutableStateOf("20") }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var payment by remember { mutableStateOf("cash") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
-    val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance() }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
+    val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
     val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
     val reservationFee = if (type == "table") mapOf("1" to 100.0, "2" to 150.0, "4" to 250.0, "8" to 450.0, "12" to 650.0)[size] ?: 250.0 else 5000.0
     val canPay = payment == "cash" || (reference.length == 13 && proofUri != null)
@@ -1620,9 +1655,9 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     Text("Complete the details below. We will confirm your request after review.", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
     Row(Modifier.horizontalScroll(rememberScrollState())) { FilterChip(selected = type == "table", onClick = { type = "table" }, label = { Text("Table") }, modifier = Modifier.padding(end = 8.dp)); FilterChip(selected = type == "exclusive", onClick = { type = "exclusive" }, label = { Text("Exclusive venue") }) }
     Spacer(Modifier.height(10.dp)); OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
-    DateTimePickerField(date, "Choose your schedule", "Select date and time", "Tap to choose a date, then choose a time.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; Spacer(Modifier.height(10.dp))
+    DateTimePickerField(date, "Choose your schedule", "Select date and time", "Open 8 AM-11 PM (Philippine time). Last arrival: 10 PM.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; ReservationSlotChoices(vm, date, type, (if (type == "table") size else guests).toIntOrNull() ?: 1) { date = it }; Spacer(Modifier.height(10.dp))
     if (type == "table") {
-        Text("Table size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text("$value seats") }, modifier = Modifier.padding(end = 6.dp)) } }
+        Text("Party size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("1", "2", "4", "8", "12").forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text("Up to $value guests") }, modifier = Modifier.padding(end = 6.dp)) } }
     } else {
         OutlinedTextField(guests, { guests = it.filter(Char::isDigit).take(3) }, label = { Text("Number of guests") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
     }
@@ -1696,4 +1731,43 @@ private fun Uri.toMultipart(context: Context, fieldName: String): MultipartBody.
     val body = bytes.toRequestBody(type.toMediaTypeOrNull())
 
     return MultipartBody.Part.createFormData(fieldName, "$fieldName.$extension", body)
+}
+
+private fun reservationTableLabel(reservation: Reservation): String = if (reservation.type == "exclusive") "Exclusive venue (all tables)" else reservation.table_number?.let { "Table $it" } ?: "Awaiting table assignment"
+
+@Composable
+private fun CartAmount(amount: Double) {
+    AnimatedContent(
+        targetState = money(amount),
+        modifier = Modifier.animateContentSize(tween(160)),
+        transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(90)) },
+        label = "cartAmount",
+    ) { value -> Text(value, fontSize = 19.sp, fontWeight = FontWeight.Black) }
+}
+private fun reservationScheduleLabel(reservation: Reservation): String = receiptDate(reservation.reservation_at) + (reservation.reservation_end_at?.let { " - " + receiptDate(it) } ?: "")
+
+@Composable
+private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String, guests: Int, onSelect: (String) -> Unit) {
+    var slots by remember { mutableStateOf<List<ReservationSlot>>(emptyList()) }
+    var message by remember { mutableStateOf("") }
+    LaunchedEffect(date.take(10), type, guests) {
+        slots = emptyList()
+        if (date.isNotBlank()) {
+            message = "Checking availability..."
+            try {
+                slots = vm.reservationSlots(date.take(10), type, guests)
+                message = if (slots.any { it.available }) "Available times; checked again at submission." else "No availability. Please choose another date."
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                message = "Could not check availability. Please choose the date again."
+            }
+        }
+    }
+    Text("A numbered table is assigned automatically. Up to 2 hours, ending by 11 PM. Pending bookings are held for 30 minutes, or until arrival if sooner.", fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+    if (message.isNotEmpty()) Text(message, fontSize = 12.sp)
+    Row(Modifier.horizontalScroll(rememberScrollState())) {
+        slots.forEach { slot ->
+            FilterChip(selected = date.replace(' ', 'T') == slot.start, enabled = slot.available, onClick = { onSelect(slot.start.replace('T', ' ')) }, label = { Text(slot.label) }, modifier = Modifier.padding(end = 6.dp))
+        }
+    }
 }

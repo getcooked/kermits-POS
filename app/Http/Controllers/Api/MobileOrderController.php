@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Reservation;
+use App\Rules\ReservationHours;
 use App\Services\OrderService;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +38,7 @@ class MobileOrderController extends Controller
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'table_size' => ['nullable', 'required_with:phone,reservation_at', 'integer', 'in:1,2,4,8,12'],
             'phone' => ['nullable', 'required_with:table_size,reservation_at', 'regex:/^09\d{9}$/'],
-            'reservation_at' => ['nullable', 'required_with:table_size,phone', 'date', 'after:now'],
+            'reservation_at' => ['nullable', 'required_with:table_size,phone', 'bail', 'date', 'after:now', new ReservationHours],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
         $quantities = collect($validated['items'])->mapWithKeys(fn (array $item): array => [(int) $item['product_id'] => (int) $item['quantity']])->all();
@@ -47,7 +48,7 @@ class MobileOrderController extends Controller
                 'table_size' => 'Add table reservation details before submitting a GCash checkout.',
             ]);
         }
-        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'])) {
+        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'])) {
             throw ValidationException::withMessages([
                 'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
             ]);
@@ -59,6 +60,7 @@ class MobileOrderController extends Controller
 
         try {
             $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules): Order {
+                $schedules->lock();
                 $order = $orders->create(
                     user: $request->user(), quantities: $quantities, paymentStatus: 'pending',
                     paymentMethod: $validated['payment_method'], paymentReference: $validated['payment_reference'] ?? null,
@@ -67,7 +69,7 @@ class MobileOrderController extends Controller
 
                 if ($needsReservation) {
                     $tableSize = (int) $validated['table_size'];
-                    $reservation = Reservation::query()->create([
+                    $reservation = $schedules->reserve([
                         'user_id' => $request->user()->id,
                         'order_id' => $order->id,
                         'reference' => $this->newReservationReference(),
@@ -130,6 +132,9 @@ class MobileOrderController extends Controller
                 'type' => $order->reservation->type, 'table_size' => $order->reservation->table_size,
                 'guests' => $order->reservation->guests,
                 'reservation_at' => $order->reservation->reservation_at?->toIso8601String(),
+                'reservation_end_at' => $order->reservation->reservation_end_at?->toIso8601String(),
+                'table_number' => $order->reservation->diningTable?->number,
+                'hold_expires_at' => $order->reservation->hold_expires_at?->toIso8601String(),
                 'phone' => $order->reservation->phone,
                 'reservation_fee' => (float) $order->reservation->reservation_fee,
                 'food_total' => (float) $order->reservation->food_total,
@@ -139,7 +144,7 @@ class MobileOrderController extends Controller
                 'payment_reference' => $order->reservation->payment_reference,
                 'food_request' => $order->reservation->food_request,
                 'notes' => $order->reservation->notes,
-                'status' => $order->reservation->status,
+                'status' => $order->reservation->booking_status,
                 'items' => [],
             ] : null,
             'items' => $order->items->map(fn ($item): array => [

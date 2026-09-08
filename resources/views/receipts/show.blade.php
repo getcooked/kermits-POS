@@ -49,8 +49,8 @@
                     @endif
                     @if($reservation)
                         <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>
-                        <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }}</dd></div>
-                        <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at?->format('M d, Y h:i A') ?? 'Not scheduled' }}</dd></div>
+                        <div><dt>Table</dt><dd>{{ $reservation->table_label }} · {{ $reservation->table_size }} seats reserved</dd></div>
+                        <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at?->format('M d, Y') }} · {{ $reservation->time_range }}</dd></div>
                     @endif
                 </dl>
 

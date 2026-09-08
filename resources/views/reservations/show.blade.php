@@ -3,10 +3,12 @@
 @section('content')
 @php
     $isStaff = auth()->user()->hasRole('super_admin', 'admin');
-    $statusLabel = match ($reservation->status) {
+    $statusLabel = match ($reservation->booking_status) {
         'confirmed' => 'Confirmed',
         'completed' => 'Completed',
         'cancelled' => 'Cancelled',
+        'expired' => 'Expired',
+        'rejected' => 'Rejected',
         default => 'Awaiting review',
     };
 @endphp
@@ -37,7 +39,7 @@
                 </div>
                 <div>
                     <span>Time</span>
-                    <strong>{{ $reservation->reservation_at->format('h:i A') }}</strong>
+                    <strong>{{ $reservation->time_range }}</strong>
                 </div>
                 <div>
                     <span>Party</span>
@@ -45,10 +47,22 @@
                 </div>
                 <div>
                     <span>Status</span>
-                    <strong class="reservation-status {{ $reservation->status }}">{{ $statusLabel }}</strong>
+                    <strong class="reservation-status {{ $reservation->booking_status }}">{{ $statusLabel }}</strong>
                 </div>
             </section>
 
+            <p><strong>{{ $reservation->table_label }}</strong></p>
+            @if($reservation->booking_status === 'pending' && $reservation->hold_expires_at)<p>Awaiting approval. Hold expires {{ $reservation->hold_expires_at->format('M d, Y h:i A') }}.</p>@endif
+            @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
+            @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
+            @if($isStaff && $reservation->type === 'table' && in_array($reservation->booking_status, ['pending','confirmed']))
+            <form method="POST" action="{{ route('reservations.table', $reservation) }}">@csrf @method('PATCH')
+                <label for="assigned-table">Assign or change table</label><select class="control" name="dining_table_id" id="assigned-table" required>
+                @foreach(\App\Models\DiningTable::query()->where('active',true)->where('capacity','>=',$reservation->guests)->orderBy('number')->get() as $table)
+                <option value="{{ $table->id }}" @selected($reservation->dining_table_id === $table->id)>Table {{ $table->number }} - {{ $table->capacity }} seats</option>
+                @endforeach</select><p>Availability is checked before saving.</p><button class="button">Save assignment</button>
+            </form>
+            @endif
             <div class="reservation-sections">
                 <section class="detail-section">
                     <div class="section-heading">

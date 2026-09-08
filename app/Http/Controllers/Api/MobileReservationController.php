@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Reservation;
+use App\Rules\ReservationHours;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class MobileReservationController extends Controller
         $validated = $request->validate([
             'type' => ['required', 'in:table,exclusive'],
             'table_size' => ['nullable', 'required_if:type,table', 'integer', 'in:1,2,4,8,12'],
-            'phone' => ['required', 'regex:/^09\d{9}$/'], 'reservation_at' => ['required', 'date', 'after:now'],
+            'phone' => ['required', 'regex:/^09\d{9}$/'], 'reservation_at' => ['required', 'bail', 'date', 'after:now', new ReservationHours],
             'guests' => ['nullable', 'required_if:type,exclusive', 'integer', 'min:1', 'max:300'],
             'food_request' => ['nullable', 'string', 'max:2000'], 'menu_items' => ['nullable', 'array'],
             'menu_items.*' => ['nullable', 'integer', 'min:0', 'max:22'], 'notes' => ['nullable', 'string', 'max:2000'],
@@ -41,7 +42,7 @@ class MobileReservationController extends Controller
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
-        if (! $schedules->isAvailable($validated['reservation_at'])) {
+        if (! $schedules->isAvailable($validated['reservation_at'], $validated['type'], (int) ($validated['table_size'] ?? $validated['guests'] ?? 1))) {
             throw ValidationException::withMessages([
                 'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
             ]);
@@ -50,8 +51,9 @@ class MobileReservationController extends Controller
 
         try {
             $reservation = DB::transaction(function () use ($request, $validated, $proofPath, $schedules): Reservation {
+                $schedules->lock();
                 $fee = $validated['type'] === 'table' ? self::TABLE_FEES[(int) $validated['table_size']] : self::EXCLUSIVE_FEE;
-                $reservation = Reservation::query()->create([
+                $reservation = $schedules->reserve([
                     ...collect($validated)->except(['menu_items', 'payment_proof'])->all(),
                     'user_id' => $request->user()->id, 'customer_name' => $request->user()->name,
                     'email' => $request->user()->email, 'reference' => $this->newReference(), 'status' => 'pending',
@@ -99,11 +101,14 @@ class MobileReservationController extends Controller
         return [
             'id' => $reservation->id, 'reference' => $reservation->reference, 'type' => $reservation->type,
             'table_size' => $reservation->table_size, 'guests' => $reservation->guests,
-            'reservation_at' => $reservation->reservation_at?->toIso8601String(), 'phone' => $reservation->phone,
+            'reservation_at' => $reservation->reservation_at?->toIso8601String(),
+            'reservation_end_at' => $reservation->reservation_end_at?->toIso8601String(),
+            'table_number' => $reservation->diningTable?->number,
+            'hold_expires_at' => $reservation->hold_expires_at?->toIso8601String(), 'phone' => $reservation->phone,
             'reservation_fee' => (float) $reservation->reservation_fee, 'food_total' => (float) $reservation->food_total,
             'total_amount' => (float) $reservation->total_amount, 'payment_method' => $reservation->payment_method,
             'payment_status' => $reservation->payment_status, 'payment_reference' => $reservation->payment_reference,
-            'food_request' => $reservation->food_request, 'notes' => $reservation->notes, 'status' => $reservation->status,
+            'food_request' => $reservation->food_request, 'notes' => $reservation->notes, 'status' => $reservation->booking_status,
             'items' => $reservation->items->map(fn ($item): array => [
                 'product_id' => $item->product_id, 'name' => $item->product?->name ?? 'Product', 'quantity' => $item->quantity,
                 'unit_price' => (float) $item->unit_price, 'subtotal' => (float) $item->subtotal,

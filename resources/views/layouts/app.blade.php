@@ -270,8 +270,9 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
 
 
+    <link rel="stylesheet" href="{{ asset('css/kermits-motion.css') }}">
 </head>
-<body>
+<body data-feedback="{{ $errors->any() ? 'error' : (session('status') ? 'success' : '') }}">
 @yield('content')
 
 
@@ -280,17 +281,7 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
 
 
-<script>
-document.addEventListener('submit', event => {
-    queueMicrotask(() => {
-        if (event.defaultPrevented) return;
-        const submitter = event.submitter;
-        if (!submitter) return;
-        submitter.classList.add('is-submitting');
-        submitter.setAttribute('aria-disabled', 'true');
-    });
-});
-</script>
+<script src="{{ asset('js/kermits-motion.js') }}" defer></script>
 <script>(()=>{const phoneInputs=document.querySelectorAll('input[type="tel"][maxlength="11"]');phoneInputs.forEach(input=>{input.setAttribute('inputmode','numeric');input.setAttribute('minlength','11');input.setAttribute('maxlength','11');input.setAttribute('pattern','09[0-9]{9}');input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,11)})})})();</script>
 </body>
 </html>
