@@ -920,6 +920,7 @@
                      }
               }
        </style>
+       <link rel="stylesheet" href="{{ asset('css/kermits-motion.css') }}">
 </head>
 
 <body>
