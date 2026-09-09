@@ -261,6 +261,11 @@ class OrderingTest extends TestCase
             ], false);
 
         $this->assertSame(1, substr_count($menu->getContent(), 'href="'.route('reservations.create').'"'));
+        $this->assertLessThan(
+            strpos($menu->getContent(), '<main class="customer-shop">'),
+            strpos($menu->getContent(), '.customer-shop {'),
+            'Customer shop styles must be rendered in the document head before visible content.',
+        );
 
         foreach (['/history', '/book'] as $page) {
             $this->actingAs($customer)->get($page)
