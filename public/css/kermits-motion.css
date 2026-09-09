@@ -44,6 +44,7 @@ dialog::backdrop{background:rgb(16 20 14 / .48)}
     .period-tabs a
 ){
     transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,box-shadow 170ms ease,filter 150ms ease,translate 150ms var(--km-ease),opacity 150ms ease!important;
+    transition-delay:0ms!important;
 }
 @media(hover:hover) and (pointer:fine){
     :where(
@@ -80,6 +81,7 @@ dialog::backdrop{background:rgb(16 20 14 / .48)}
 }
 :where(button,input[type="button"],input[type="submit"],input[type="reset"]):disabled,
 :where(button,[role="button"],a.button,a[class*="button"],a.app-download,a.customer-app-link,a.report-primary,a.global-back)[aria-disabled="true"]{
+    transition-delay:0ms!important;
     cursor:not-allowed!important;
     filter:none!important;
     translate:none!important;

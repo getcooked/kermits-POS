@@ -6,7 +6,7 @@
     function animate(element, frames, duration = 260, delay = 0) {
         if (!element || reduced.matches || !element.animate) return;
         motions.get(element)?.cancel();
-        const animation = element.animate(frames, {duration, delay, easing: ease});
+        const animation = element.animate(frames, {duration, delay, easing: ease, fill: delay ? 'backwards' : 'none'});
         motions.set(element, animation);
         playing.add(animation);
         animation.finished.catch(() => {}).finally(() => playing.delete(animation));
@@ -23,7 +23,10 @@
     enter('.hero-copy > h1, .hero-copy > .hero-text, .hero-copy > .hero-actions', {distance:'0 10px', duration:380, stagger:50, limit:3});
     enter('.hero-visual .plate', {distance:'12px 0', duration:480, limit:1});
     enter('.table-editor', {distance:'0 10px', duration:320, stagger:22});
-    enter('.reservation-card .reservation-date', {distance:'-6px 0', duration:240, stagger:18, limit:6});
+    enter('table tbody > tr', {distance:'0 6px', duration:260, stagger:35, limit:6});
+    enter('.product-grid > .product-card', {distance:'0 8px', duration:280, stagger:32, limit:6});
+    enter('.reservation-card', {distance:'0 8px', duration:290, stagger:35, limit:6});
+    enter('.reservation-schedule', {distance:'0 7px', duration:280, stagger:45, limit:1});
     enter('.activity-card .activity-title', {distance:'0 6px', duration:260, limit:6});
     enter('.booking-brand img, .login-brand img, .page .logo', {distance:'0 -6px', duration:340, limit:1});
     enter('.login-inner > .eyebrow, .login-inner > h1', {distance:'0 6px', duration:300, stagger:40, limit:2});
@@ -44,7 +47,7 @@
             if (isVisible && !wasVisible) {
                 const isStep = panel.hasAttribute('data-checkout-step');
                 const direction = panel.dataset.checkoutStep === 'payment' ? '14px 0' : '-10px 0';
-                animate(panel, [{opacity:.2, translate:isStep ? direction : '0 14px'}, {opacity:1, translate:'0 0'}], isStep ? 220 : 280);
+                animate(panel, [{opacity:.2, translate:isStep ? direction : '0 14px'}, {opacity:1, translate:'0 0'}], isStep ? 220 : 280, isStep ? 35 : 55);
             }
             wasVisible = isVisible;
         }).observe(panel, {attributes:true, attributeFilter:['hidden', 'open', 'style', 'class']});
