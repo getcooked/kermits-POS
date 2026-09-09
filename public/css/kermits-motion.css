@@ -20,6 +20,71 @@
 .reservation-schedule select{transition:background-color 160ms ease!important}
 .reservation-schedule[aria-busy="true"] select{background-color:#f1f2e7}
 dialog::backdrop{background:rgb(16 20 14 / .48)}
+
+/* Every web action gets immediate pointer feedback without affecting touch devices. */
+:where(
+    button,
+    [role="button"],
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    a.button,
+    a[class*="button"],
+    a.primary,
+    a.secondary,
+    a.app-download,
+    a.customer-app-link,
+    a.report-primary,
+    a.global-back,
+    .header-actions a,
+    .hero-actions a,
+    .record-actions a,
+    .product-header-actions a,
+    .checkout-actions a,
+    .period-tabs a
+){
+    transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,box-shadow 170ms ease,filter 150ms ease,translate 150ms var(--km-ease),opacity 150ms ease!important;
+}
+@media(hover:hover) and (pointer:fine){
+    :where(
+        button,
+        [role="button"],
+        input[type="button"],
+        input[type="submit"],
+        input[type="reset"],
+        a.button,
+        a[class*="button"],
+        a.primary,
+        a.secondary,
+        a.app-download,
+        a.customer-app-link,
+        a.report-primary,
+        a.global-back,
+        .header-actions a,
+        .hero-actions a,
+        .record-actions a,
+        .product-header-actions a,
+        .checkout-actions a,
+        .period-tabs a
+    ):not(:disabled):not([aria-disabled="true"]):hover:not(:active){
+        filter:brightness(1.04) saturate(1.06)!important;
+        translate:0 -2px!important;
+        box-shadow:0 8px 18px rgb(23 24 23 / .16)!important;
+    }
+    .admin-sidebar nav a:hover,.customer-actions>a:hover,.history-actions>a:hover{
+        filter:brightness(1.08);
+    }
+    :where(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"]):not(:disabled):not([aria-disabled="true"]):active{
+        translate:0 1px!important;
+    }
+}
+:where(button,input[type="button"],input[type="submit"],input[type="reset"]):disabled,
+:where(button,[role="button"],a.button,a[class*="button"],a.app-download,a.customer-app-link,a.report-primary,a.global-back)[aria-disabled="true"]{
+    cursor:not-allowed!important;
+    filter:none!important;
+    translate:none!important;
+    box-shadow:none!important;
+}
 @keyframes km-turn{to{rotate:360deg}}
 @keyframes km-progress{to{background-position:-200% 0}}
 @keyframes km-breathe{from{opacity:.35}to{opacity:1}}

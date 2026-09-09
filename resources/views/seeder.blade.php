@@ -8,6 +8,7 @@
     <style>
         *{box-sizing:border-box}body{min-height:100vh;margin:0;padding:24px;display:grid;place-items:center;background:#f4f5ee;color:#171817;font-family:Inter,system-ui,sans-serif}.setup{width:min(480px,100%)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.brand img{width:52px;height:52px;border-radius:50%;background:#fff}.brand strong{letter-spacing:.1em}.panel{padding:28px;background:#fff;border:1px solid #d8dacf;border-radius:8px}.eyebrow{margin:0 0 8px;color:#747d00;font-size:12px;font-weight:800;text-transform:uppercase}.panel h1{margin:0 0 8px;font-size:26px}.muted{margin:0 0 22px;color:#6d7269;line-height:1.5}.field{display:grid;gap:7px;margin-top:15px}.field label{font-size:14px;font-weight:700}.field input{width:100%;min-height:46px;padding:10px 12px;border:1px solid #cfd3c7;border-radius:7px;font:inherit}.button{width:100%;min-height:48px;margin-top:20px;border:0;border-radius:7px;background:#171817;color:#fff;font:700 15px/1 Inter,system-ui,sans-serif;cursor:pointer}.notice,.error{padding:12px 14px;border-radius:7px;margin-bottom:16px}.notice{background:#edf7ed;color:#17652d}.error{background:#fff0f0;color:#9b1c1c}.accounts{margin:20px 0 0;padding:16px;background:#f5f6ef;border-radius:7px;line-height:1.7}.accounts code{font-size:13px}.complete{text-align:center}.complete a{display:inline-block;margin-top:12px;color:#525900;font-weight:700}
     </style>
+    <link rel="stylesheet" href="{{ asset('css/kermits-motion.css') }}">
 </head>
 <body>
 <main class="setup">
