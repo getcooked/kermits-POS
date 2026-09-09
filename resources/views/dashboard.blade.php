@@ -46,6 +46,7 @@
         </div>
     </main>
 </div>
+@push('styles')
 <style>
     body {
         background: #dfe2de
@@ -527,6 +528,7 @@
         }
     }
 </style>
+@endpush
 
 <script>
     (() => {

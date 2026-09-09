@@ -33,9 +33,11 @@
         </section>
     </div></main>
 </div>
+@push('styles')
 <style>
 .topbar h1{font-size:26px}.topbar p{margin:4px 0}.filters{padding:16px;margin-bottom:18px;display:flex;gap:10px;align-items:end}.filters .button{width:auto}.reservation-error{background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:14px}.reservation-list{display:grid;gap:13px}.reservation-card{padding:20px;display:grid;grid-template-columns:80px 1fr 190px;gap:18px;align-items:center}.reservation-date{display:grid;text-align:center;border-right:1px solid #e2e4dc;padding-right:18px}.reservation-date strong{font-size:30px}.reservation-date span{font-size:12px;color:#7b8308}.reservation-date small{color:#777b72}.reservation-details h2{font-size:18px;margin:8px 0 4px}.reservation-details p{color:#687286;margin:0 0 6px;font-size:13px}.reservation-details small{display:block;margin-top:5px}.type-pill,.status-pill{display:inline-block;padding:5px 8px;border-radius:20px;background:#eff1df;font-size:11px}.status-pill{background:#f0f1ed}.status-pill.confirmed{background:#e5f5e9;color:#267444}.status-pill.cancelled{background:#fff0f0;color:#c42b2b}.status-pill.completed{background:#e8eefc;color:#315efb}.reference,.final-status{font-size:11px;color:#777b72;margin-top:8px}.reservation-card form{display:grid;gap:8px}.reservation-card form .button{padding:10px}@media(max-width:850px){.reservation-card{grid-template-columns:65px 1fr}.reservation-card form,.final-status{grid-column:1/-1}}@media(max-width:520px){.filters{display:grid}.reservation-card{grid-template-columns:1fr}.reservation-date{display:flex;gap:7px;border-right:0;border-bottom:1px solid #e2e4dc;padding:0 0 10px}}
 @media(min-width:851px){.reservation-card>form,.reservation-card>.final-status{grid-column:3;grid-row:1/span 2}.preorder-items{grid-column:2!important}}@media(max-width:850px){.preorder-items{grid-column:2!important}.reservation-card>form,.reservation-card>.final-status{grid-column:1/-1!important}}@media(max-width:520px){.preorder-items{grid-column:1!important}}
 </style>
+@endpush
 
 @endsection

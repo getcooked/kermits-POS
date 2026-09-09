@@ -32,7 +32,9 @@
         </div>
     </main>
 </div>
+@push('styles')
 <style>
 .security-shell{background:#f5f6ef}.security-page{width:min(1060px,100%)}.security-page>header{margin-bottom:22px}.security-page>header p,.security-notes>p{margin:0;color:#7a8300;font-size:11px;letter-spacing:.16em}.security-page>header h1{margin:6px 0 4px;font-size:30px}.security-page>header span,.security-title p,.security-form small,.security-notes li,.security-notes div span{color:#687286}.security-message{padding:13px 15px;margin-bottom:16px;border-radius:8px}.security-message.success{background:#eaf8ef;color:#267444}.security-message.error{background:#fff0f0;color:#b42318}.security-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:18px}.security-form,.security-notes{padding:24px;border:1px solid #daddd1;border-radius:8px;background:#fff}.security-title{display:flex;gap:14px;align-items:center;padding-bottom:20px;border-bottom:1px solid #e5e7df}.security-title>span{width:48px;height:48px;display:grid;place-items:center;border-radius:8px;background:#e9ecd4;color:#626b00}.security-title svg{width:24px;height:24px}.security-title h2,.security-notes h2{margin:0;font-size:20px}.security-title p{margin:4px 0 0}.security-form form{display:grid;gap:15px;margin-top:20px}.security-form .field{margin:0}.security-form .control{min-height:49px;border-radius:8px}.security-form small{display:block;margin-top:5px}.security-form .button{min-height:49px;border-radius:8px}.security-notes{align-self:start;background:#f9faf5}.security-notes h2{margin:8px 0 16px}.security-notes ul{display:grid;gap:12px;margin:0;padding-left:20px}.security-notes div{display:grid;gap:5px;margin-top:22px;padding:14px;border-radius:8px;background:#e9ecd4}.security-notes div span{font-size:13px;line-height:1.45}@media(max-width:900px){.security-grid{grid-template-columns:1fr}}@media(max-width:560px){.security-form,.security-notes{padding:18px}}
 </style>
+@endpush
 @endsection
