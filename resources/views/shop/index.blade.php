@@ -133,6 +133,7 @@
         </dialog>
     </form>
 </main>
+@push('styles')
 <style>
     .customer-shop {
         min-height: 100dvh;
@@ -1950,6 +1951,7 @@
         }
     }
 </style>
+@endpush
 
 <script>
     (() => {

@@ -28,5 +28,7 @@
         </section>
     </div></main>
 </div>
+@push('styles')
 <style>.table-policy{padding:20px;margin-bottom:20px}.table-policy p{line-height:1.6}.table-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.table-editor{padding:20px;display:grid;gap:8px;align-content:start}.table-editor h2{margin:0 0 8px}.table-editor .button{margin-top:10px}@media(max-width:500px){.table-grid{grid-template-columns:1fr}}</style>
+@endpush
 @endsection

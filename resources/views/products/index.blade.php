@@ -68,6 +68,7 @@
         @empty <div class="welcome">{{ $search !== '' ? 'No products match your search.' : 'No products yet. Add your first product above.' }}</div> @endforelse
     </section>
 </div></main></div>
+@push('styles')
 <style>
 .product-management-header{gap:28px}
 .product-page-heading{flex:0 0 auto}
@@ -106,6 +107,7 @@
 @media(max-width:640px){.product-header-actions{display:grid}.product-search-form{display:grid;grid-template-columns:1fr auto auto}.product-search-control{grid-column:1/-1}.product-search-button{padding-inline:20px}.product-create-toggle{width:100%;justify-content:center}}
 @media(max-width:520px){.product-create-grid{grid-template-columns:1fr}}
 </style>
+@endpush
 <script>
 (() => {
     const input = document.getElementById('product-search');

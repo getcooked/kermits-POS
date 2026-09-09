@@ -26,6 +26,7 @@
         </div>
     </section>
 </main>
+@push('styles')
 <style>
     .login-page {
         min-height: 100dvh;
@@ -416,6 +417,7 @@
         }
     }
 </style>
+@endpush
 
 @if($loginRetryAfter > 0)
 <script>
