@@ -120,7 +120,7 @@
                     </fieldset>
 
                     <div class="gcash-checkout" data-gcash-fields>
-                        <div class="shop-qr"><img src="{{ $gcashQrPath ? route('public.media', ['path' => $gcashQrPath]) : asset('gcash-qr-placeholder.svg') }}" alt="Kermit's GCash QR code"><small>{{ $gcashQrPath ? 'Scan using your GCash app.' : 'The Super Admin has not uploaded the GCash QR yet.' }}</small></div>
+                        <div class="shop-qr"><img src="{{ $gcashQrSrc ?? asset('gcash-qr-placeholder.svg') }}" alt="Kermit's GCash QR code"><small>{{ $gcashQrSrc ? 'Scan using your GCash app.' : 'The GCash QR is unavailable. Please ask the Super Admin to upload it in Payment Settings.' }}</small></div>
                         <div class="gcash-details">
                             <div class="field"><label for="payment_reference">GCash transaction reference</label><input class="control" id="payment_reference" name="payment_reference" value="{{ old('payment_reference') }}" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" placeholder="Enter exactly 13 digits"><small>Use the 13-digit reference shown by GCash.</small></div>
                             <div class="field"><label for="payment_proof">Payment proof</label><input class="control" id="payment_proof" name="payment_proof" type="file" accept="image/jpeg,image/png,image/webp"><small>Upload a JPG, PNG, or WebP image up to 5 MB.</small></div>
