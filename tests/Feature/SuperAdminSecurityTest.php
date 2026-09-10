@@ -23,6 +23,7 @@ class SuperAdminSecurityTest extends TestCase
             ->assertOk()
             ->assertSee('Change my password')
             ->assertSee('Send verification code')
+            ->assertDontSee('Current password')
             ->assertDontSee('AFTER YOU SAVE')
             ->assertDontSee('Your account stays protected');
 
@@ -41,7 +42,7 @@ class SuperAdminSecurityTest extends TestCase
 
         $this->actingAs($superAdmin)->post(route('superadmin.security.email-code'))
             ->assertRedirect()
-            ->assertSessionHas('status')
+            ->assertSessionHas('verification_sent', 'A 6-digit verification code was sent to kermitsbantayan1@gmail.com.')
             ->assertSessionHas('super_admin_password_verification', fn (array $verification): bool => $verification['user_id'] === $superAdmin->id
                 && $verification['email'] === $superAdmin->email
                 && $verification['expires_at'] > now()->timestamp
@@ -52,8 +53,16 @@ class SuperAdminSecurityTest extends TestCase
         Notification::assertSentTo(
             $superAdmin,
             SuperAdminPasswordVerification::class,
-            fn (SuperAdminPasswordVerification $notification): bool => preg_match('/^\d{6}$/', $notification->code) === 1,
+            fn (SuperAdminPasswordVerification $notification): bool => preg_match('/^\d{6}$/', $notification->code) === 1
+                && $notification->toMail($superAdmin)->subject === 'Super Admin verification code'
+                && ! str_contains(implode(' ', $notification->toMail($superAdmin)->introLines), "Kermit's"),
         );
+
+        $this->withSession(['verification_sent' => 'A 6-digit verification code was sent to kermitsbantayan1@gmail.com.'])
+            ->get(route('superadmin.security.edit'))
+            ->assertOk()
+            ->assertSee('id="security-toast"', false)
+            ->assertSee('A 6-digit verification code was sent to kermitsbantayan1@gmail.com.');
     }
 
     public function test_email_verification_is_required_to_change_the_password(): void
@@ -65,7 +74,6 @@ class SuperAdminSecurityTest extends TestCase
 
         $this->actingAs($superAdmin)->put(route('superadmin.security.password.update'), [
             'verification_code' => '123456',
-            'current_password' => 'CurrentPassword123!',
             'password' => 'NewSecurePassword456!',
             'password_confirmation' => 'NewSecurePassword456!',
         ])->assertSessionHasErrors('verification_code');
@@ -83,27 +91,9 @@ class SuperAdminSecurityTest extends TestCase
         $this->actingAs($superAdmin)->withSession($this->verificationSession($superAdmin, now()->subSecond()->timestamp))
             ->put(route('superadmin.security.password.update'), [
                 'verification_code' => '123456',
-                'current_password' => 'CurrentPassword123!',
                 'password' => 'NewSecurePassword456!',
                 'password_confirmation' => 'NewSecurePassword456!',
             ])->assertSessionHasErrors('verification_code');
-
-        $this->assertTrue(Hash::check('CurrentPassword123!', $superAdmin->fresh()->password));
-    }
-
-    public function test_current_password_is_required_to_change_super_admin_password(): void
-    {
-        $superAdmin = User::factory()->create([
-            'role' => User::ROLE_SUPER_ADMIN,
-            'password' => 'CurrentPassword123!',
-        ]);
-
-        $this->actingAs($superAdmin)->withSession($this->verificationSession($superAdmin))->put(route('superadmin.security.password.update'), [
-            'verification_code' => '123456',
-            'current_password' => 'WrongPassword123!',
-            'password' => 'NewSecurePassword456!',
-            'password_confirmation' => 'NewSecurePassword456!',
-        ])->assertSessionHasErrors('current_password');
 
         $this->assertTrue(Hash::check('CurrentPassword123!', $superAdmin->fresh()->password));
     }
@@ -131,7 +121,6 @@ class SuperAdminSecurityTest extends TestCase
 
         $this->actingAs($superAdmin)->withSession($this->verificationSession($superAdmin))->put(route('superadmin.security.password.update'), [
             'verification_code' => '123456',
-            'current_password' => 'CurrentPassword123!',
             'password' => 'NewSecurePassword456!',
             'password_confirmation' => 'NewSecurePassword456!',
         ])->assertRedirect()->assertSessionHas('status');

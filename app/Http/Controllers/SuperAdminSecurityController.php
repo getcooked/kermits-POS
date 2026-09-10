@@ -32,7 +32,7 @@ class SuperAdminSecurityController extends Controller
 
         $user->notify(new SuperAdminPasswordVerification($code));
 
-        return back()->with('status', 'A 6-digit verification code was sent to '.$user->email.'.');
+        return back()->with('verification_sent', 'A 6-digit verification code was sent to '.$user->email.'.');
     }
 
     public function updatePassword(UpdateSuperAdminPasswordRequest $request): RedirectResponse
