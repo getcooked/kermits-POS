@@ -13,7 +13,7 @@
     <header>
         <div class="shop-header-main">
             <div class="shop-title">
-                <h1>Menu</h1><a class="menu-reserve" data-menu-reserve href="{{ route('reservations.create') }}">Reserve</a>
+                <h1>Menu</h1>
             </div>
             <div class="shop-search"><button type="button" aria-label="Search products"><span></span></button><input id="shop-search" type="search" placeholder="Search products"></div>
         </div>
@@ -1557,33 +1557,11 @@
         gap: 14px
     }
 
-    .menu-reserve {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 40px;
-        padding: 9px 16px;
-        border-radius: 10px;
-        background: #202124;
-        color: #fff;
-        text-decoration: none;
-        font-size: 13px;
-        font-weight: 850
-    }
-
-    .menu-reserve:hover {
-        background: #36383b
-    }
-
     @media(max-width:650px) {
         .shop-title {
             justify-content: space-between
         }
 
-        .menu-reserve {
-            min-height: 38px;
-            padding: 8px 14px
-        }
     }
 
     .cart-error {
