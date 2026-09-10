@@ -108,6 +108,9 @@ Route::middleware('auth')->group(function (): void {
             ->name('superadmin.security.edit');
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])
             ->name('activity-logs.index');
+        Route::post('/staff/security/email-code', [SuperAdminSecurityController::class, 'sendVerificationCode'])
+            ->middleware('throttle:3,1')
+            ->name('superadmin.security.email-code');
         Route::put('/staff/security/password', [SuperAdminSecurityController::class, 'updatePassword'])
             ->middleware('throttle:5,1')
             ->name('superadmin.security.password.update');
