@@ -19,8 +19,7 @@ class UpdateSuperAdminPasswordRequest extends FormRequest
     {
         return [
             'verification_code' => ['required', 'digits:6'],
-            'current_password' => ['required', 'current_password:web'],
-            'password' => ['required', 'different:current_password', 'confirmed', Password::defaults()],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }
 
@@ -51,8 +50,6 @@ class UpdateSuperAdminPasswordRequest extends FormRequest
     {
         return [
             'verification_code.required' => 'Enter the verification code sent to your email.',
-            'current_password.current_password' => 'The current password is incorrect.',
-            'password.different' => 'The new password must be different from the current password.',
         ];
     }
 }

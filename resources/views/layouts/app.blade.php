@@ -284,5 +284,6 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
 <script src="{{ asset('js/kermits-motion.js') }}" defer></script>
 <script>(()=>{const phoneInputs=document.querySelectorAll('input[type="tel"][maxlength="11"]');phoneInputs.forEach(input=>{input.setAttribute('inputmode','numeric');input.setAttribute('minlength','11');input.setAttribute('maxlength','11');input.setAttribute('pattern','09[0-9]{9}');input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,11)})})})();</script>
+@stack('scripts')
 </body>
 </html>
