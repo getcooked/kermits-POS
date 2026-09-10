@@ -157,7 +157,7 @@ class ReservationController extends Controller
         ]);
 
         $reservations = Reservation::query()
-            ->with(['handler', 'items.product', 'diningTable'])
+            ->with(['handler', 'items.product'])
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->orderBy('reservation_at')
             ->get()->when($filters['status'] ?? null, fn ($items, $status) => $items->where('booking_status', $status));

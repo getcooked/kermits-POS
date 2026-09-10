@@ -583,7 +583,7 @@ fun KermitsApp(
             },
         )
     }
-    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservationScheduleLabel(reservation), reservationTableLabel(reservation), "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
+    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)", reservationScheduleLabel(reservation), "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
 }
 
 @Composable
@@ -1348,7 +1348,7 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
                     )
                 }
                 items(reservations, key = { "reservation-${it.id}" }) { reservation ->
-                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservationScheduleLabel(reservation), "TABLE" to reservationTableLabel(reservation), "TYPE" to if (reservation.type == "table") "${reservation.table_size}-seater table" else "Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
+                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservationScheduleLabel(reservation), "PARTY" to if (reservation.type == "table") "${reservation.table_size} guests" else "${reservation.guests} guests · Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
                 }
             }
         } else {
@@ -1490,9 +1490,8 @@ private fun OrderReceiptDialog(
                                     Text("TABLE REQUEST", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Black)
                                     ReceiptLine("Reference", reservation.reference)
                                     ReceiptLine("Schedule", reservationScheduleLabel(reservation))
-                                    ReceiptLine("Table", reservationTableLabel(reservation))
                                     reservation.hold_expires_at?.let { ReceiptLine("Approval deadline", receiptDate(it)) }
-                                    ReceiptLine("Table", "${reservation.table_size ?: reservation.guests ?: 0} seats")
+                                    ReceiptLine("Party", "${reservation.table_size ?: reservation.guests ?: 0} guests")
                                     ReceiptLine("Status", reservation.status.replaceFirstChar { it.uppercase() })
                                 }
                             }
@@ -1578,8 +1577,8 @@ private fun receiptPrintHtml(order: Order, customerName: String): String {
     val reservationRows = order.reservation?.let { reservation ->
         """
         <div class="line"><span>Reservation</span><b>${reservation.reference.html()}</b></div>
-        <div class="line"><span>Schedule</span><b>${reservationScheduleLabel(reservation).html()}</b></div><div class="line"><span>Table</span><b>${reservationTableLabel(reservation).html()}</b></div>
-        <div class="line"><span>Table</span><b>${reservation.table_size ?: reservation.guests ?: 0} seats</b></div>
+        <div class="line"><span>Schedule</span><b>${reservationScheduleLabel(reservation).html()}</b></div>
+        <div class="line"><span>Party</span><b>${reservation.table_size ?: reservation.guests ?: 0} guests</b></div>
         <div class="line"><span>Reservation fee</span><b>${money(reservation.total_amount).html()}</b></div>
         """.trimIndent()
     }.orEmpty()
@@ -1733,8 +1732,6 @@ private fun Uri.toMultipart(context: Context, fieldName: String): MultipartBody.
     return MultipartBody.Part.createFormData(fieldName, "$fieldName.$extension", body)
 }
 
-private fun reservationTableLabel(reservation: Reservation): String = if (reservation.type == "exclusive") "Exclusive venue (all tables)" else reservation.table_number?.let { "Table $it" } ?: "Awaiting table assignment"
-
 @Composable
 private fun CartAmount(amount: Double) {
     AnimatedContent(
@@ -1763,7 +1760,7 @@ private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String,
             }
         }
     }
-    Text("A numbered table is assigned automatically. Up to 2 hours, ending by 11 PM. Pending bookings are held for 30 minutes, or until arrival if sooner.", fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+    Text("Availability is checked automatically for your party size. Reservations last up to 2 hours and end by 11 PM. Pending bookings are held for 30 minutes, or until arrival if sooner.", fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
     if (message.isNotEmpty()) Text(message, fontSize = 12.sp)
     Row(Modifier.horizontalScroll(rememberScrollState())) {
         slots.forEach { slot ->

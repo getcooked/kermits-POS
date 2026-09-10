@@ -133,7 +133,6 @@ class MobileOrderController extends Controller
                 'guests' => $order->reservation->guests,
                 'reservation_at' => $order->reservation->reservation_at?->toIso8601String(),
                 'reservation_end_at' => $order->reservation->reservation_end_at?->toIso8601String(),
-                'table_number' => $order->reservation->diningTable?->number,
                 'hold_expires_at' => $order->reservation->hold_expires_at?->toIso8601String(),
                 'phone' => $order->reservation->phone,
                 'reservation_fee' => (float) $order->reservation->reservation_fee,

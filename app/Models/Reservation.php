@@ -64,12 +64,6 @@ class Reservation extends Model
         return $this->status === 'pending' && $this->hold_expires_at?->lte(now()) ? 'expired' : $this->status;
     }
 
-    public function getTableLabelAttribute(): string
-    {
-        return $this->type === 'exclusive' ? 'Exclusive venue (all tables)'
-            : ($this->diningTable ? 'Table '.$this->diningTable->number : 'Awaiting table assignment');
-    }
-
     public function getTimeRangeAttribute(): string
     {
         return $this->reservation_at->format('h:i A')

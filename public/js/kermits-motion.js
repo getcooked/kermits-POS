@@ -22,7 +22,6 @@
     enter('.topbar, .dash-head, .report-topbar, .sell-head, .reservation-view-header, .customer-shop > header, .history-page > header', {distance:'0 5px', duration:220, limit:1});
     enter('.hero-copy > h1, .hero-copy > .hero-text, .hero-copy > .hero-actions', {distance:'0 10px', duration:380, stagger:50, limit:3});
     enter('.hero-visual .plate', {distance:'12px 0', duration:480, limit:1});
-    enter('.table-editor', {distance:'0 10px', duration:320, stagger:22});
     enter('table tbody > tr', {distance:'0 6px', duration:260, stagger:35, limit:6});
     enter('.product-grid > .product-card', {distance:'0 8px', duration:280, stagger:32, limit:6});
     enter('.reservation-card', {distance:'0 8px', duration:290, stagger:35, limit:6});
@@ -53,11 +52,6 @@
         }).observe(panel, {attributes:true, attributeFilter:['hidden', 'open', 'style', 'class']});
     });
 
-    document.querySelectorAll('.table-editor').forEach(form => {
-        form.addEventListener('input', () => form.classList.add('km-edited'));
-        form.addEventListener('change', () => form.classList.add('km-edited'));
-    });
-
     // Cart numbers respond to a real total change, without rolling through fake amounts.
     document.querySelectorAll('#cart-total, #customer-cart-total, #cart-count, #menu-total').forEach(total => {
         let previous = total.textContent;
@@ -74,8 +68,6 @@
             const status = new FormData(form).get('status');
             return {confirmed:'Approving reservation', cancelled:'Cancelling reservation', rejected:'Declining request', completed:'Completing reservation'}[status] || 'Updating reservation';
         }
-        if (/\/reservations\/\d+\/table$/.test(path)) return 'Checking table assignment';
-        if (/\/tables(?:\/\d+)?$/.test(path)) return 'Saving table';
         if (/\/book$|\/shop\/orders$/.test(path)) return 'Securing your table';
         if (/confirm-payment$|\/cashier\/checkout$/.test(path)) return 'Recording payment';
         if (/\/login$/.test(path)) return 'Opening your workspace';
@@ -115,7 +107,7 @@
             button.replaceChildren(copy);
             button.classList.add('is-submitting'); button.setAttribute('aria-disabled', 'true');
             form.setAttribute('aria-busy', 'true');
-            const panel = form.closest('.reservation-card, .table-editor') || form.querySelector('.payment-card');
+            const panel = form.closest('.reservation-card') || form.querySelector('.payment-card');
             panel?.classList.add('km-pending-rail');
             const status = document.createElement('span');
             status.className = 'km-submit-status'; status.setAttribute('role', 'status');
@@ -132,7 +124,7 @@
         sessionStorage.removeItem('km-action');
         if (last && Date.now() - last.time < 120000 && document.body.dataset.feedback === 'success') {
             const form = [...document.forms].find(form => form.action === last.action);
-            (form?.closest('.reservation-card, .table-editor') || form)?.classList.add('km-saved');
+            (form?.closest('.reservation-card') || form)?.classList.add('km-saved');
             enter('.notice', {distance:'0 -4px', duration:250, limit:1});
         }
     } catch {}

@@ -5,7 +5,6 @@
             <a class="{{ request()->routeIs('cashier') || request()->routeIs('cashier.checkout') ? 'active' : '' }}" href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>
             <a class="{{ request()->routeIs('cashier.orders.*') ? 'active' : '' }}" href="{{ route('cashier.orders.index') }}">@include('partials.nav-icon',['name'=>'orders']) Customer Orders</a>
         @elseif(auth()->user()->hasRole('super_admin'))
-            <a class="{{ request()->routeIs('tables.*') ? 'active' : '' }}" href="{{ route('tables.index') }}">@include('partials.nav-icon',['name'=>'reservations']) Tables</a>
             <a class="{{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">@include('partials.nav-icon',['name'=>'home']) Dashboard</a>
             <a class="{{ request()->routeIs('superadmin.security.*') ? 'active' : '' }}" href="{{ route('superadmin.security.edit') }}">@include('partials.nav-icon',['name'=>'security']) Security</a>
             <a class="{{ request()->routeIs('cashier') || request()->routeIs('cashier.checkout') ? 'active' : '' }}" href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>

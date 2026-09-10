@@ -215,6 +215,7 @@ class MobileApiTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('data.total_amount', 250)
             ->assertJsonPath('data.status', 'pending')
+            ->assertJsonMissingPath('data.table_number')
             ->json('data.id');
 
         $this->withToken($token)->getJson('/api/v1/reservations/'.$reservationId)
@@ -253,6 +254,7 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.payment_reference', '1234567890123')
             ->assertJsonPath('data.reservation.table_size', 4)
             ->assertJsonPath('data.reservation.status', 'pending')
+            ->assertJsonMissingPath('data.reservation.table_number')
             ->json('data');
 
         $this->assertDatabaseHas('orders', [
