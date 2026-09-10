@@ -22,9 +22,17 @@ class CustomerOrderController extends Controller
 
     public function index(): View
     {
+        $qrPath = SystemSetting::get('gcash_qr_path');
+        $disk = Storage::disk('public');
+        $qrImage = $qrPath && $disk->exists($qrPath) ? $disk->get($qrPath) : null;
+        $qrMime = $qrImage ? (new \finfo(FILEINFO_MIME_TYPE))->buffer($qrImage) : null;
+        $gcashQrSrc = $qrImage && in_array($qrMime, ['image/png', 'image/jpeg', 'image/webp'], true)
+            ? 'data:'.$qrMime.';base64,'.base64_encode($qrImage)
+            : null;
+
         return view('shop.index', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
-            'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
+            'gcashQrSrc' => $gcashQrSrc,
             'tableFees' => self::TABLE_FEES,
         ]);
     }

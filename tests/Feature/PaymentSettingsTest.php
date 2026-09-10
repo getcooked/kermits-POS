@@ -43,6 +43,35 @@ class PaymentSettingsTest extends TestCase
         $this->actingAs($customer)->get('/settings/payment')->assertForbidden();
     }
 
+    public function test_checkout_embeds_the_current_uploaded_gcash_qr(): void
+    {
+        Storage::fake('public');
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $upload = $this->fakePng('gcash.png');
+        $expectedSource = 'data:image/png;base64,'.base64_encode(file_get_contents($upload->getPathname()));
+
+        $this->actingAs($superAdmin)->put('/settings/payment', ['gcash_qr' => $upload])->assertRedirect();
+
+        $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('src="'.$expectedSource.'"', false)
+            ->assertSee('Scan using your GCash app.');
+    }
+
+    public function test_checkout_handles_a_missing_uploaded_qr(): void
+    {
+        Storage::fake('public');
+        SystemSetting::query()->create(['key' => 'gcash_qr_path', 'value' => 'payment/missing.png']);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('gcash-qr-placeholder.svg')
+            ->assertSee('The GCash QR is unavailable.')
+            ->assertDontSee('Scan using your GCash app.');
+    }
+
     private function fakePng(string $name): UploadedFile
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
