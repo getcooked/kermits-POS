@@ -18,7 +18,6 @@ class Reservation extends Model
         'email',
         'phone',
         'reservation_at',
-        'dining_table_id',
         'reservation_end_at',
         'hold_expires_at',
         'guests',
@@ -52,11 +51,6 @@ class Reservation extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by');
-    }
-
-    public function diningTable(): BelongsTo
-    {
-        return $this->belongsTo(DiningTable::class);
     }
 
     public function getBookingStatusAttribute(): string

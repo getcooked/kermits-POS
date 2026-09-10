@@ -334,6 +334,7 @@ class ReservationsTest extends TestCase
 
     public function test_customer_cannot_submit_a_reservation_for_an_occupied_schedule(): void
     {
+        config(['reservations.table_capacities' => [4]]);
         $schedule = now()->addDays(2)->setTime(12, 0)->startOfHour();
         $firstCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $secondCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
