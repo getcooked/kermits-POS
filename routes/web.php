@@ -9,7 +9,6 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerHistoryController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DiningTableController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
@@ -97,10 +96,6 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
         Route::post('/inventory/{product}', [InventoryController::class, 'update'])->name('inventory.update');
         Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
-        Route::get('/tables', [DiningTableController::class, 'index'])->name('tables.index');
-        Route::post('/tables', [DiningTableController::class, 'store'])->name('tables.store');
-        Route::put('/tables/{table}', [DiningTableController::class, 'update'])->name('tables.update');
-        Route::patch('/reservations/{reservation}/table', [DiningTableController::class, 'reassign'])->name('reservations.table');
         Route::patch('/reservations/{reservation}/status', [ReservationController::class, 'updateStatus'])->name('reservations.status');
         Route::get('/crud', [ProductController::class, 'index'])->name('crud.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');

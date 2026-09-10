@@ -236,7 +236,7 @@ class OrderingTest extends TestCase
             ->assertOk()
             ->assertSee('>Menu</a>', false)
             ->assertDontSee('>Shop</a>', false)
-            ->assertSee('data-menu-reserve', false)
+            ->assertDontSee('data-menu-reserve', false)
             ->assertSee('data-checkout-modal', false)
             ->assertSee('data-checkout-step="reservation"', false)
             ->assertSee('name="table_size"', false)
@@ -260,7 +260,7 @@ class OrderingTest extends TestCase
                 'GCash',
             ], false);
 
-        $this->assertSame(1, substr_count($menu->getContent(), 'href="'.route('reservations.create').'"'));
+        $this->assertSame(0, substr_count($menu->getContent(), 'href="'.route('reservations.create').'"'));
         $this->assertLessThan(
             strpos($menu->getContent(), '<main class="customer-shop">'),
             strpos($menu->getContent(), '.customer-shop {'),

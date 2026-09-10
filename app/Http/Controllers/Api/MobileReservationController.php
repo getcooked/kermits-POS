@@ -103,7 +103,6 @@ class MobileReservationController extends Controller
             'table_size' => $reservation->table_size, 'guests' => $reservation->guests,
             'reservation_at' => $reservation->reservation_at?->toIso8601String(),
             'reservation_end_at' => $reservation->reservation_end_at?->toIso8601String(),
-            'table_number' => $reservation->diningTable?->number,
             'hold_expires_at' => $reservation->hold_expires_at?->toIso8601String(), 'phone' => $reservation->phone,
             'reservation_fee' => (float) $reservation->reservation_fee, 'food_total' => (float) $reservation->food_total,
             'total_amount' => (float) $reservation->total_amount, 'payment_method' => $reservation->payment_method,

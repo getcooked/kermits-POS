@@ -13,7 +13,6 @@ class SuperAdminNavigationTest extends TestCase
     use RefreshDatabase;
 
     private const SIDEBAR_ROUTES = [
-        'tables.index',
         'dashboard',
         'superadmin.security.edit',
         'cashier',

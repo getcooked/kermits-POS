@@ -36,7 +36,7 @@
                 <aside class="review-card payment-review">
                     <div class="card-title"><div><p>PAYMENT CHECK</p><h2>Confirm payment</h2></div></div>
                     @if($order->reservation)
-                        <div class="reservation-charge"><span>{{ $order->reservation->table_label }} &middot; {{ $order->reservation->table_size }} reserved seats &middot; {{ $order->reservation->reservation_at->format('M d') }} &middot; {{ $order->reservation->time_range }} &middot; {{ ucfirst($order->reservation->booking_status) }}</span><strong>Reservation fee: &#8369;{{ number_format($order->reservation->total_amount, 2) }}</strong></div>
+                        <div class="reservation-charge"><span>{{ $order->reservation->table_size }} reserved seats &middot; {{ $order->reservation->reservation_at->format('M d') }} &middot; {{ $order->reservation->time_range }} &middot; {{ ucfirst($order->reservation->booking_status) }}</span><strong>Reservation fee: &#8369;{{ number_format($order->reservation->total_amount, 2) }}</strong></div>
                     @endif
                     @if($order->payment_method === 'gcash')
                         <div class="payment-state paid"><span>✓</span><div><b>Already submitted through GCash</b><small>Verify this reference before confirming.</small></div></div>

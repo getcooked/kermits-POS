@@ -144,29 +144,15 @@ class TableSchedulingTest extends TestCase
         app(ReservationSchedule::class)->changeStatus($first, 'confirmed', $admin->id);
     }
 
-    public function test_reassignment_checks_overlap_and_capacity_and_admin_permissions(): void
-    {
-        $first = $this->book();
-        $second = $this->book();
-        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        $this->actingAs($customer)->patch('/reservations/'.$first->id.'/table', ['dining_table_id' => 3])->assertForbidden();
-        $this->actingAs($admin)->patch('/reservations/'.$first->id.'/table', ['dining_table_id' => $second->dining_table_id])->assertSessionHasErrors('dining_table_id');
-        $this->actingAs($admin)->patch('/reservations/'.$first->id.'/table', ['dining_table_id' => 3])->assertSessionHasNoErrors();
-        $this->assertSame(3, $first->fresh()->dining_table_id);
-        $large = $this->book(guests: 12);
-        $this->actingAs($admin)->patch('/reservations/'.$large->id.'/table', ['dining_table_id' => 4])->assertSessionHasErrors('dining_table_id');
-    }
-
-    public function test_tables_can_be_managed_but_active_assignments_are_protected(): void
+    public function test_table_management_is_not_exposed_in_super_admin(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $this->actingAs($admin)->get('/tables')->assertOk()->assertSee('Table 8');
-        $this->post('/tables', ['number' => 9, 'capacity' => 6])->assertSessionHasNoErrors();
-        $first = $this->book();
-        $this->put('/tables/'.$first->dining_table_id, ['number' => 1, 'capacity' => 2, 'active' => 0])->assertSessionHasErrors('table');
-        $this->put('/tables/2', ['number' => 2, 'capacity' => 2, 'active' => 0])->assertSessionHasNoErrors();
-        $this->assertSame(3, $this->book()->diningTable->number);
+        $this->actingAs($admin)->get('/dashboard')->assertOk()->assertDontSee('>Tables</a>', false);
+        $reservation = $this->book();
+        $this->get('/reservations')->assertOk()->assertDontSee('Table '.$reservation->diningTable->number);
+        $this->get(route('reservations.show', $reservation))->assertOk()->assertDontSee('Table '.$reservation->diningTable->number);
+        $this->get('/tables')->assertNotFound();
+        $this->patch('/reservations/1/table', ['dining_table_id' => 1])->assertNotFound();
     }
 
     public function test_cancellation_and_rejection_release_tables(): void
@@ -203,7 +189,7 @@ class TableSchedulingTest extends TestCase
         $this->assertDatabaseCount('reservations', 0);
         $this->assertSame(10, $product->fresh()->stock);
         $payload['reservation_at'] = '2030-01-02T14:00:00Z';
-        $this->postJson('/api/v1/reservations', $payload)->assertCreated()->assertJsonPath('data.table_number', 1)->assertJsonPath('data.reservation_end_at', '2030-01-02T23:00:00+08:00');
+        $this->postJson('/api/v1/reservations', $payload)->assertCreated()->assertJsonMissingPath('data.table_number')->assertJsonPath('data.reservation_end_at', '2030-01-02T23:00:00+08:00');
     }
 
     public function test_verified_payment_preserves_pending_hold_but_expired_payment_is_rejected(): void

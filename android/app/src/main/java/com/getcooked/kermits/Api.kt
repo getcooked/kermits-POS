@@ -39,7 +39,7 @@ data class Order(
     val items: List<OrderItem> = emptyList(),
 )
 @JsonClass(generateAdapter = true)
-data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val table_number: Int? = null, val reservation_end_at: String? = null, val hold_expires_at: String? = null)
+data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null)
 @JsonClass(generateAdapter = true)
 data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)

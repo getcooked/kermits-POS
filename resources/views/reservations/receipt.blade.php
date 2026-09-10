@@ -21,7 +21,7 @@
             <dl class="receipt-meta">
                 <div><dt>Reference</dt><dd>{{ $reservation->reference }}</dd></div>
                 <div><dt>Guest</dt><dd>{{ $reservation->customer_name }}</dd></div>
-                <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range.' - '.$reservation->table_label }}</dd></div>
+                <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range }}</dd></div>
                 <div><dt>Reservation</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : $reservation->guests.' guests, exclusive venue' }}</dd></div>
                 <div><dt>Status</dt><dd>{{ ucfirst($reservation->booking_status) }}</dd></div>
                 <div><dt>Payment</dt><dd>{{ $reservation->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }} &middot; {{ ucfirst($reservation->payment_status) }}</dd></div>
