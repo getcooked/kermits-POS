@@ -15,6 +15,10 @@ use Illuminate\View\View;
 
 class PasswordResetController extends Controller
 {
+    private const LEGACY_SUPER_ADMIN_EMAIL = 'superadmin@gmail.com';
+
+    private const SUPER_ADMIN_EMAIL = 'kermitsbantayan1@gmail.com';
+
     public function request(): View
     {
         return view('auth.forgot-password', ['superAdminRecovery' => false]);
@@ -41,12 +45,21 @@ class PasswordResetController extends Controller
             'email' => ['required', 'email', 'max:160'],
         ]);
 
+        $email = Str::lower($validated['email']);
+        $acceptedEmails = $requiredRole === User::ROLE_SUPER_ADMIN && $email === self::SUPER_ADMIN_EMAIL
+            ? [self::SUPER_ADMIN_EMAIL, self::LEGACY_SUPER_ADMIN_EMAIL]
+            : [$email];
         $user = User::query()
-            ->whereRaw('LOWER(email) = ?', [Str::lower($validated['email'])])
+            ->whereIn(DB::raw('LOWER(email)'), $acceptedEmails)
             ->when($requiredRole, fn ($query, string $role) => $query->where('role', $role))
             ->first();
 
         if ($user) {
+            if ($requiredRole === User::ROLE_SUPER_ADMIN
+                && strtolower($user->email) === self::LEGACY_SUPER_ADMIN_EMAIL
+                && ! User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
+                $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
+            }
             Password::sendResetLink(['email' => $user->email]);
         }
 

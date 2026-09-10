@@ -53,12 +53,30 @@ class WebSeederTest extends TestCase
         ])->assertRedirect('/seeder');
 
         $this->assertDatabaseCount('users', 4);
-        $this->assertDatabaseHas('users', ['username' => 'superadmin', 'role' => User::ROLE_SUPER_ADMIN]);
+        $this->assertDatabaseHas('users', ['username' => 'superadmin', 'email' => 'kermitsbantayan1@gmail.com', 'role' => User::ROLE_SUPER_ADMIN]);
         $this->assertDatabaseHas('users', ['username' => 'admin', 'role' => User::ROLE_ADMIN]);
         $this->assertDatabaseHas('users', ['username' => 'cashier', 'role' => User::ROLE_CASHIER]);
         $this->assertDatabaseHas('users', ['username' => 'customer', 'role' => User::ROLE_CUSTOMER]);
         $this->assertFileExists($this->lockPath);
 
         $this->get('/seeder')->assertSee('Setup complete');
+    }
+
+    public function test_existing_super_admin_email_is_changed_without_replacing_the_account(): void
+    {
+        $superAdmin = User::factory()->create([
+            'username' => 'superadmin',
+            'email' => 'superadmin@gmail.com',
+            'role' => User::ROLE_SUPER_ADMIN,
+        ]);
+        $password = $superAdmin->getRawOriginal('password');
+        $migration = require database_path('migrations/2026_09_10_000002_change_super_admin_email.php');
+
+        $migration->up();
+
+        $superAdmin->refresh();
+        $this->assertSame('kermitsbantayan1@gmail.com', $superAdmin->email);
+        $this->assertSame('superadmin', $superAdmin->username);
+        $this->assertSame($password, $superAdmin->getRawOriginal('password'));
     }
 }
