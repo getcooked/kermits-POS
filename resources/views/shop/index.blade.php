@@ -492,7 +492,7 @@
 
     .gcash-checkout {
         display: grid;
-        grid-template-columns: 150px 1fr;
+        grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
         gap: 18px;
         align-items: center;
         margin-top: 18px;
@@ -506,11 +506,17 @@
     }
 
     .shop-qr {
+        min-width: 0;
         text-align: center
     }
 
     .shop-qr img {
-        width: 140px;
+        display: block;
+        box-sizing: border-box;
+        width: min(100%, 240px, 38dvh);
+        height: auto;
+        max-height: 38dvh;
+        margin-inline: auto;
         aspect-ratio: 1;
         object-fit: contain;
         background: #fff;
@@ -595,9 +601,6 @@
             grid-template-columns: 1fr
         }
 
-        .shop-qr img {
-            width: min(220px, 100%)
-        }
     }
 
     /* Full-page customer shop */
@@ -1865,6 +1868,7 @@
 
     .gcash-details {
         display: grid;
+        min-width: 0;
         gap: 13px
     }
 
@@ -1924,9 +1928,6 @@
             grid-template-columns: 1fr
         }
 
-        .shop-qr img {
-            width: min(210px, 100%)
-        }
     }
 </style>
 @endpush
