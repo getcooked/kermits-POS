@@ -80,6 +80,21 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertRedirect('/shop');
     }
 
+    public function test_new_super_admin_email_works_before_the_data_migration_runs(): void
+    {
+        $superAdmin = User::factory()->create([
+            'email' => 'superadmin@gmail.com',
+            'password' => 'Password123!',
+            'role' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $this->post('/login', ['email' => 'kermitsbantayan1@gmail.com', 'password' => 'Password123!'])
+            ->assertRedirect('/dashboard');
+
+        $this->assertAuthenticatedAs($superAdmin);
+        $this->assertSame('kermitsbantayan1@gmail.com', $superAdmin->fresh()->email);
+    }
+
     public function test_only_super_admin_can_edit_customer_login_details_and_reset_password(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);

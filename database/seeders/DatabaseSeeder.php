@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         foreach ([
-            ['name' => 'Super Admin', 'email' => 'superadmin@gmail.com', 'role' => 'super_admin'],
+            ['name' => 'Super Admin', 'email' => 'kermitsbantayan1@gmail.com', 'role' => 'super_admin'],
             ['name' => 'Administrator', 'email' => 'admin@gmail.com', 'role' => 'admin'],
             ['name' => 'Cashier User', 'email' => 'cashier@gmail.com', 'role' => 'cashier'],
         ] as $account) {

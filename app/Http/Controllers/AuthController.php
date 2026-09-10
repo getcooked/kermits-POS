@@ -15,6 +15,10 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
+    private const LEGACY_SUPER_ADMIN_EMAIL = 'superadmin@gmail.com';
+
+    private const SUPER_ADMIN_EMAIL = 'kermitsbantayan1@gmail.com';
+
     public function create(): View
     {
         return view('auth.login');
@@ -113,8 +117,9 @@ class AuthController extends Controller
             return $this->lockoutResponse($request, $loginAttempts, $login);
         }
 
-        $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
-        $credentials = [$field => $login, 'password' => $request->validated('password')];
+        $credentialLogin = $this->resolveSuperAdminEmail($login);
+        $field = filter_var($credentialLogin, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $credentials = [$field => $credentialLogin, 'password' => $request->validated('password')];
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             if ($loginAttempts->recordFailure($request, $login)) {
@@ -126,10 +131,34 @@ class AuthController extends Controller
             ])->onlyInput('email');
         }
 
+        $this->updateLegacySuperAdminEmail($request->user());
         $loginAttempts->clear($request, $login);
         $request->session()->regenerate();
 
         return redirect()->intended($request->user()->homeRoute());
+    }
+
+    private function resolveSuperAdminEmail(string $login): string
+    {
+        if (strtolower($login) !== self::SUPER_ADMIN_EMAIL
+            || User::query()->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
+            return $login;
+        }
+
+        return User::query()
+            ->where('role', User::ROLE_SUPER_ADMIN)
+            ->whereRaw('LOWER(email) = ?', [self::LEGACY_SUPER_ADMIN_EMAIL])
+            ->exists() ? self::LEGACY_SUPER_ADMIN_EMAIL : $login;
+    }
+
+    private function updateLegacySuperAdminEmail(User $user): void
+    {
+        if ($user->role !== User::ROLE_SUPER_ADMIN || strtolower($user->email) !== self::LEGACY_SUPER_ADMIN_EMAIL
+            || User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
+            return;
+        }
+
+        $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
     }
 
     public function destroy(Request $request): RedirectResponse

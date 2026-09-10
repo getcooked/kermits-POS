@@ -50,6 +50,22 @@ class PasswordResetTest extends TestCase
         Notification::assertNotSentTo($admin, ResetPassword::class);
     }
 
+    public function test_new_email_can_recover_a_super_admin_before_the_data_migration_runs(): void
+    {
+        Notification::fake();
+        $superAdmin = User::factory()->create([
+            'email' => 'superadmin@gmail.com',
+            'role' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $this->post(route('superadmin.password.email'), ['email' => 'kermitsbantayan1@gmail.com'])
+            ->assertSessionHas('status')
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame('kermitsbantayan1@gmail.com', $superAdmin->fresh()->email);
+        Notification::assertSentTo($superAdmin, ResetPassword::class);
+    }
+
     public function test_reset_link_can_be_requested_for_an_active_user(): void
     {
         Notification::fake();
