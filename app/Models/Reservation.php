@@ -55,13 +55,31 @@ class Reservation extends Model
 
     public function getBookingStatusAttribute(): string
     {
-        return $this->status === 'pending' && $this->hold_expires_at?->lte(now()) ? 'expired' : $this->status;
+        if ($this->status !== 'pending') {
+            return $this->status;
+        }
+        if (array_key_exists('hold_expires_at', $this->attributes)) {
+            return $this->hold_expires_at?->lte(now()) ? 'expired' : 'pending';
+        }
+        if ($this->payment_status === 'paid' || ! $this->created_at) {
+            return 'pending';
+        }
+
+        return $this->created_at->copy()->addMinutes(config('reservations.hold_minutes'))->lte(now()) ? 'expired' : 'pending';
     }
 
     public function getTimeRangeAttribute(): string
     {
-        return $this->reservation_at->format('h:i A')
-            .($this->reservation_end_at ? ' – '.$this->reservation_end_at->format('h:i A') : '');
+        $end = $this->reservation_end_at;
+        if (! $end) {
+            $closing = $this->reservation_at->copy()->setTimeFromTimeString(config('reservations.closing_time'));
+            $end = $this->reservation_at->copy()->addMinutes(config('reservations.duration_minutes'));
+            if ($end->gt($closing)) {
+                $end = $closing;
+            }
+        }
+
+        return $this->reservation_at->format('h:i A').' – '.$end->format('h:i A');
     }
 
     public function user(): BelongsTo

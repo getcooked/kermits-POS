@@ -7,11 +7,48 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ReservationSchedule
 {
     public const HOURS_MESSAGE = 'Open 8:00 AM–11:00 PM. Choose an arrival from 8:00 AM to 10:00 PM. The last reservation is 10:00–11:00 PM.';
+
+    private ?bool $hasReservationEndAt = null;
+
+    private ?bool $hasHoldExpiresAt = null;
+
+    private ?bool $hasReservationLock = null;
+
+    private ?bool $hasLegacyUniqueSchedule = null;
+
+    public function __construct()
+    {
+        $this->hasReservationEndAt = Schema::hasColumn('reservations', 'reservation_end_at');
+        $this->hasHoldExpiresAt = Schema::hasColumn('reservations', 'hold_expires_at');
+        $this->hasReservationLock = Schema::hasTable('reservation_locks');
+        $this->hasLegacyUniqueSchedule = Schema::hasIndex('reservations', 'reservations_reservation_at_unique');
+    }
+
+    private function hasReservationEndAt(): bool
+    {
+        return $this->hasReservationEndAt ??= Schema::hasColumn('reservations', 'reservation_end_at');
+    }
+
+    private function hasHoldExpiresAt(): bool
+    {
+        return $this->hasHoldExpiresAt ??= Schema::hasColumn('reservations', 'hold_expires_at');
+    }
+
+    private function hasReservationLock(): bool
+    {
+        return $this->hasReservationLock ??= Schema::hasTable('reservation_locks');
+    }
+
+    private function hasLegacyUniqueSchedule(): bool
+    {
+        return $this->hasLegacyUniqueSchedule ??= Schema::hasIndex('reservations', 'reservations_reservation_at_unique');
+    }
 
     /**
      * Store every reservation time in one canonical format so duplicate checks
@@ -43,24 +80,39 @@ class ReservationSchedule
     {
         return Reservation::query()->where(function (Builder $query) {
             $query->where('status', 'confirmed')->orWhere(function (Builder $pending) {
-                $pending->where('status', 'pending')->where(function (Builder $hold) {
-                    $hold->whereNull('hold_expires_at')->orWhere('hold_expires_at', '>', now());
-                });
+                $pending->where('status', 'pending');
+                if ($this->hasHoldExpiresAt()) {
+                    $pending->where(function (Builder $hold) {
+                        $hold->whereNull('hold_expires_at')->orWhere('hold_expires_at', '>', now());
+                    });
+                } else {
+                    $pending->where(function (Builder $hold) {
+                        $hold->where('payment_status', 'paid')
+                            ->orWhere('created_at', '>', now()->subMinutes(config('reservations.hold_minutes')));
+                    });
+                }
             });
         });
     }
 
     private function conflicts(string $start, string $end, ?int $ignore = null): Builder
     {
-        return $this->active()->when($ignore, fn (Builder $q) => $q->whereKeyNot($ignore))
-            ->where('reservation_at', '<', $end)
-            ->where(fn (Builder $q) => $q->where('reservation_end_at', '>', $start)->orWhereNull('reservation_end_at'));
+        $query = $this->active()->when($ignore, fn (Builder $q) => $q->whereKeyNot($ignore))
+            ->where('reservation_at', '<', $end);
+
+        return $this->hasReservationEndAt()
+            ? $query->where(fn (Builder $q) => $q->where('reservation_end_at', '>', $start)->orWhereNull('reservation_end_at'))
+            : $query->where('reservation_at', '>', CarbonImmutable::parse($start)
+                ->subMinutes(config('reservations.duration_minutes'))->format('Y-m-d H:i:s'));
     }
 
     private function hasCapacity(string $start, string $end, int $guests, ?int $ignore = null): bool
     {
-        $bookings = $this->conflicts($start, $end, $ignore)
-            ->get(['id', 'type', 'guests', 'table_size', 'reservation_at', 'reservation_end_at']);
+        $columns = ['id', 'type', 'guests', 'table_size', 'reservation_at'];
+        if ($this->hasReservationEndAt()) {
+            $columns[] = 'reservation_end_at';
+        }
+        $bookings = $this->conflicts($start, $end, $ignore)->get($columns);
         if ($bookings->contains(fn (Reservation $reservation): bool => $reservation->type === 'exclusive')) {
             return false;
         }
@@ -105,6 +157,11 @@ class ReservationSchedule
         $start = $this->normalize($at);
         $end = $this->endAt($at);
 
+        if ($type === 'table' && $this->hasLegacyUniqueSchedule()
+            && $this->active()->where('reservation_at', $start)->exists()) {
+            return false;
+        }
+
         return $type === 'exclusive' ? ! $this->conflicts($start, $end)->exists()
             : $this->hasCapacity($start, $end, $guests);
     }
@@ -114,7 +171,13 @@ class ReservationSchedule
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Reservation lock requires a transaction.');
         }
-        if (DB::getDriverName() === 'sqlite') {
+        if (! $this->hasReservationLock()) {
+            if (DB::getDriverName() === 'sqlite') {
+                DB::table('migrations')->orderBy('id')->limit(1)->update(['batch' => DB::raw('batch')]);
+            } else {
+                DB::table('migrations')->orderBy('id')->lockForUpdate()->firstOrFail();
+            }
+        } elseif (DB::getDriverName() === 'sqlite') {
             // SQLite ignores FOR UPDATE. A write acquires its database write lock
             // before any availability read, including with an empty schedule.
             DB::table('reservation_locks')->where('id', 1)->update(['id' => 1]);
@@ -133,6 +196,10 @@ class ReservationSchedule
             }
             $start = $this->normalize($at);
             $end = $this->endAt($at);
+            if ($attributes['type'] === 'table' && $this->hasLegacyUniqueSchedule()
+                && $this->active()->where('reservation_at', $start)->exists()) {
+                throw ValidationException::withMessages(['reservation_at' => 'This exact start time is already reserved. Please choose another available time.']);
+            }
             if ($attributes['type'] === 'exclusive') {
                 $available = ! $this->conflicts($start, $end)->exists();
             } else {
@@ -142,12 +209,19 @@ class ReservationSchedule
                 throw ValidationException::withMessages(['reservation_at' => 'No suitable table or venue is available for this period. Please choose another schedule.']);
             }
 
+            $periodAttributes = [];
+            if ($this->hasReservationEndAt()) {
+                $periodAttributes['reservation_end_at'] = $end;
+            }
+            if ($this->hasHoldExpiresAt()) {
+                $periodAttributes['hold_expires_at'] = now()->addMinutes(config('reservations.hold_minutes'))->min(CarbonImmutable::parse($start));
+            }
+
             return Reservation::query()->create([
                 ...$attributes,
                 'reservation_at' => $start,
-                'reservation_end_at' => $end,
+                ...$periodAttributes,
                 'status' => 'pending',
-                'hold_expires_at' => now()->addMinutes(config('reservations.hold_minutes'))->min(CarbonImmutable::parse($start)),
             ]);
         }, attempts: 3);
     }
@@ -176,9 +250,15 @@ class ReservationSchedule
                     || ($reservation->type === 'exclusive' && $this->conflicts($start, $end, $reservation->id)->exists())) {
                     throw ValidationException::withMessages(['status' => 'No suitable capacity or venue is available for this reservation.']);
                 }
-                $reservation->reservation_end_at = $end;
+                if ($this->hasReservationEndAt()) {
+                    $reservation->reservation_end_at = $end;
+                }
             }
-            $reservation->fill(['status' => $status, 'hold_expires_at' => null, 'handled_by' => $actor])->save();
+            $updates = ['status' => $status, 'handled_by' => $actor];
+            if ($this->hasHoldExpiresAt()) {
+                $updates['hold_expires_at'] = null;
+            }
+            $reservation->fill($updates)->save();
             $reservation->statusHistories()->create(['from_status' => $previous, 'to_status' => $status, 'changed_by' => $actor]);
         }, attempts: 3);
     }
@@ -187,7 +267,13 @@ class ReservationSchedule
     {
         return DB::transaction(function () {
             $this->lock();
-            $expired = Reservation::query()->where('status', 'pending')->where('hold_expires_at', '<=', now())->get();
+            $expired = Reservation::query()->where('status', 'pending')
+                ->when(
+                    $this->hasHoldExpiresAt(),
+                    fn (Builder $query) => $query->where('hold_expires_at', '<=', now()),
+                    fn (Builder $query) => $query->where('payment_status', '!=', 'paid')
+                        ->where('created_at', '<=', now()->subMinutes(config('reservations.hold_minutes'))),
+                )->get();
             foreach ($expired as $reservation) {
                 $reservation->update(['status' => 'expired']);
                 $reservation->statusHistories()->create(['from_status' => 'pending', 'to_status' => 'expired']);
