@@ -14,6 +14,7 @@ use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -153,7 +154,7 @@ class CashierController extends Controller
                     throw ValidationException::withMessages(['payment_reference' => 'A valid 13-digit GCash reference is required.']);
                 }
                 $lockedOrder->update(['payment_status' => 'paid', 'cash_received' => null, 'change_due' => null]);
-                $lockedOrder->reservation?->update(['payment_status' => 'paid', 'hold_expires_at' => null]);
+                $this->markReservationPaid($lockedOrder->reservation);
 
                 return;
             }
@@ -171,12 +172,24 @@ class CashierController extends Controller
                 'cash_received' => $cash,
                 'change_due' => $cash - $amountDue,
             ]);
-            $lockedOrder->reservation?->update(['payment_status' => 'paid', 'hold_expires_at' => null]);
+            $this->markReservationPaid($lockedOrder->reservation);
         }, attempts: 3);
 
         return redirect()
             ->route('receipts.show', $order)
             ->with('status', 'Payment confirmed. The official receipt is ready to print.');
+    }
+
+    private function markReservationPaid(?Reservation $reservation): void
+    {
+        if (! $reservation) {
+            return;
+        }
+        $updates = ['payment_status' => 'paid'];
+        if (Schema::hasColumn('reservations', 'hold_expires_at')) {
+            $updates['hold_expires_at'] = null;
+        }
+        $reservation->update($updates);
     }
 
     private function ensurePendingCustomerOrder(Order $order): void
