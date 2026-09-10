@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\DiningTable;
 use App\Models\Reservation;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -58,18 +57,44 @@ class ReservationSchedule
             ->where(fn (Builder $q) => $q->where('reservation_end_at', '>', $start)->orWhereNull('reservation_end_at'));
     }
 
-    private function tableFor(string $start, string $end, int $guests, ?int $ignore = null, ?int $tableId = null): ?DiningTable
+    private function hasCapacity(string $start, string $end, int $guests, ?int $ignore = null): bool
     {
-        $conflicts = $this->conflicts($start, $end, $ignore)->get(['type', 'dining_table_id']);
-        // Unassigned legacy bookings reserve the venue until staff assigns them.
-        if ($conflicts->contains(fn ($r) => $r->type === 'exclusive' || $r->dining_table_id === null)) {
-            return null;
+        $bookings = $this->conflicts($start, $end, $ignore)
+            ->get(['id', 'type', 'guests', 'table_size', 'reservation_at', 'reservation_end_at']);
+        if ($bookings->contains(fn (Reservation $reservation): bool => $reservation->type === 'exclusive')) {
+            return false;
         }
 
-        return DiningTable::query()->where('active', true)->where('capacity', '>=', $guests)
-            ->when($tableId !== null, fn ($q) => $q->whereKey($tableId))
-            ->whereNotIn('id', $conflicts->pluck('dining_table_id'))
-            ->orderBy('capacity')->orderBy('number')->first();
+        $periods = $bookings->map(fn (Reservation $reservation): array => [
+            'start' => $this->normalize($reservation->reservation_at),
+            'end' => $reservation->reservation_end_at?->format('Y-m-d H:i:s') ?? $this->endAt($reservation->reservation_at),
+            'guests' => (int) ($reservation->guests ?: $reservation->table_size),
+        ])->push(['start' => $start, 'end' => $end, 'guests' => $guests])->all();
+
+        usort($periods, fn (array $left, array $right): int => [$left['start'], -$left['guests']] <=> [$right['start'], -$right['guests']]);
+        $capacities = array_map('intval', (array) config('reservations.table_capacities', []));
+        sort($capacities);
+        $slots = array_map(
+            fn (int $capacity): array => ['capacity' => $capacity, 'available_at' => null],
+            $capacities,
+        );
+
+        foreach ($periods as $period) {
+            $slotIndex = null;
+            foreach ($slots as $index => $slot) {
+                if ($slot['capacity'] >= $period['guests']
+                    && ($slot['available_at'] === null || $slot['available_at'] <= $period['start'])) {
+                    $slotIndex = $index;
+                    break;
+                }
+            }
+            if ($slotIndex === null) {
+                return false;
+            }
+            $slots[$slotIndex]['available_at'] = $period['end'];
+        }
+
+        return true;
     }
 
     public function isAvailable(string|DateTimeInterface $at, string $type = 'table', int $guests = 1): bool
@@ -81,7 +106,7 @@ class ReservationSchedule
         $end = $this->endAt($at);
 
         return $type === 'exclusive' ? ! $this->conflicts($start, $end)->exists()
-            : $this->tableFor($start, $end, $guests) !== null;
+            : $this->hasCapacity($start, $end, $guests);
     }
 
     public function lock(): void
@@ -108,12 +133,10 @@ class ReservationSchedule
             }
             $start = $this->normalize($at);
             $end = $this->endAt($at);
-            $table = null;
             if ($attributes['type'] === 'exclusive') {
                 $available = ! $this->conflicts($start, $end)->exists();
             } else {
-                $table = $this->tableFor($start, $end, (int) ($attributes['guests'] ?? $attributes['table_size']));
-                $available = $table !== null;
+                $available = $this->hasCapacity($start, $end, (int) ($attributes['guests'] ?? $attributes['table_size']));
             }
             if (! $available) {
                 throw ValidationException::withMessages(['reservation_at' => 'No suitable table or venue is available for this period. Please choose another schedule.']);
@@ -123,29 +146,9 @@ class ReservationSchedule
                 ...$attributes,
                 'reservation_at' => $start,
                 'reservation_end_at' => $end,
-                'dining_table_id' => $table?->id,
                 'status' => 'pending',
                 'hold_expires_at' => now()->addMinutes(config('reservations.hold_minutes'))->min(CarbonImmutable::parse($start)),
             ]);
-        }, attempts: 3);
-    }
-
-    public function reassign(Reservation $reservation, int $tableId, int $actor): void
-    {
-        DB::transaction(function () use ($reservation, $tableId, $actor) {
-            $this->lock();
-            $reservation->refresh();
-            if ($reservation->type !== 'table' || ! in_array($reservation->booking_status, ['pending', 'confirmed'])
-                || $reservation->reservation_end_at?->lte(now())) {
-                throw ValidationException::withMessages(['dining_table_id' => 'Only active table reservations can be assigned.']);
-            }
-            $table = $this->tableFor($this->normalize($reservation->reservation_at),
-                $reservation->reservation_end_at?->format('Y-m-d H:i:s') ?? $this->endAt($reservation->reservation_at),
-                $reservation->guests, $reservation->id, $tableId);
-            if (! $table) {
-                throw ValidationException::withMessages(['dining_table_id' => 'That table is unavailable, overlaps another booking, or has too few seats.']);
-            }
-            $reservation->update(['dining_table_id' => $table->id, 'handled_by' => $actor]);
         }, attempts: 3);
     }
 
@@ -169,13 +172,10 @@ class ReservationSchedule
                 }
                 $start = $this->normalize($reservation->reservation_at);
                 $end = $reservation->reservation_end_at?->format('Y-m-d H:i:s') ?? $this->endAt($start);
-                $table = $reservation->type === 'table'
-                    ? $this->tableFor($start, $end, $reservation->guests, $reservation->id, $reservation->dining_table_id) : null;
-                if (($reservation->type === 'table' && ! $table)
+                if (($reservation->type === 'table' && ! $this->hasCapacity($start, $end, $reservation->guests, $reservation->id))
                     || ($reservation->type === 'exclusive' && $this->conflicts($start, $end, $reservation->id)->exists())) {
-                    throw ValidationException::withMessages(['status' => 'No suitable table or venue is available. Assign an available table before approval.']);
+                    throw ValidationException::withMessages(['status' => 'No suitable capacity or venue is available for this reservation.']);
                 }
-                $reservation->dining_table_id = $table?->id;
                 $reservation->reservation_end_at = $end;
             }
             $reservation->fill(['status' => $status, 'hold_expires_at' => null, 'handled_by' => $actor])->save();

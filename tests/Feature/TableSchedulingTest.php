@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\DiningTable;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Services\ReservationSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -32,32 +32,35 @@ class TableSchedulingTest extends TestCase
         ]);
     }
 
-    public function test_configured_tables_match_the_restaurant(): void
+    public function test_configured_capacity_matches_the_restaurant(): void
     {
-        $this->assertSame([1 => 2, 2 => 2, 3 => 2, 4 => 4, 5 => 4, 6 => 4, 7 => 4, 8 => 12], DiningTable::query()->pluck('capacity', 'number')->all());
+        $this->assertSame([2, 2, 2, 4, 4, 4, 4, 12], config('reservations.table_capacities'));
+        $this->assertFalse(Schema::hasColumn('reservations', 'dining_table_id'));
+        $this->assertFalse(Schema::hasTable('dining_tables'));
     }
 
-    public function test_simultaneous_and_overlapping_bookings_use_different_tables(): void
+    public function test_simultaneous_and_overlapping_bookings_use_separate_capacity(): void
     {
         $first = $this->book();
-        $second = $this->book();
-        $overlap = $this->book('2030-01-02 18:30:00');
-        $this->assertSame([1, 2, 3], [$first->diningTable->number, $second->diningTable->number, $overlap->diningTable->number]);
+        $this->book();
+        $this->book('2030-01-02 18:30:00');
+        $this->assertDatabaseCount('reservations', 3);
         $this->assertSame('20:00', $first->reservation_end_at->format('H:i'));
         $this->assertSame('09:30', $first->hold_expires_at->format('H:i'));
     }
 
-    public function test_back_to_back_bookings_reuse_the_same_table(): void
+    public function test_back_to_back_bookings_reuse_capacity(): void
     {
-        $first = $this->book();
-        $next = $this->book('2030-01-02 20:00:00');
-        $this->assertSame($first->dining_table_id, $next->dining_table_id);
+        config(['reservations.table_capacities' => [2]]);
+        $this->book();
+        $this->book('2030-01-02 20:00:00');
+        $this->assertDatabaseCount('reservations', 2);
     }
 
-    public function test_larger_parties_use_a_suitable_table_and_capacity_is_finite(): void
+    public function test_larger_parties_use_suitable_capacity_and_capacity_is_finite(): void
     {
-        $this->assertSame(4, $this->book(guests: 4)->diningTable->number);
-        $this->assertSame(8, $this->book(guests: 8)->diningTable->number);
+        $this->assertSame(4, $this->book(guests: 4)->guests);
+        $this->assertSame(8, $this->book(guests: 8)->guests);
         $this->expectException(ValidationException::class);
         $this->book(guests: 12);
     }
@@ -65,10 +68,21 @@ class TableSchedulingTest extends TestCase
     public function test_all_eight_tables_can_be_booked_but_a_ninth_cannot(): void
     {
         for ($i = 1; $i <= 8; $i++) {
-            $this->assertSame($i, $this->book()->diningTable->number);
+            $this->book();
         }
+        $this->assertDatabaseCount('reservations', 8);
         $this->expectException(ValidationException::class);
         $this->book();
+    }
+
+    public function test_small_bookings_preserve_capacity_for_a_large_party(): void
+    {
+        config(['reservations.table_capacities' => [2, 12]]);
+        $this->book(guests: 2);
+        $this->book(guests: 12);
+
+        $this->expectException(ValidationException::class);
+        $this->book(guests: 2);
     }
 
     public function test_exclusive_booking_blocks_tables_and_other_exclusive_bookings(): void
@@ -118,21 +132,25 @@ class TableSchedulingTest extends TestCase
         $first = $this->book();
         $this->travel(30)->minutes();
         $this->assertSame('expired', $first->booking_status);
-        $next = $this->book();
-        $this->assertSame($first->dining_table_id, $next->dining_table_id);
+        $this->book();
+        $this->assertDatabaseCount('reservations', 2);
         $this->artisan('reservations:expire')->assertSuccessful();
         $this->assertSame('expired', $first->fresh()->status);
         $this->assertDatabaseHas('reservation_status_histories', ['reservation_id' => $first->id, 'to_status' => 'expired']);
     }
 
-    public function test_confirmation_preserves_the_table_after_the_hold_deadline(): void
+    public function test_confirmation_preserves_capacity_after_the_hold_deadline(): void
     {
+        config(['reservations.table_capacities' => [2, 2]]);
         $first = $this->book();
         $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         app(ReservationSchedule::class)->changeStatus($first, 'confirmed', $admin->id);
         $this->travel(31)->minutes();
         $this->assertNull($first->hold_expires_at);
-        $this->assertNotSame($first->dining_table_id, $this->book()->dining_table_id);
+        $this->book();
+        $this->assertDatabaseCount('reservations', 2);
+        $this->expectException(ValidationException::class);
+        $this->book();
     }
 
     public function test_expired_reservation_cannot_be_approved_using_a_stale_page(): void
@@ -149,8 +167,8 @@ class TableSchedulingTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $this->actingAs($admin)->get('/dashboard')->assertOk()->assertDontSee('>Tables</a>', false);
         $reservation = $this->book();
-        $this->get('/reservations')->assertOk()->assertDontSee('Table '.$reservation->diningTable->number);
-        $this->get(route('reservations.show', $reservation))->assertOk()->assertDontSee('Table '.$reservation->diningTable->number);
+        $this->get('/reservations')->assertOk()->assertDontSee('Table number');
+        $this->get(route('reservations.show', $reservation))->assertOk()->assertDontSee('Table number');
         $this->get('/tables')->assertNotFound();
         $this->patch('/reservations/1/table', ['dining_table_id' => 1])->assertNotFound();
     }
@@ -216,16 +234,5 @@ class TableSchedulingTest extends TestCase
                 $this->assertNull($reservation->fresh()->hold_expires_at);
             }
         }
-    }
-
-    public function test_unassigned_legacy_booking_is_protected_until_staff_assigns_it(): void
-    {
-        $legacy = $this->book();
-        $legacy->update(['dining_table_id' => null, 'hold_expires_at' => null]);
-        $schedules = app(ReservationSchedule::class);
-        $this->assertFalse($schedules->isAvailable('2030-01-02 19:00:00', 'table', 2));
-        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $schedules->reassign($legacy, 1, $admin->id);
-        $this->assertTrue($schedules->isAvailable('2030-01-02 19:00:00', 'table', 2));
     }
 }

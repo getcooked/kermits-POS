@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\DiningTable;
 use App\Services\ReservationSchedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
@@ -11,13 +10,17 @@ use Illuminate\Validation\ValidationException;
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => $argv[1], 'queue.default' => 'sync']);
+config([
+    'database.default' => 'sqlite',
+    'database.connections.sqlite.database' => $argv[1],
+    'queue.default' => 'sync',
+    'reservations.table_capacities' => [2],
+]);
 DB::purge('sqlite');
 DB::statement('PRAGMA busy_timeout = 5000');
 
 if ($argv[2] === 'setup') {
     Artisan::call('migrate', ['--force' => true]);
-    DiningTable::query()->where('number', '!=', 1)->update(['active' => false]);
     exit(0);
 }
 
