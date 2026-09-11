@@ -1354,7 +1354,7 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
         } else {
             if (vm.orders.isEmpty()) item(key = "empty-orders") { HistoryEmpty("No purchases yet.", "Your completed menu orders will appear here.") }
             items(vm.orders, key = { "order-${it.id}" }) { order ->
-                ActivityCard(title = "Order #${order.id}", kind = "Purchase", status = order.payment_status, details = listOf("DATE" to receiptDate(order.created_at), "PAYMENT" to order.payment_method.uppercase(), "TOTAL DUE" to money(order.total_due)), actionLabel = "View receipt", onClick = { onOrder(order.id) })
+                ActivityCard(title = "Order #${order.id}", kind = "Purchase", status = order.payment_status, details = listOf("DATE" to receiptDate(order.created_at), "PAYMENT" to order.payment_method.uppercase(), "TOTAL DUE" to money(order.total_due)), actionLabel = if (order.payment_status.equals("rejected", ignoreCase = true)) "View order" else "View receipt", onClick = { onOrder(order.id) })
             }
         }
     }
@@ -1368,8 +1368,8 @@ private fun ActivityCard(title: String, kind: String, status: String, details: L
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column { Text(kind, color = Color(0xFF73796F), fontSize = 12.sp, fontWeight = FontWeight.Bold); Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp)) }
-                val statusColor = when (status.lowercase()) { "paid", "confirmed" -> Color(0xFF257342); "cancelled" -> Color(0xFFB72C2C); "completed" -> Color(0xFF315EC9); else -> Color(0xFF5D6259) }
-                val statusBackground = when (status.lowercase()) { "paid", "confirmed" -> Color(0xFFE5F4E9); "cancelled" -> Color(0xFFFDEAEA); "completed" -> Color(0xFFE9EEFB); else -> Color(0xFFEFF0EC) }
+                val statusColor = when (status.lowercase()) { "paid", "confirmed" -> Color(0xFF257342); "cancelled", "rejected" -> Color(0xFFB72C2C); "completed" -> Color(0xFF315EC9); else -> Color(0xFF5D6259) }
+                val statusBackground = when (status.lowercase()) { "paid", "confirmed" -> Color(0xFFE5F4E9); "cancelled", "rejected" -> Color(0xFFFDEAEA); "completed" -> Color(0xFFE9EEFB); else -> Color(0xFFEFF0EC) }
                 Text(status.replaceFirstChar { it.uppercase() }, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.background(statusBackground, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 6.dp))
             }
             HorizontalDivider(Modifier.padding(vertical = 13.dp), color = Color(0xFFE3E5DD))
@@ -1388,9 +1388,21 @@ private fun OrderReceiptDialog(
 ) {
     val context = LocalContext.current
     val isPaid = order.payment_status.equals("paid", ignoreCase = true)
+    val isRejected = order.payment_status.equals("rejected", ignoreCase = true)
     val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
+    val receiptLabel = when {
+        isPaid -> "OFFICIAL RECEIPT"
+        isRejected -> "ORDER REJECTED"
+        else -> "ORDER RECEIPT"
+    }
+    val statusLabel = when {
+        isPaid -> "PAID"
+        isRejected -> "REJECTED"
+        else -> "PAYMENT PENDING"
+    }
     val paymentMessage = when {
         isPaid -> "Payment confirmed."
+        isRejected -> "This order was rejected. No payment is required."
         order.payment_method == "gcash" -> "Payment submitted — awaiting verification."
         else -> "Payment due at the counter."
     }
@@ -1427,7 +1439,7 @@ private fun OrderReceiptDialog(
                         }
                         Text("KERMIT'S", color = Color(0xFF747D00), fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Black)
                         Text(
-                            if (isPaid) "OFFICIAL RECEIPT" else "ORDER RECEIPT",
+                            receiptLabel,
                             fontSize = 25.sp,
                             fontWeight = FontWeight.Black,
                             modifier = Modifier.padding(top = 4.dp).semantics { heading() },
@@ -1436,10 +1448,14 @@ private fun OrderReceiptDialog(
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
                             shape = RoundedCornerShape(9.dp),
-                            color = if (isPaid) Color(0xFFE5F4E9) else Color(0xFFFFF2CC),
+                            color = when {
+                                isPaid -> Color(0xFFE5F4E9)
+                                isRejected -> Color(0xFFFDEAEA)
+                                else -> Color(0xFFFFF2CC)
+                            },
                         ) {
                             Column(Modifier.padding(12.dp)) {
-                                Text(if (isPaid) "PAID" else "PAYMENT PENDING", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                Text(statusLabel, color = if (isRejected) Color(0xFFB72C2C) else Color.Unspecified, fontSize = 11.sp, fontWeight = FontWeight.Black)
                                 Text(paymentMessage, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
                             }
                         }
@@ -1447,7 +1463,7 @@ private fun OrderReceiptDialog(
                             ReceiptLine("Date", receiptDate(order.created_at))
                             ReceiptLine("Customer", customerName.ifBlank { "Customer" })
                             ReceiptLine("Payment", paymentLabel)
-                            ReceiptLine("Payment status", if (isPaid) "Paid" else "Pending")
+                            ReceiptLine("Payment status", when { isPaid -> "Paid"; isRejected -> "Rejected"; else -> "Pending" })
                             order.payment_reference?.let { ReceiptLine("GCash reference", it) }
                         }
                         Text("ITEMS", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Black)
@@ -1472,7 +1488,7 @@ private fun OrderReceiptDialog(
                                 ReceiptLine("Reservation fee", money(reservation.total_amount))
                             }
                             HorizontalDivider(color = Color(0xFFCBD0C3), modifier = Modifier.padding(vertical = 8.dp))
-                            ReceiptLine(if (isPaid) "Total paid" else "Total due", money(order.total_due), emphasized = true)
+                            ReceiptLine(when { isPaid -> "Total paid"; isRejected -> "Order total"; else -> "Total due" }, money(order.total_due), emphasized = true)
                             order.cash_received?.let { ReceiptLine("Cash received", money(it)) }
                             order.change_due?.let { ReceiptLine("Change", money(it)) }
                         }
@@ -1500,7 +1516,11 @@ private fun OrderReceiptDialog(
 
                     item(key = "receipt-note") {
                         Text(
-                            if (isPaid) "Thank you for your purchase!" else "This confirms your order request. It becomes an official receipt after payment is verified.",
+                            when {
+                                isPaid -> "Thank you for your purchase!"
+                                isRejected -> "This order was rejected and no payment is due."
+                                else -> "This confirms your order request. It becomes an official receipt after payment is verified."
+                            },
                             color = Color(0xFF6E746B),
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
@@ -1517,7 +1537,7 @@ private fun OrderReceiptDialog(
                         onClick = { printOrderReceipt(context, order, customerName) },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(11.dp),
-                    ) { Text("Print receipt", fontWeight = FontWeight.ExtraBold) }
+                    ) { Text(if (isRejected) "Print order" else "Print receipt", fontWeight = FontWeight.ExtraBold) }
                     Button(
                         onClick = close,
                         modifier = Modifier.weight(1f).height(50.dp),
@@ -1573,7 +1593,28 @@ private fun releasePrintedWebView(webView: WebView, printJob: PrintJob) {
 
 private fun receiptPrintHtml(order: Order, customerName: String): String {
     val isPaid = order.payment_status.equals("paid", ignoreCase = true)
+    val isRejected = order.payment_status.equals("rejected", ignoreCase = true)
     val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
+    val receiptLabel = when {
+        isPaid -> "OFFICIAL RECEIPT"
+        isRejected -> "ORDER REJECTED"
+        else -> "ORDER RECEIPT"
+    }
+    val statusLabel = when {
+        isPaid -> "Paid"
+        isRejected -> "Rejected"
+        else -> "Pending"
+    }
+    val totalLabel = when {
+        isPaid -> "Total paid"
+        isRejected -> "Order total"
+        else -> "Total due"
+    }
+    val receiptNote = when {
+        isPaid -> "Thank you for your purchase!"
+        isRejected -> "This order was rejected and no payment is due."
+        else -> "Present this order receipt when paying at the counter."
+    }
     val reservationRows = order.reservation?.let { reservation ->
         """
         <div class="line"><span>Reservation</span><b>${reservation.reference.html()}</b></div>
@@ -1603,22 +1644,22 @@ private fun receiptPrintHtml(order: Order, customerName: String): String {
         .item { padding:9px 0; } .item span { display:grid; gap:3px; } .item > b { white-space:nowrap; } .total { border-top:1px solid #222; margin-top:6px; padding-top:8px; font-size:16px; }
         .note { margin:16px 0 0; text-align:center; color:#667064; line-height:1.45; }
         </style></head><body>
-        <div class="brand"><strong>KERMIT'S</strong><span>${if (isPaid) "OFFICIAL RECEIPT" else "ORDER RECEIPT"}</span><h1>#${String.format(Locale.US, "%06d", order.id)}</h1></div>
+        <div class="brand"><strong>KERMIT'S</strong><span>$receiptLabel</span><h1>#${String.format(Locale.US, "%06d", order.id)}</h1></div>
         <div class="meta">
           <div class="line"><span>Date</span><b>${receiptDate(order.created_at).html()}</b></div>
           <div class="line"><span>Customer</span><b>${customerName.ifBlank { "Customer" }.html()}</b></div>
           <div class="line"><span>Payment</span><b>${paymentLabel.html()}</b></div>
-          <div class="line"><span>Status</span><b>${if (isPaid) "Paid" else "Pending"}</b></div>
+          <div class="line"><span>Status</span><b>$statusLabel</b></div>
           $paymentReference
           $reservationRows
         </div>
         <div class="items">$items</div>
         <div class="totals">
           <div class="line"><span>Food subtotal</span><b>${money(order.total).html()}</b></div>
-          <div class="line total"><b>${if (isPaid) "Total paid" else "Total due"}</b><b>${money(order.total_due).html()}</b></div>
+          <div class="line total"><b>$totalLabel</b><b>${money(order.total_due).html()}</b></div>
           $cashRows
         </div>
-        <p class="note">${if (isPaid) "Thank you for your purchase!" else "Present this order receipt when paying at the counter."}</p>
+        <p class="note">$receiptNote</p>
         </body></html>
     """.trimIndent()
 }
