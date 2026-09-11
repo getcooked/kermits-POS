@@ -376,7 +376,10 @@ class OrderingTest extends TestCase
 
     public function test_cashier_can_confirm_customer_payment_and_connect_it_to_super_admin_sales_reports(): void
     {
-        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $customer = User::factory()->create([
+            'role' => User::ROLE_CUSTOMER,
+            'email' => 'hidden.review@example.com',
+        ]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
@@ -405,6 +408,7 @@ class OrderingTest extends TestCase
             ->assertSee('Already submitted through GCash')
             ->assertSee('Add more items')
             ->assertSee('Reject order')
+            ->assertDontSee('hidden.review@example.com')
             ->assertSee('Verify GCash and confirm paid');
 
         $this->actingAs($superAdmin)->get('/reports')

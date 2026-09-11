@@ -9,7 +9,7 @@
                 <a href="{{ route('cashier.orders.index') }}">← Customer orders</a>
                 <p>ORDER #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</p>
                 <h1>Review complete order</h1>
-                <span>{{ $order->customer?->name }} · {{ $order->customer?->email }}</span>
+                <span>{{ $order->customer?->name }}</span>
             </header>
 
             @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
