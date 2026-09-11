@@ -56,6 +56,7 @@ class ReservationPushNotifier
                 'confirmed' => ['Reservation accepted', "Your reservation {$reference} was accepted by the admin."],
                 'completed' => ['Reservation completed', "Your reservation {$reference} was marked as completed."],
                 'cancelled' => ['Reservation cancelled', "Your reservation {$reference} was cancelled."],
+                'rejected' => ['Order and reservation rejected', "Your order for reservation {$reference} was rejected."],
                 default => ['Reservation updated', "Reservation {$reference} has a new status."],
             };
         }

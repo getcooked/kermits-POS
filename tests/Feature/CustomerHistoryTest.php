@@ -39,6 +39,27 @@ class CustomerHistoryTest extends TestCase
         $this->actingAs($admin)->get('/history')->assertForbidden();
     }
 
+    public function test_customer_sees_a_rejected_order_without_a_payment_receipt_action(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $order = Order::query()->create([
+            'user_id' => $customer->id,
+            'total' => 250,
+            'payment_method' => 'cash',
+            'payment_status' => 'rejected',
+        ]);
+
+        $this->actingAs($customer)->get(route('customer.history'))
+            ->assertOk()
+            ->assertSee('Rejected')
+            ->assertDontSee(route('receipts.show', $order), false);
+
+        $this->actingAs($customer)->get(route('shop.orders.show', $order))
+            ->assertOk()
+            ->assertSee('Your order was rejected.')
+            ->assertSee('No payment was recorded');
+    }
+
     public function test_super_admin_status_change_is_recorded_in_customer_timeline(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);

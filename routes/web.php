@@ -144,6 +144,9 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('/cashier/orders/{order}/confirm-payment', [CashierController::class, 'confirmCustomerPayment'])
             ->middleware(['role:cashier', 'throttle:20,1'])
             ->name('cashier.orders.confirm-payment');
+        Route::patch('/cashier/orders/{order}/reject', [CashierController::class, 'rejectCustomerOrder'])
+            ->middleware(['role:cashier', 'throttle:20,1'])
+            ->name('cashier.orders.reject');
     });
 
     Route::get('/receipts/{order}', [ReportController::class, 'receipt'])

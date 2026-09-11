@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
+use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -380,6 +381,7 @@ class OrderingTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $product = Product::query()->create(['name' => 'Connected Online Sale', 'price' => 275, 'stock' => 5, 'active' => true]);
+        Product::query()->create(['name' => 'Available Order Add-on', 'price' => 50, 'stock' => 5, 'active' => true]);
         $order = app(OrderService::class)->create(
             user: $customer,
             quantities: [$product->id => 1],
@@ -401,6 +403,8 @@ class OrderingTest extends TestCase
         $this->actingAs($cashier)->get(route('cashier.orders.review', $order))
             ->assertOk()
             ->assertSee('Already submitted through GCash')
+            ->assertSee('Add more items')
+            ->assertSee('Reject order')
             ->assertSee('Verify GCash and confirm paid');
 
         $this->actingAs($superAdmin)->get('/reports')
@@ -418,6 +422,263 @@ class OrderingTest extends TestCase
             ->assertOk()
             ->assertSee('275.00')
             ->assertSee('GCash · 1 sales');
+    }
+
+    public function test_cashier_can_add_a_new_product_while_reviewing_a_customer_order(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $original = Product::query()->create(['name' => 'Original Meal', 'price' => 50, 'stock' => 5, 'active' => true]);
+        $addition = Product::query()->create(['name' => 'Added Drink', 'price' => 80, 'stock' => 4, 'active' => true]);
+        $order = app(OrderService::class)->create(
+            user: $customer,
+            quantities: [$original->id => 2],
+            paymentStatus: 'pending',
+            paymentMethod: 'cash',
+            customer: $customer,
+        );
+
+        $this->actingAs($cashier)
+            ->put(route('cashier.orders.update', $order), [
+                'quantities' => [$order->items()->firstOrFail()->id => 2],
+                'new_quantities' => [$addition->id => 3],
+            ])
+            ->assertRedirect(route('cashier.orders.review', $order))
+            ->assertSessionHas('status', '3 items were added to the order.');
+
+        $this->assertDatabaseHas('order_items', [
+            'order_id' => $order->id,
+            'product_id' => $addition->id,
+            'quantity' => 3,
+            'unit_price' => 80,
+            'subtotal' => 240,
+        ]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'total' => 340]);
+        $this->assertSame(1, $addition->fresh()->stock);
+        $this->assertDatabaseHas('stock_movements', [
+            'product_id' => $addition->id,
+            'user_id' => $cashier->id,
+            'type' => 'order_adjustment',
+            'quantity' => -3,
+            'stock_before' => 4,
+            'stock_after' => 1,
+        ]);
+    }
+
+    public function test_adding_new_products_to_a_customer_order_is_atomic_when_stock_is_insufficient(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $original = Product::query()->create(['name' => 'Original Meal', 'price' => 100, 'stock' => 5, 'active' => true]);
+        $available = Product::query()->create(['name' => 'Available Add-on', 'price' => 30, 'stock' => 4, 'active' => true]);
+        $short = Product::query()->create(['name' => 'Unavailable Add-on', 'price' => 40, 'stock' => 1, 'active' => true]);
+        $order = app(OrderService::class)->create(
+            user: $customer,
+            quantities: [$original->id => 1],
+            paymentStatus: 'pending',
+            paymentMethod: 'cash',
+            customer: $customer,
+        );
+
+        $this->actingAs($cashier)
+            ->put(route('cashier.orders.update', $order), [
+                'quantities' => [$order->items()->firstOrFail()->id => 1],
+                'new_quantities' => [$available->id => 2, $short->id => 2],
+            ])
+            ->assertSessionHasErrors('new_quantities.'.$short->id);
+
+        $this->assertDatabaseMissing('order_items', ['order_id' => $order->id, 'product_id' => $available->id]);
+        $this->assertDatabaseMissing('order_items', ['order_id' => $order->id, 'product_id' => $short->id]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'total' => 100]);
+        $this->assertSame(4, $available->fresh()->stock);
+        $this->assertSame(1, $short->fresh()->stock);
+        $this->assertDatabaseMissing('stock_movements', ['type' => 'order_adjustment']);
+    }
+
+    public function test_cashier_can_reject_a_customer_order_and_release_its_stock_and_reservation(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $meal = Product::query()->create(['name' => 'Rejected Meal', 'price' => 125, 'stock' => 8, 'active' => true]);
+        $drink = Product::query()->create(['name' => 'Rejected Drink', 'price' => 50, 'stock' => 6, 'active' => true]);
+
+        $this->actingAs($customer)->post('/shop/orders', [
+            'quantities' => [$meal->id => 2, $drink->id => 1],
+            'table_size' => 2,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
+            'payment_method' => 'cash',
+        ])->assertSessionHasNoErrors();
+
+        $order = Order::query()->with('reservation')->firstOrFail();
+        $reservation = $order->reservation;
+
+        $this->assertNotNull($reservation?->hold_expires_at);
+        $this->assertSame(6, $meal->fresh()->stock);
+        $this->assertSame(5, $drink->fresh()->stock);
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.reject', $order))
+            ->assertRedirect(route('cashier.orders.index'))
+            ->assertSessionHas('status', 'Order rejected. Reserved stock has been restored.');
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'rejected']);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'rejected',
+            'payment_status' => 'rejected',
+            'hold_expires_at' => null,
+        ]);
+        $this->assertSame(8, $meal->fresh()->stock);
+        $this->assertSame(6, $drink->fresh()->stock);
+        $this->assertDatabaseHas('stock_movements', [
+            'product_id' => $meal->id,
+            'user_id' => $cashier->id,
+            'type' => 'order_rejected',
+            'quantity' => 2,
+            'stock_before' => 6,
+            'stock_after' => 8,
+        ]);
+        $this->assertDatabaseHas('stock_movements', [
+            'product_id' => $drink->id,
+            'user_id' => $cashier->id,
+            'type' => 'order_rejected',
+            'quantity' => 1,
+            'stock_before' => 5,
+            'stock_after' => 6,
+        ]);
+        $this->assertDatabaseHas('reservation_status_histories', [
+            'reservation_id' => $reservation->id,
+            'from_status' => 'pending',
+            'to_status' => 'rejected',
+            'changed_by' => $cashier->id,
+        ]);
+    }
+
+    public function test_rejecting_the_same_customer_order_twice_does_not_restore_stock_twice(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $product = Product::query()->create(['name' => 'Single Restore Meal', 'price' => 90, 'stock' => 5, 'active' => true]);
+        $order = app(OrderService::class)->create(
+            user: $customer,
+            quantities: [$product->id => 2],
+            paymentStatus: 'pending',
+            paymentMethod: 'cash',
+            customer: $customer,
+        );
+
+        $this->actingAs($cashier)->patch(route('cashier.orders.reject', $order))->assertSessionHasNoErrors();
+        $this->assertSame(5, $product->fresh()->stock);
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.reject', $order))
+            ->assertSessionHasErrors('order');
+
+        $this->assertSame(5, $product->fresh()->stock);
+        $this->assertDatabaseCount('stock_movements', 2);
+        $this->assertSame(1, StockMovement::query()
+            ->where('product_id', $product->id)
+            ->where('type', 'order_rejected')
+            ->count());
+    }
+
+    public function test_cashier_can_reject_an_order_after_its_linked_reservation_hold_expires(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $product = Product::query()->create(['name' => 'Expired Hold Meal', 'price' => 120, 'stock' => 4, 'active' => true]);
+
+        $this->actingAs($customer)->post('/shop/orders', [
+            'quantities' => [$product->id => 1],
+            'table_size' => 2,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
+            'payment_method' => 'cash',
+        ])->assertSessionHasNoErrors();
+
+        $order = Order::query()->with('reservation')->firstOrFail();
+        $reservation = $order->reservation;
+        $reservation->update(['hold_expires_at' => now()->subMinute()]);
+        $this->assertSame('expired', $reservation->fresh()->booking_status);
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.reject', $order))
+            ->assertRedirect(route('cashier.orders.index'));
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'rejected']);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'rejected',
+            'payment_status' => 'rejected',
+            'hold_expires_at' => null,
+        ]);
+        $this->assertDatabaseHas('reservation_status_histories', [
+            'reservation_id' => $reservation->id,
+            'from_status' => 'expired',
+            'to_status' => 'rejected',
+            'changed_by' => $cashier->id,
+        ]);
+        $this->assertSame(4, $product->fresh()->stock);
+    }
+
+    public function test_non_cashier_roles_cannot_reject_customer_orders(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $order = Order::query()->create([
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 100,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+        ]);
+
+        foreach ([$customer, $admin, $superAdmin] as $user) {
+            $this->actingAs($user)
+                ->patch(route('cashier.orders.reject', $order))
+                ->assertForbidden();
+        }
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'pending']);
+    }
+
+    public function test_cashier_cannot_reject_an_order_for_a_completed_reservation(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $product = Product::query()->create(['name' => 'Completed Reservation Meal', 'price' => 150, 'stock' => 5, 'active' => true]);
+        $order = app(OrderService::class)->create(
+            user: $customer,
+            quantities: [$product->id => 2],
+            paymentStatus: 'pending',
+            paymentMethod: 'cash',
+            customer: $customer,
+        );
+        Reservation::query()->create([
+            'user_id' => $customer->id,
+            'order_id' => $order->id,
+            'reference' => 'KRM-COMPLETED-ORDER',
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => '09171234567',
+            'reservation_at' => now()->subHour(),
+            'guests' => 2,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+            'status' => 'completed',
+        ]);
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.reject', $order))
+            ->assertSessionHasErrors('order');
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'pending']);
+        $this->assertSame(3, $product->fresh()->stock);
+        $this->assertDatabaseMissing('stock_movements', ['type' => 'order_rejected']);
     }
 
     public function test_cashier_collects_the_combined_order_and_table_fee_before_marking_linked_checkout_paid(): void
