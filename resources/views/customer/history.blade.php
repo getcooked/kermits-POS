@@ -37,7 +37,6 @@
             <p>MY ACCOUNT</p>
             <h1>Reservations and purchases</h1>
         </div>
-        <a class="new-reservation" href="{{ route('reservations.create') }}">New reservation</a>
     </header>
 
     <section class="history-summary" aria-label="Activity summary">
