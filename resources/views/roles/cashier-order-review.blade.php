@@ -45,7 +45,7 @@
                                         <button type="button" class="dialog-close" data-close-add-items aria-label="Close add items">&times;</button>
                                     </header>
                                     <label class="add-items-search">
-                                        <span aria-hidden="true">&#128269;</span>
+                                        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="flex-shrink:0"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
                                         <input id="add-items-search" type="search" placeholder="Search food or category" autocomplete="off">
                                     </label>
                                     <div class="add-items-catalog" id="add-items-catalog">
