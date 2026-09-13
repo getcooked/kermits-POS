@@ -22,13 +22,14 @@ class AddSecurityHeaders
         $response->headers->set('Content-Security-Policy', implode('; ', [
             "default-src 'self'",
             "base-uri 'self'",
-            "connect-src 'self'",
+            "connect-src 'self' https://www.google.com/recaptcha/",
+            "frame-src 'self' https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/",
             "font-src 'self' data:",
             "form-action 'self'",
             "frame-ancestors 'self'",
             "img-src 'self' data: https:",
             "object-src 'none'",
-            "script-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
             "style-src 'self' 'unsafe-inline'",
         ]));
 

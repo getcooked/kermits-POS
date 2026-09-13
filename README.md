@@ -2,6 +2,14 @@
 
 A Laravel capstone project for restaurant sales, inventory, customer ordering, and reservations. The application separates public customer features from protected staff tools and keeps business rules in dedicated service classes.
 
+## Login reCAPTCHA
+
+The website login supports Google reCAPTCHA v2 (the "I'm not a robot" checkbox). In `.env`, set `RECAPTCHA_ENABLED=true`, `RECAPTCHA_SITE_KEY`, and `RECAPTCHA_SECRET_KEY`, then run `php artisan config:clear`. Configure these values separately on the deployed server; `.env` is not committed to Git. Keep the secret key on the server only.
+
+Register the website hostname in the [reCAPTCHA console](https://www.google.com/recaptcha/admin). For local development, allow `localhost` and open the site using `localhost` rather than `127.0.0.1`. Keep Google's domain validation enabled and use checkbox v2 keys. The server verifies each token and its hostname before checking login credentials. Missing/expired tokens and verification outages reject the login with a retry message. Existing login rate limits remain in effect. Registration, password reset, and the native Android API login are unchanged.
+
+Automated tests disable reCAPTCHA by default; `RecaptchaLoginTest` explicitly enables it and mocks Google's responses to cover successful verification, rejection, expiry, hostname mismatch, and outages. For a live check, open `/login`, complete the checkbox, and sign in; also confirm submitting without completing the checkbox shows an error.
+
 ## Roles and access
 
 | Role | Access |
