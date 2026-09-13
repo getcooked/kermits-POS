@@ -8,14 +8,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class MobileRegistrationController extends Controller
 {
     public function sendCode(Request $request): JsonResponse
     {
+        $this->normalizeEmail($request);
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
         ]);
@@ -27,11 +30,19 @@ class MobileRegistrationController extends Controller
             'email' => $email,
             'code_hash' => Hash::make($code),
             'attempts' => 0,
+            'expires_at' => now()->addMinutes(10)->timestamp,
         ], now()->addMinutes(10));
 
-        Mail::raw("Your Kermit's verification code is {$code}. It expires in 10 minutes.", function ($message) use ($email): void {
-            $message->to($email)->subject("Kermit's account verification code");
-        });
+        try {
+            Mail::raw("Your Kermit's verification code is {$code}. It expires in 10 minutes.", function ($message) use ($email): void {
+                $message->to($email)->subject("Kermit's account verification code");
+            });
+        } catch (TransportExceptionInterface) {
+            Cache::forget($this->challengeKey($challenge));
+            Log::warning('Mobile registration email delivery failed.');
+
+            return response()->json(['message' => 'The verification email could not be sent. Please try again later.'], 503);
+        }
 
         return response()->json(['data' => [
             'challenge' => $challenge,
@@ -42,6 +53,7 @@ class MobileRegistrationController extends Controller
 
     public function verifyCode(Request $request): JsonResponse
     {
+        $this->normalizeEmail($request);
         $validated = $request->validate([
             'challenge' => ['required', 'string', 'size:64'],
             'email' => ['required', 'email', 'max:160'],
@@ -51,18 +63,19 @@ class MobileRegistrationController extends Controller
         $challenge = Cache::get($key);
 
         if (! $challenge || ! hash_equals($challenge['email'], Str::lower($validated['email']))) {
-            return response()->json(['message' => 'The verification request has expired. Please request a new code.'], 422);
+            return response()->json(['code' => 'verification_expired', 'message' => 'The verification request has expired. Please request a new code.'], 422);
         }
 
         if (($challenge['attempts'] ?? 0) >= 5) {
             Cache::forget($key);
 
-            return response()->json(['message' => 'Too many incorrect attempts. Please request a new code.'], 422);
+            return response()->json(['code' => 'verification_attempts_exceeded', 'message' => 'Too many incorrect attempts. Please request a new code.'], 422);
         }
 
         if (! Hash::check($validated['code'], $challenge['code_hash'])) {
             $challenge['attempts'] = ($challenge['attempts'] ?? 0) + 1;
-            Cache::put($key, $challenge, now()->addMinutes(10));
+            $remainingSeconds = max(1, ($challenge['expires_at'] ?? now()->addMinutes(10)->timestamp) - now()->timestamp);
+            Cache::put($key, $challenge, $remainingSeconds);
 
             return response()->json(['message' => 'The verification code is incorrect.'], 422);
         }
@@ -80,6 +93,7 @@ class MobileRegistrationController extends Controller
 
     public function register(Request $request): JsonResponse
     {
+        $this->normalizeEmail($request);
         $validated = $request->validate([
             'registration_token' => ['required', 'string', 'size:64'],
             'name' => ['required', 'string', 'max:30', 'regex:/^\p{L}[\p{L}\p{M}]*(?: \p{L}[\p{L}\p{M}]*)*$/u'],
@@ -100,7 +114,7 @@ class MobileRegistrationController extends Controller
         $email = Str::lower($validated['email']);
 
         if (! $verifiedEmail || ! hash_equals($verifiedEmail, $email)) {
-            return response()->json(['message' => 'Email verification has expired. Please verify your Gmail address again.'], 422);
+            return response()->json(['code' => 'verification_expired', 'message' => 'Email verification has expired. Please verify your Gmail address again.'], 422);
         }
 
         $user = User::query()->create([
@@ -117,6 +131,13 @@ class MobileRegistrationController extends Controller
         return response()->json(['data' => $user->only([
             'id', 'name', 'username', 'email', 'phone', 'role',
         ])], 201);
+    }
+
+    private function normalizeEmail(Request $request): void
+    {
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => Str::lower(trim($request->input('email')))]);
+        }
     }
 
     private function challengeKey(string $challenge): string

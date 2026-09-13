@@ -26,7 +26,7 @@
                 <div class="product-grid">@foreach($products->groupBy('category') as $category => $items)@foreach($items as $product)
                     <article class="product-card">
                         @if($imageUrl = $product->imageUrl())<img class="product-photo" src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="product-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
-                        <div class="product-copy" data-product="{{ $product->id }}" data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}" data-stock="{{ $product->stock }}"><div><h3>{{ $product->name }}</h3><p>{{ $product->description }}</p></div><div class="product-meta"><strong>₱{{ number_format($product->price,2) }}</strong><span>{{ $product->stock }} in stock</span></div><input class="cart-quantity" name="quantities[{{ $product->id }}]" type="hidden" value="{{ old('quantities.'.$product->id,0) }}"><button class="add-cart" type="button" aria-label="Add {{ $product->name }} to cart"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L3.6 6H13.5a.5.5 0 0 1 .479.642l-1.5 4A.5.5 0 0 1 11.5 11H5a.5.5 0 0 1-.485-.379L3.295 3H1.5a.5.5 0 0 1-.5-.5zM4.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM7 6.5v2H5.5a.5.5 0 0 0 0 1H7v1.5a.5.5 0 0 0 1 0V9.5h1.5a.5.5 0 0 0 0-1H8V6.5a.5.5 0 0 0-1 0z" fill="currentColor"/></svg></button></div>
+                        <div class="product-copy" data-product="{{ $product->id }}" data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}" data-stock="{{ $product->stock }}"><div><h3>{{ $product->name }}</h3><p>{{ $product->description }}</p></div><div class="product-meta"><strong>₱{{ number_format($product->price,2) }}</strong><span>{{ $product->stock }} in stock</span></div><input class="cart-quantity" name="quantities[{{ $product->id }}]" type="hidden" value="{{ old('quantities.'.$product->id,0) }}"><button class="add-cart" type="button" aria-label="Add {{ $product->name }} to cart"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 4.5H6l1.5 8.5h10l2-6H6.5"/><circle cx="9" cy="18" r="1.25"/><circle cx="17" cy="18" r="1.25"/><path d="M12.5 7v4M10.5 9h4"/></svg></button></div>
                     </article>
                 @endforeach @endforeach</div>
             </section>
@@ -110,10 +110,15 @@
     background: #202124 !important;
     color: #fff !important;
     cursor: pointer;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    line-height: 0 !important;
     box-shadow: 0 8px 18px rgba(23, 24, 23, .14) !important;
     transition: background-color .15s ease, box-shadow .17s ease, translate .15s ease, filter .15s ease !important;
 }
-.add-cart svg {width: 16px; height: 16px; display: block;}
+.add-cart svg {width: 18px; height: 18px; display: block; flex: 0 0 18px; margin: 0; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;}
 .add-cart:focus-visible {outline: 3px solid rgba(174, 187, 25, .38) !important; outline-offset: 3px;}
 .add-cart:disabled {box-shadow: none !important; cursor: not-allowed !important;}
 .sell-shell .product-card:has(.add-cart:focus-visible) {

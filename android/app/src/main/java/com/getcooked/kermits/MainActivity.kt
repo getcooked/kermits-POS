@@ -163,12 +163,15 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var busy by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
+    var registrationNeedsVerification by mutableStateOf(false); private set
+    private val mobileAuth = MobileAuth(api)
     var signedIn by mutableStateOf(store.token != null && store.keepsSession); private set
     var loginCooldownSeconds by mutableIntStateOf(0); private set
     var loginCooldownReason by mutableStateOf<String?>(null); private set
     private var loginCooldownDeadlineMillis = 0L
     private var loginCooldownJob: Job? = null
     fun clearError() { error = null }
+    fun clearRegistrationFeedback() { error = null; registrationMessage = null; registrationNeedsVerification = false }
     suspend fun reservationSlots(date: String, type: String, guests: Int) = api.reservationSlots(date, type, guests).data
     init {
         if (signedIn) refresh() else store.clear()
@@ -309,53 +312,61 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         ordersRequest.await()?.let { orders = it }
         reservationsRequest.await()?.let { reservations = it }
     }
-    fun sendCode(email: String, done: (String?) -> Unit) = viewModelScope.launch {
+    fun sendCode(email: String, done: (String?) -> Unit) {
+        if (busy) return
+        registrationMessage = null
+        runAuthRequest({
+            val data = mobileAuth.sendCode(email)
+            registrationMessage = "Verification code sent to ${data.email}. Check your inbox and spam folder."
+            data.challenge
+        }, done)
+    }
+    fun requestPasswordReset(email: String, done: (String?) -> Unit) =
+        runAuthRequest({ mobileAuth.requestPasswordReset(email) }, done)
+
+    fun verifyCode(challenge: String, email: String, code: String, done: (String?) -> Unit) =
+        runAuthRequest({
+            val data = mobileAuth.verifyCode(challenge, email, code)
+            registrationMessage = "Gmail verified. Complete your account details below."
+            data.registration_token
+        }, done)
+
+    fun register(request: RegisterRequest, done: (Boolean) -> Unit) =
+        runAuthRequest({
+            mobileAuth.register(request)
+            registrationMessage = "Account created. You can now log in."
+            true
+        }, { done(it == true) })
+
+    private fun <T> runAuthRequest(action: suspend () -> T, done: (T?) -> Unit) {
+        if (busy) return
         busy = true
         error = null
-        val normalizedEmail = email.trim().lowercase()
-        try {
-            val response = api.sendRegistrationCode(SendCodeRequest(normalizedEmail))
-            if (!response.isSuccessful) {
-                error = apiError(response.errorBody()?.string()) ?: "The verification code could not be sent. Please try again."
+        registrationNeedsVerification = false
+        viewModelScope.launch {
+            try {
+                done(action())
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: AuthRequestException) {
+                error = exception.message
+                registrationNeedsVerification = exception.restartVerification
+                if (exception.restartVerification) registrationMessage = null
                 done(null)
-                return@launch
-            }
-            val challenge = response.body()?.data?.challenge
-            if (challenge == null) {
-                error = "Kermit's returned an incomplete verification response. Please try again."
+            } catch (_: SocketTimeoutException) {
+                error = "The server took too long to respond. Check your inbox before trying again."
                 done(null)
-                return@launch
+            } catch (_: IOException) {
+                error = "Could not contact Kermit's. Check your internet connection and try again."
+                done(null)
+            } catch (_: Exception) {
+                error = "Could not read the server response. Please try again."
+                done(null)
+            } finally {
+                busy = false
             }
-            registrationMessage = "Verification code sent to $normalizedEmail"
-            done(challenge)
-        } catch (_: Exception) {
-            error = "Could not reach Kermit's server. Make sure this phone and the restaurant computer use the same Wi-Fi, then try again."
-            done(null)
-        } finally {
-            busy = false
         }
     }
-    fun requestPasswordReset(email: String, done: (String?) -> Unit) = viewModelScope.launch {
-        if (busy) return@launch
-        busy = true
-        error = null
-        try {
-            val response = api.forgotPassword(ForgotPasswordRequest(email.trim().lowercase()))
-            if (!response.isSuccessful) {
-                error = apiError(response.errorBody()?.string()) ?: "The reset request could not be sent. Please try again."
-                done(null)
-                return@launch
-            }
-            done(response.body()?.message ?: "If that customer account exists, a password reset link has been sent.")
-        } catch (_: Exception) {
-            error = "Could not contact Kermit's. Check your connection and try again."
-            done(null)
-        } finally {
-            busy = false
-        }
-    }
-    fun verifyCode(challenge: String, email: String, code: String, done: (String?) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.verifyRegistrationCode(VerifyCodeRequest(challenge, email.trim().lowercase(), code)); check(response.isSuccessful); done(response.body()?.data?.registration_token) } catch (_: Exception) { error = "The verification code is invalid or expired"; done(null) } finally { busy = false } }
-    fun register(request: RegisterRequest, done: (Boolean) -> Unit) = viewModelScope.launch { busy = true; error = null; try { val response = api.register(request); check(response.isSuccessful); registrationMessage = "Account created. You can now log in."; done(true) } catch (_: Exception) { error = "Could not create the account. Check your details."; done(false) } finally { busy = false } }
     fun loadOrder(id: Int, done: (Order?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.order(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this order"; done(null) } finally { busy = false } }
     fun loadReservation(id: Int, done: (Reservation?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.reservation(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this reservation"; done(null) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
@@ -479,8 +490,8 @@ fun KermitsApp(
     ) { }
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var registering by remember { mutableStateOf(false) }
-    var recoveringPassword by remember { mutableStateOf(false) }
+    var registering by rememberSaveable { mutableStateOf(false) }
+    var recoveringPassword by rememberSaveable { mutableStateOf(false) }
     var tab by rememberSaveable(vm.signedIn) { mutableIntStateOf(0) }
     var payment by remember { mutableStateOf("cash") }
     var submissionMessage by remember { mutableStateOf<String?>(null) }
@@ -513,7 +524,7 @@ fun KermitsApp(
         when {
             recoveringPassword -> PasswordRecoveryScreen(vm, onBack = { recoveringPassword = false })
             registering -> RegistrationScreen(vm, onBack = { registering = false })
-            else -> LoginScreen(vm, login, { login = it }, password, { password = it }, onRegister = { vm.clearError(); registering = true }, onForgotPassword = { vm.clearError(); recoveringPassword = true })
+            else -> LoginScreen(vm, login, { login = it }, password, { password = it }, onRegister = { vm.clearRegistrationFeedback(); registering = true }, onForgotPassword = { vm.clearRegistrationFeedback(); recoveringPassword = true })
         }
         return
     }
@@ -641,6 +652,7 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
             Spacer(Modifier.height(28.dp))
             OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submitLogin() }), trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (passwordVisible) "Hide password" else "Show password") } }, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            vm.registrationMessage?.let { Text(it, color = Color(0xFF626B00), fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             loginError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it }); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
             Spacer(Modifier.height(15.dp)); Button(onClick = submitLogin, enabled = canLogIn, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(when { vm.busy -> "Signing in..."; cooldownSeconds > 0 -> "Try again in ${cooldownSeconds}s"; else -> "Log in" }, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
@@ -701,13 +713,13 @@ private fun AccountScreen(vm: AppViewModel) {
 
 @Composable
 private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
-    var email by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf<String?>(null) }
+    var email by rememberSaveable { mutableStateOf("") }
+    var message by rememberSaveable { mutableStateOf<String?>(null) }
     val validEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).padding(horizontal = 26.dp, vertical = 28.dp)) {
-        TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
-        Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).weight(1f).align(Alignment.CenterHorizontally), verticalArrangement = Arrangement.Center) {
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).imePadding().padding(horizontal = 26.dp, vertical = 28.dp)) {
+        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+        Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).weight(1f).align(Alignment.CenterHorizontally).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.Center) {
             BrandLogo(Modifier.size(72.dp).align(Alignment.CenterHorizontally).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
             Spacer(Modifier.height(22.dp))
             Text("RESET PASSWORD", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
@@ -716,19 +728,26 @@ private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(7.dp))
             Text("Enter the email address used by your customer account. We’ll email you a secure reset link.", color = Color(0xFF687286), fontSize = 14.sp, lineHeight = 21.sp)
             Spacer(Modifier.height(24.dp))
-            OutlinedTextField(email, { email = it; message = null }, label = { Text("Email address") }, placeholder = { Text("name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { if (validEmail && !vm.busy) vm.requestPasswordReset(email) { message = it } }), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(email, { email = it; message = null; vm.clearError() }, label = { Text("Email address") }, placeholder = { Text("name@gmail.com") }, enabled = !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { if (validEmail && !vm.busy) { message = null; vm.requestPasswordReset(email) { message = it } } }), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
-            message?.let { Text(it, color = Color(0xFF626B00), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 12.dp)) }
+            message?.let { Text("$it\n\nCheck your inbox and spam folder. Open the link to choose a new password, then return to the app to log in.", color = Color(0xFF626B00), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(18.dp))
-            Button(onClick = { vm.requestPasswordReset(email) { message = it } }, enabled = validEmail && !vm.busy, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Text(if (vm.busy) "Sending..." else "Send reset link", fontWeight = FontWeight.Bold) }
+            Button(onClick = { message = null; vm.requestPasswordReset(email) { message = it } }, enabled = validEmail && !vm.busy, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Text(if (vm.busy) "Sending..." else "Send reset link", fontWeight = FontWeight.Bold) }
         }
     }
 }
 
 @Composable
 private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
-    var email by remember { mutableStateOf("") }; var challenge by remember { mutableStateOf<String?>(null) }; var code by remember { mutableStateOf("") }; var token by remember { mutableStateOf<String?>(null) }
-    var name by remember { mutableStateOf("") }; var username by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }; var challenge by rememberSaveable { mutableStateOf<String?>(null) }; var code by rememberSaveable { mutableStateOf("") }; var token by rememberSaveable { mutableStateOf<String?>(null) }
+    var name by rememberSaveable { mutableStateOf("") }; var username by rememberSaveable { mutableStateOf("") }; var phone by rememberSaveable { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    var resendSeconds by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(resendSeconds) {
+        if (resendSeconds > 0) { delay(1000); resendSeconds-- }
+    }
+    LaunchedEffect(vm.registrationNeedsVerification) {
+        if (vm.registrationNeedsVerification) { challenge = null; token = null; code = ""; resendSeconds = 0 }
+    }
     var showRegistrationErrors by remember { mutableStateOf(false) }
     val validGmail = email.trim().matches(Regex("^[^@\\s]+@gmail\\.com$", RegexOption.IGNORE_CASE))
     val normalizedName = name.trim()
@@ -766,15 +785,32 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         else -> null
     }
     val firstRegistrationError = nameError ?: usernameError ?: phoneError ?: passwordError ?: confirmationError
-    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1))) {
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).imePadding()) {
         RegistrationBrandPanel(Modifier.fillMaxWidth().height(170.dp))
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp)) {
-        TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(12.dp)); Text("SIGN UP", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold); Text("Create your account", fontSize = 30.sp, fontWeight = FontWeight.Bold); Text("Verify your Gmail first, then create your customer account securely.", color = Color(0xFF687286), modifier = Modifier.padding(top = 7.dp))
         Spacer(Modifier.height(22.dp)); Text("Step 1  Gmail verification", fontWeight = FontWeight.Bold); Text("Use a Gmail address you can open now.", color = Color(0xFF687286), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)); Spacer(Modifier.height(10.dp))
-        OutlinedTextField(email, { email = it }, label = { Text("Gmail address") }, placeholder = { Text("name@gmail.com") }, enabled = challenge == null, singleLine = true, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { vm.sendCode(email) { issuedChallenge -> challenge = issuedChallenge } }, enabled = challenge == null && validGmail && !vm.busy, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(if (vm.busy) "Sending..." else "Send code", fontWeight = FontWeight.Bold) }
-        if (challenge != null && token == null) { Spacer(Modifier.height(12.dp)); OutlinedTextField(code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("6-digit verification code") }, singleLine = true, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(8.dp)); Button(onClick = { vm.verifyCode(challenge!!, email, code) { verified -> token = verified } }, enabled = code.length == 6 && !vm.busy, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Verify Gmail", fontWeight = FontWeight.Bold) } }
+        OutlinedTextField(email, { email = it; vm.clearError() }, label = { Text("Gmail address") }, placeholder = { Text("name@gmail.com") }, enabled = challenge == null && !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+        if (token == null) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = {
+                vm.sendCode(email) { issuedChallenge ->
+                    if (issuedChallenge != null) { challenge = issuedChallenge; code = ""; resendSeconds = 60 }
+                }
+            }, enabled = validGmail && !vm.busy && resendSeconds == 0, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                Text(when { resendSeconds > 0 -> "Resend in ${resendSeconds}s"; challenge != null -> "Resend code"; else -> "Send code" }, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (challenge != null && token == null) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(code, { code = it.filter { digit -> digit in '0'..'9' }.take(6); vm.clearError() }, label = { Text("6-digit verification code") }, enabled = !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { challenge?.let { vm.verifyCode(it, email, code) { verified -> token = verified } } }, enabled = code.length == 6 && !vm.busy, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(if (vm.busy) "Please wait..." else "Verify Gmail", fontWeight = FontWeight.Bold) }
+        }
+        if (challenge != null || token != null) {
+            TextButton(onClick = { challenge = null; token = null; code = ""; resendSeconds = 0; vm.clearRegistrationFeedback() }, enabled = !vm.busy) { Text("Change email / verify again") }
+        }
         if (token != null) {
             Spacer(Modifier.height(22.dp))
             Text("Step 2  Account details", fontWeight = FontWeight.Bold)

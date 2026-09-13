@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::post('/login', [MobileAuthController::class, 'login']);
-    Route::post('/password/forgot', [MobilePasswordResetController::class, 'store'])->middleware('throttle:3,1');
-    Route::post('/register/email', [MobileRegistrationController::class, 'sendCode'])->middleware('throttle:3,1');
-    Route::post('/register/email/verify', [MobileRegistrationController::class, 'verifyCode'])->middleware('throttle:6,1');
-    Route::post('/register', [MobileRegistrationController::class, 'register'])->middleware('throttle:3,1');
+    Route::post('/password/forgot', [MobilePasswordResetController::class, 'store'])->middleware('throttle:3,1,mobile-password-forgot');
+    Route::post('/register/email', [MobileRegistrationController::class, 'sendCode'])->middleware('throttle:3,1,mobile-registration-email');
+    Route::post('/register/email/verify', [MobileRegistrationController::class, 'verifyCode'])->middleware('throttle:6,1,mobile-registration-verify');
+    Route::post('/register', [MobileRegistrationController::class, 'register'])->middleware('throttle:3,1,mobile-registration-create');
     Route::middleware('mobile.auth')->group(function (): void {
         Route::get('/me', [MobileAuthController::class, 'me']);
         Route::post('/logout', [MobileAuthController::class, 'logout']);
