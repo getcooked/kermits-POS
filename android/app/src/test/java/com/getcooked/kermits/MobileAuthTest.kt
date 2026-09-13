@@ -61,9 +61,17 @@ class MobileAuthTest {
     @Test fun passwordResetDisplaysConfirmedServerResponse() = runBlocking {
         val auth = MobileAuth(api { _, request ->
             assertEquals(ForgotPasswordRequest("customer@gmail.com"), request)
-            Response.success(ApiError(message = "If the account exists, a reset link has been sent."))
+            Response.success(ApiError(message = "A password reset link was sent to your registered email address."))
         })
-        assertEquals("If the account exists, a reset link has been sent.", auth.requestPasswordReset(" Customer@Gmail.com "))
+        assertEquals("A password reset link was sent to your registered email address.", auth.requestPasswordReset(" Customer@Gmail.com "))
+    }
+
+    @Test fun unregisteredCustomerCannotRequestAPasswordReset() = runBlocking {
+        val auth = MobileAuth(api { _, _ -> failure(422, """{"code":"account_not_found","message":"No registered customer account was found with that email address.","errors":{"email":["No registered customer account was found with that email address."]}}""") })
+        assertEquals(
+            "No registered customer account was found with that email address.",
+            failureOf { auth.requestPasswordReset("unknown@example.com") }.message,
+        )
     }
 
     @Test fun throttledResetShowsWaitTimeInsteadOfClaimingEmailWasSent() = runBlocking {
