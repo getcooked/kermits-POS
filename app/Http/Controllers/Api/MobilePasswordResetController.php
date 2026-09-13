@@ -24,21 +24,29 @@ class MobilePasswordResetController extends Controller
             ->where('role', User::ROLE_CUSTOMER)
             ->first();
 
-        if ($user) {
-            try {
-                Password::sendResetLink(['email' => $user->email]);
-            } catch (TransportExceptionInterface) {
-                // The broker creates the token before sending. A failed send must
-                // not throttle a retry for a link the customer never received.
-                Password::deleteToken($user);
-                Log::warning('Mobile password reset email delivery failed.');
+        if (! $user) {
+            return response()->json([
+                'message' => 'No registered customer account was found with that email address.',
+                'code' => 'account_not_found',
+                'errors' => [
+                    'email' => ['No registered customer account was found with that email address.'],
+                ],
+            ], 422);
+        }
 
-                return response()->json(['message' => 'The password reset email could not be sent. Please try again later.'], 503);
-            }
+        try {
+            Password::sendResetLink(['email' => $user->email]);
+        } catch (TransportExceptionInterface) {
+            // The broker creates the token before sending. A failed send must
+            // not throttle a retry for a link the customer never received.
+            Password::deleteToken($user);
+            Log::warning('Mobile password reset email delivery failed.');
+
+            return response()->json(['message' => 'The password reset email could not be sent. Please try again later.'], 503);
         }
 
         return response()->json([
-            'message' => 'If an active customer account uses that email address, check your inbox and spam folder for a password reset link. If you recently requested one, use the latest email or wait a minute before trying again.',
+            'message' => 'A password reset link was sent to your registered email address. Check your inbox and spam folder.',
         ]);
     }
 }

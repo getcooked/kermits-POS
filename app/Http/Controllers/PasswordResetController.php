@@ -54,18 +54,26 @@ class PasswordResetController extends Controller
             ->when($requiredRole, fn ($query, string $role) => $query->where('role', $role))
             ->first();
 
-        if ($user) {
-            if ($requiredRole === User::ROLE_SUPER_ADMIN
-                && strtolower($user->email) === self::LEGACY_SUPER_ADMIN_EMAIL
-                && ! User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
-                $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
-            }
-            Password::sendResetLink(['email' => $user->email]);
+        if (! $user) {
+            $accountType = $requiredRole === User::ROLE_SUPER_ADMIN ? 'Super Admin account' : 'account';
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => "No registered {$accountType} was found with that email address.",
+                ]);
         }
+
+        if ($requiredRole === User::ROLE_SUPER_ADMIN
+            && strtolower($user->email) === self::LEGACY_SUPER_ADMIN_EMAIL
+            && ! User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
+            $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
+        }
+        Password::sendResetLink(['email' => $user->email]);
 
         return back()->with(
             'status',
-            'If an active account uses that email address, a password reset link has been sent.'
+            'A password reset link was sent to your registered email address.'
         );
     }
 
