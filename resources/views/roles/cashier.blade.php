@@ -6,8 +6,23 @@
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error sell-error">{{ $errors->first() }}</div>@endif
     <form method="POST" action="{{ route('cashier.checkout') }}">@csrf
+        <header class="pos-menu-header">
+            <div class="pos-catalog-head">
+                <h2>Menu</h2>
+                <div class="pos-search"><button type="button" aria-label="Search products"><span></span></button><input id="pos-search" type="search" placeholder="Search products" aria-label="Search products"></div>
+            </div>
+            <div class="pos-category-row">
+                <button class="category-arrow" type="button" data-pos-scroll="-1" aria-label="Scroll categories left">&lsaquo;</button>
+                <div class="pos-category-tabs">
+                    <button class="active" type="button" data-category-filter="all">All</button>
+                    @foreach($products->pluck('category')->unique()->values() as $category)<button type="button" data-category-filter="{{ $category }}">{{ $category }}</button>@endforeach
+                </div>
+                <button class="category-arrow" type="button" data-pos-scroll="1" aria-label="Scroll categories right">&rsaquo;</button>
+            </div>
+            <p id="pos-filter-summary" class="pos-filter-summary" role="status">Showing: All categories</p>
+        </header>
         <div class="sell-layout">
-            <section><div class="pos-catalog-head"><div><h2>Menu</h2></div><div class="pos-search"><button type="button" aria-label="Search products"><span></span></button><input id="pos-search" type="search" placeholder="Search products"></div></div><div class="pos-category-row"><button class="category-arrow" type="button" data-pos-scroll="-1" aria-label="Scroll categories left">‹</button><div class="pos-category-tabs"><button class="active" type="button" data-category-filter="all">All</button>@foreach($products->pluck('category')->unique()->values() as $category)<button type="button" data-category-filter="{{ $category }}">{{ $category }}</button>@endforeach</div><button class="category-arrow" type="button" data-pos-scroll="1" aria-label="Scroll categories right">›</button></div><p id="pos-filter-summary" class="pos-filter-summary" role="status">Showing: All categories</p>
+            <section aria-label="Menu products">
                 <div class="product-grid">@foreach($products->groupBy('category') as $category => $items)@foreach($items as $product)
                     <article class="product-card">
                         @if($imageUrl = $product->imageUrl())<img class="product-photo" src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="product-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
@@ -48,8 +63,85 @@
 .pos-search{width:min(380px,42vw)!important;min-width:280px!important;height:46px!important;border:1px solid #d4d6cf!important;border-radius:10px!important;background:#fff!important;padding:0 14px!important;gap:10px!important;box-shadow:none!important}.pos-search span{width:18px!important;height:18px!important;flex-basis:18px!important}.pos-search span:before{width:12px!important;height:12px!important;border-width:2px!important;border-color:#5f6872!important}.pos-search span:after{right:0!important;bottom:2px!important;width:7px!important;background:#5f6872!important}.pos-search input{font-size:14px!important;font-weight:650!important}.pos-search:focus-within{border-color:#202124!important;box-shadow:none!important}@media(max-width:760px){.pos-search{min-width:0!important;width:100%!important}}
 .pos-search{width:min(520px,44vw)!important;min-width:320px!important;height:58px!important;display:flex!important;align-items:center!important;gap:10px!important;border:0!important;border-radius:999px!important;background:#fff!important;padding:0 22px!important;box-shadow:0 14px 28px rgba(33,45,77,.12)!important}.pos-search button{width:38px!important;height:38px!important;border:0!important;background:transparent!important;padding:0!important;display:grid!important;place-items:center!important;cursor:pointer!important;flex:0 0 38px!important}.pos-search button span{position:relative!important;width:28px!important;height:28px!important;display:block!important;font-size:0!important;color:transparent!important}.pos-search button span:before{content:"";position:absolute;left:2px;top:2px;width:18px!important;height:18px!important;border:4px solid #5e5968!important;border-radius:50%!important;box-sizing:border-box!important}.pos-search button span:after{content:"";position:absolute;right:2px;bottom:3px;width:12px!important;height:4px!important;background:#5e5968!important;border-radius:4px!important;transform:rotate(45deg)!important;transform-origin:center!important}.pos-search input{width:100%!important;height:100%!important;border:0!important;outline:0!important;background:transparent!important;font-size:15px!important;font-weight:650!important;color:#232323!important}.pos-search input::placeholder{color:#777b84!important}.pos-search:focus-within{box-shadow:0 0 0 3px rgba(199,211,0,.18),0 14px 28px rgba(33,45,77,.12)!important}@media(max-width:760px){.pos-search{min-width:0!important;width:100%!important;height:54px!important;padding:0 18px!important}}
 .product-copy{padding-bottom:18px!important}.product-meta{display:grid!important;grid-template-columns:1fr auto!important;align-items:end!important;gap:14px!important;margin:0!important;padding-right:48px!important}.product-meta strong{white-space:nowrap!important}.product-meta span{display:block!important;min-width:max-content!important;color:#596273!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:right!important;white-space:nowrap!important}.add-cart{right:14px!important;bottom:12px!important}@media(max-width:430px){.product-meta{padding-right:46px!important;gap:8px!important}.product-meta span{font-size:11px!important}}
-/* Match the customer menu's product interaction on the cashier POS. */
-.product-card{box-shadow:0 10px 28px rgba(24,25,22,.06)!important;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease!important}.product-photo,.product-placeholder{transition:transform .24s cubic-bezier(.2,.8,.2,1),filter .2s ease!important}.add-cart{background:#202124!important;color:#fff!important;box-shadow:0 8px 18px rgba(23,24,23,.14)!important;transition:background-color .16s ease,color .16s ease,box-shadow .16s ease!important}.add-cart svg{width:16px;height:16px;display:block}.add-cart:focus-visible{outline:3px solid rgba(174,187,25,.38)!important;outline-offset:3px}.add-cart:disabled{box-shadow:none!important;cursor:not-allowed!important}.product-card:has(.add-cart:focus-visible){box-shadow:0 0 0 3px rgba(174,187,25,.2),0 20px 46px rgba(24,25,22,.13)!important}@media(hover:hover){.product-card:hover{background:#fff!important;box-shadow:0 20px 46px rgba(24,25,22,.13)!important}.product-card:hover .product-photo,.product-card:hover .product-placeholder{transform:scale(1.035)!important;filter:saturate(1.06)}.add-cart:hover:not(:disabled){background:#aebb19!important;color:#171817!important;box-shadow:0 10px 22px rgba(112,121,0,.26)!important}}@media(prefers-reduced-motion:reduce){.product-card,.product-photo,.product-placeholder,.add-cart{transition:none!important}}
+/* Use the customer menu's header, cards, and gentle card lift. */
+.sell-shell .admin-workspace {
+    --pos-page-padding: clamp(22px, 3vw, 38px);
+    padding: 0 var(--pos-page-padding) var(--pos-page-padding) !important;
+    background: #efefef;
+}
+.pos-menu-header {
+    position: relative;
+    margin: 0 calc(-1 * var(--pos-page-padding));
+    padding: 36px var(--pos-page-padding) 24px;
+    background: #f4f3ec;
+}
+.pos-menu-header .pos-catalog-head {
+    align-items: center !important;
+    margin-bottom: 16px !important;
+}
+.pos-catalog-head h2 {font-size: 30px; font-weight: 900; letter-spacing: -.04em;}
+.pos-menu-header .pos-category-row {margin-bottom: 0;}
+.pos-filter-summary {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.sell-layout > section {min-width: 0;}
+.sell-shell .product-card {
+    background: #fff !important;
+    box-shadow: 0 16px 44px rgba(24, 25, 22, .08) !important;
+    transition: transform .2s ease, box-shadow .2s ease !important;
+}
+.sell-shell .product-placeholder {
+    background: #e9ecd4;
+    color: #747d00;
+    font-size: 54px;
+    font-weight: 400;
+}
+.sell-shell .product-meta {margin-top: auto !important;}
+.sell-shell .add-cart {
+    width: 34px !important;
+    height: 34px !important;
+    background: #202124 !important;
+    color: #fff !important;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(23, 24, 23, .14) !important;
+    transition: background-color .15s ease, box-shadow .17s ease, translate .15s ease, filter .15s ease !important;
+}
+.add-cart svg {width: 16px; height: 16px; display: block;}
+.add-cart:focus-visible {outline: 3px solid rgba(174, 187, 25, .38) !important; outline-offset: 3px;}
+.add-cart:disabled {box-shadow: none !important; cursor: not-allowed !important;}
+.sell-shell .product-card:has(.add-cart:focus-visible) {
+    box-shadow: 0 0 0 3px rgba(174, 187, 25, .2), 0 20px 46px rgba(24, 25, 22, .12) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+    .sell-shell .product-card:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 20px 46px rgba(24, 25, 22, .12) !important;
+    }
+}
+@media (min-width: 1101px) {
+    .sell-shell .sell-layout {grid-template-columns: minmax(0, 1fr) 320px !important;}
+}
+@media (min-width: 781px) and (max-width: 1440px) {
+    .sell-shell .product-grid {grid-template-columns: repeat(2, minmax(0, 1fr)) !important;}
+}
+@media (max-width: 780px) {
+    .sell-shell .admin-workspace {--pos-page-padding: 14px; padding-bottom: 90px !important;}
+    .pos-menu-header {padding-top: 22px; padding-bottom: 20px;}
+}
+@media (max-width: 650px) {
+    .sell-shell .product-grid {grid-template-columns: 1fr !important;}
+}
+@media (prefers-reduced-motion: reduce) {
+    .sell-shell .product-card, .sell-shell .add-cart {transition: none !important;}
+    .sell-shell .product-card:hover {transform: none !important;}
+}
 </style>
 @endpush
 
