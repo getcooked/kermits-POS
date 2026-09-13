@@ -1,15 +1,58 @@
 package com.getcooked.kermits
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.os.Build
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 class SessionStore(context: Context) {
-    private val prefs = EncryptedSharedPreferences.create(
-        context, "kermits_session", MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val prefs = createPreferences(context.applicationContext)
+
+    private companion object {
+        const val TAG = "SessionStore"
+        const val ENCRYPTED_PREFS = "kermits_session"
+        const val DEVICE_ENCRYPTED_PREFS = "kermits_session_device"
+        const val DEVICE_FALLBACK_PREFS = "kermits_session_private"
+
+        fun createPreferences(context: Context): SharedPreferences {
+            try {
+                return createEncryptedPreferences(context, ENCRYPTED_PREFS)
+            } catch (error: Exception) {
+                Log.w(TAG, "Credential-protected session storage is unavailable", error)
+            }
+
+            val deviceContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                context.createDeviceProtectedStorageContext()
+            } else {
+                context
+            }
+
+            try {
+                return createEncryptedPreferences(deviceContext, DEVICE_ENCRYPTED_PREFS)
+            } catch (error: Exception) {
+                Log.e(TAG, "Encrypted session storage is unavailable; using private app storage", error)
+            }
+
+            return deviceContext.getSharedPreferences(DEVICE_FALLBACK_PREFS, Context.MODE_PRIVATE)
+        }
+
+        fun createEncryptedPreferences(context: Context, name: String): SharedPreferences {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            return EncryptedSharedPreferences.create(
+                context,
+                name,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        }
+    }
+
     var token: String? get() = prefs.getString("token", null); set(value) = prefs.edit().putString("token", value).apply()
     var userId: Int?
         get() = if (prefs.contains("user_id")) prefs.getInt("user_id", 0) else null

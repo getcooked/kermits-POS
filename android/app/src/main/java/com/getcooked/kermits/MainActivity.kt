@@ -466,7 +466,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
 
 @Composable
 private fun BrandLogo(modifier: Modifier = Modifier) {
-    val fallback = painterResource(R.drawable.ic_launcher)
+    val fallback = painterResource(R.drawable.kermits_logo)
     AsyncImage(
         model = BRAND_LOGO_URL,
         contentDescription = "Kermit's logo",

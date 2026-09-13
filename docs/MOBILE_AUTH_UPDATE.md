@@ -1,6 +1,6 @@
 # Mobile authentication update - 1.0.13
 
-The Android download APK is `storage/app/releases/kermits.apk` (version code 14). It uses the production API at `https://kermits-pos.com/api/v1/` and the same signing certificate as the previous download, so it can update that installation.
+The Android download APK is `storage/app/releases/kermits.apk` (version code 15, version 1.0.14). It uses the production API at `https://kermits-pos.com/api/v1/` and the same signing certificate as the previous download, so it can update that installation.
 
 ## Deploy the online fixes
 
