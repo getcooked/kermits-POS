@@ -268,7 +268,7 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee(route('inventory.index'), false)
             ->assertSee(route('reservations.index'), false)
             ->assertSee(route('products.index'), false)
-            ->assertSee(route('admins.index'), false)
+            ->assertDontSee(route('admins.index'), false)
             ->assertSee(route('cashiers.index'), false)
             ->assertSee(route('activity-logs.index'), false)
             ->assertSee(route('settings.payment.edit'), false)
