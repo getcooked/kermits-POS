@@ -19,7 +19,16 @@
                 <form id="login-form" method="POST" action="{{ route('login.store') }}" data-retry-after="{{ $loginRetryAfter }}">@csrf
                     <div class="field"><label for="email">Username or email address</label><input class="control" id="email" name="email" type="text" value="{{ old('email') }}" autocomplete="username" placeholder="Username or name@gmail.com" required autofocus>@error('email')@if($loginRetryAfter > 0)<p class="error" id="login-lockout" role="status" aria-live="polite">Too many login attempts. Try again in <span id="login-retry-seconds">{{ $loginRetryAfter }}</span> <span id="login-retry-unit">{{ $loginRetryAfter === 1 ? 'second' : 'seconds' }}</span>.</p>@else<p class="error">{{ $message }}</p>@endif @enderror</div>
                     <div class="field"><label for="password">Password</label><input class="control" id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>@error('password')<p class="error">{{ $message }}</p>@enderror</div>
-                    <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1" @checked(old('remember'))> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div><button class="login-button" id="login-submit" type="submit"><span id="login-submit-label">{{ $loginRetryAfter > 0 ? "Try again in {$loginRetryAfter}s" : 'Log in' }}</span> <span>&rarr;</span></button>
+                    <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1" @checked(old('remember'))> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div>
+                    @if(config('services.recaptcha.enabled'))
+                        <div class="field">
+                            <div id="login-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                            <p id="recaptcha-status" class="error" role="status" aria-live="polite"></p>
+                            @error('g-recaptcha-response')<p class="error" role="alert">{{ $message }}</p>@enderror
+                            <noscript><p class="error">Please enable JavaScript to complete reCAPTCHA and log in.</p></noscript>
+                        </div>
+                    @endif
+                    <button class="login-button" id="login-submit" type="submit"><span id="login-submit-label">{{ $loginRetryAfter > 0 ? "Try again in {$loginRetryAfter}s" : 'Log in' }}</span> <span>&rarr;</span></button>
                     <p style="text-align:center;margin:18px 0 0;color:#687286">New customer? <a href="{{ route('register') }}">Create an account</a></p>
                 </form>
             </div>
@@ -418,6 +427,28 @@
     }
 </style>
 @endpush
+
+@if(config('services.recaptcha.enabled'))
+@push('scripts')
+<script>
+    window.loginRecaptchaError = function () {
+        document.getElementById('recaptcha-status').textContent = 'Unable to load reCAPTCHA. Check your connection and reload this page.';
+    };
+    window.loginRecaptchaReady = function () {
+        const container = document.getElementById('login-recaptcha');
+        const status = document.getElementById('recaptcha-status');
+        grecaptcha.render(container, {
+            sitekey: container.dataset.sitekey,
+            size: container.parentElement.clientWidth < 304 ? 'compact' : 'normal',
+            callback: function () { status.textContent = ''; },
+            'expired-callback': function () { status.textContent = 'reCAPTCHA expired. Please check the box again.'; },
+            'error-callback': window.loginRecaptchaError
+        });
+    };
+</script>
+<script src="https://www.google.com/recaptcha/api.js?onload=loginRecaptchaReady&render=explicit" async defer onerror="loginRecaptchaError()"></script>
+@endpush
+@endif
 
 @if($loginRetryAfter > 0)
 <script>
