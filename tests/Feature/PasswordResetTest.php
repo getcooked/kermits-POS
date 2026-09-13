@@ -85,7 +85,7 @@ class PasswordResetTest extends TestCase
 
         $this->postJson('/api/v1/password/forgot', ['email' => $customer->email])
             ->assertOk()
-            ->assertJsonPath('message', 'If an active customer account uses that email address, a password reset link has been sent.');
+            ->assertJsonPath('message', 'If an active customer account uses that email address, check your inbox and spam folder for a password reset link. If you recently requested one, use the latest email or wait a minute before trying again.');
         $this->postJson('/api/v1/password/forgot', ['email' => $admin->email])->assertOk();
 
         Notification::assertSentTo($customer, ResetPassword::class);

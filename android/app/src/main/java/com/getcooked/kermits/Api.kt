@@ -49,6 +49,7 @@ data class ApiError(
     val message: String? = null,
     val errors: Map<String, List<String>>? = null,
     val retry_after: Int? = null,
+    val code: String? = null,
 )
 @JsonClass(generateAdapter = true)
 data class CatalogData(val products: List<Product>, val gcash_qr_url: String?)
