@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\MobileApiToken;
 use App\Models\User;
+use App\Notifications\CustomerPasswordVerification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class CustomerAccountTest extends TestCase
@@ -18,17 +20,21 @@ class CustomerAccountTest extends TestCase
 
         $this->actingAs($customer)->get(route('customer.profile.edit'))
             ->assertOk()
-            ->assertSee('Personal information')
+            ->assertSee('Personal Information')
             ->assertDontSee('Change password')
             ->assertDontSee('<span>1</span>', false)
             ->assertDontSee('<span>2</span>', false)
+            ->assertSee('id="email" type="email" value="'.$customer->email.'" readonly', false)
+            ->assertSee('cannot be changed')
             ->assertSee(route('customer.profile.update'), false)
             ->assertDontSee(route('customer.settings.password.update'), false);
 
         $this->actingAs($customer)->get(route('customer.profile.edit', ['section' => 'password']))
             ->assertOk()
             ->assertSee('Change password')
-            ->assertDontSee('Personal information')
+            ->assertDontSee('Personal Information')
+            ->assertSee('Send verification code')
+            ->assertSee(route('customer.settings.password.email-code'), false)
             ->assertSee(route('customer.settings.password.update'), false)
             ->assertDontSee(route('customer.profile.update'), false);
 
@@ -107,11 +113,16 @@ class CustomerAccountTest extends TestCase
             'expires_at' => now()->addDay(),
         ]);
 
-        $this->actingAs($customer)->put(route('customer.settings.password.update'), [
-            'current_password' => 'CurrentPassword123!',
-            'password' => 'NewSecurePassword456!',
-            'password_confirmation' => 'NewSecurePassword456!',
-        ])->assertRedirect()->assertSessionHas('status');
+        $this->actingAs($customer)
+            ->withSession($this->passwordVerificationSession($customer))
+            ->put(route('customer.settings.password.update'), [
+                'verification_code' => '123456',
+                'current_password' => 'CurrentPassword123!',
+                'password' => 'NewSecurePassword456!',
+                'password_confirmation' => 'NewSecurePassword456!',
+            ])->assertRedirect()
+            ->assertSessionHas('status')
+            ->assertSessionMissing('customer_password_verification');
 
         $this->assertTrue(Hash::check('NewSecurePassword456!', $customer->fresh()->password));
         $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $customer->id]);
@@ -124,11 +135,65 @@ class CustomerAccountTest extends TestCase
             'role' => User::ROLE_CUSTOMER,
         ]);
 
-        $this->actingAs($customer)->put(route('customer.settings.password.update'), [
-            'current_password' => 'WrongPassword123!',
+        $this->actingAs($customer)
+            ->withSession($this->passwordVerificationSession($customer))
+            ->put(route('customer.settings.password.update'), [
+                'verification_code' => '123456',
+                'current_password' => 'WrongPassword123!',
+                'password' => 'NewSecurePassword456!',
+                'password_confirmation' => 'NewSecurePassword456!',
+            ])->assertSessionHasErrors('current_password');
+
+        $this->assertTrue(Hash::check('CurrentPassword123!', $customer->fresh()->password));
+    }
+
+    public function test_customer_can_request_a_password_verification_code_by_email(): void
+    {
+        Notification::fake();
+        $customer = User::factory()->create([
+            'email' => 'customer@example.com',
+            'role' => User::ROLE_CUSTOMER,
+        ]);
+
+        $this->actingAs($customer)
+            ->post(route('customer.settings.password.email-code'))
+            ->assertRedirect()
+            ->assertSessionHas('verification_sent')
+            ->assertSessionHas('customer_password_verification', function (array $verification) use ($customer): bool {
+                return $verification['user_id'] === $customer->id
+                    && $verification['email'] === $customer->email
+                    && $verification['expires_at'] > now()->timestamp
+                    && is_string($verification['code_hash']);
+            });
+
+        Notification::assertSentTo(
+            $customer,
+            CustomerPasswordVerification::class,
+            fn (CustomerPasswordVerification $notification): bool => preg_match('/^\d{6}$/', $notification->code) === 1,
+        );
+    }
+
+    public function test_password_change_requires_a_valid_unexpired_email_code(): void
+    {
+        $customer = User::factory()->create([
+            'password' => 'CurrentPassword123!',
+            'role' => User::ROLE_CUSTOMER,
+        ]);
+        $passwordData = [
+            'verification_code' => '654321',
+            'current_password' => 'CurrentPassword123!',
             'password' => 'NewSecurePassword456!',
             'password_confirmation' => 'NewSecurePassword456!',
-        ])->assertSessionHasErrors('current_password');
+        ];
+
+        $this->actingAs($customer)
+            ->put(route('customer.settings.password.update'), $passwordData)
+            ->assertSessionHasErrors('verification_code');
+
+        $this->actingAs($customer)
+            ->withSession($this->passwordVerificationSession($customer, now()->subMinute()->timestamp))
+            ->put(route('customer.settings.password.update'), $passwordData)
+            ->assertSessionHasErrors('verification_code');
 
         $this->assertTrue(Hash::check('CurrentPassword123!', $customer->fresh()->password));
     }
@@ -139,7 +204,21 @@ class CustomerAccountTest extends TestCase
 
         $this->get(route('customer.profile.edit'))->assertRedirect(route('login'));
         $this->get(route('customer.settings.edit'))->assertRedirect(route('login'));
+        $this->post(route('customer.settings.password.email-code'))->assertRedirect(route('login'));
         $this->actingAs($staff)->get(route('customer.profile.edit'))->assertForbidden();
         $this->actingAs($staff)->get(route('customer.settings.edit'))->assertForbidden();
+        $this->actingAs($staff)->post(route('customer.settings.password.email-code'))->assertForbidden();
+    }
+
+    private function passwordVerificationSession(User $customer, ?int $expiresAt = null): array
+    {
+        return [
+            'customer_password_verification' => [
+                'user_id' => $customer->id,
+                'email' => strtolower($customer->email),
+                'code_hash' => Hash::make('123456'),
+                'expires_at' => $expiresAt ?? now()->addMinutes(10)->timestamp,
+            ],
+        ];
     }
 }

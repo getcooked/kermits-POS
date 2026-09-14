@@ -81,6 +81,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/profile', [CustomerAccountController::class, 'editProfile'])->name('customer.profile.edit');
         Route::put('/profile', [CustomerAccountController::class, 'updateProfile'])->name('customer.profile.update');
         Route::get('/settings', [CustomerAccountController::class, 'editSettings'])->name('customer.settings.edit');
+        Route::post('/settings/password/email-code', [CustomerAccountController::class, 'sendPasswordVerificationCode'])
+            ->middleware('throttle:3,1')
+            ->name('customer.settings.password.email-code');
         Route::put('/settings/password', [CustomerAccountController::class, 'updatePassword'])
             ->middleware('throttle:5,1')
             ->name('customer.settings.password.update');
