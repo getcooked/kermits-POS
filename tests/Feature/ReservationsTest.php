@@ -25,6 +25,7 @@ class ReservationsTest extends TestCase
             ->assertSee('data-reservation-date', false)
             ->assertSee('Available times for your selected date')
             ->assertSee('name="reservation_at" type="hidden"', false)
+            ->assertSee('reservation-schedule.js?v=', false)
             ->assertDontSee('type="datetime-local"', false)
             ->assertDontSee('Availability is checked automatically for your party size')
             ->assertDontSee('Pending reservations are held for 30 minutes');
