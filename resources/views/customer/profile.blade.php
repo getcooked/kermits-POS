@@ -7,7 +7,7 @@
 
     <header class="account-header">
         <p>MY ACCOUNT</p>
-        <h1>{{ $accountSection === 'password' ? 'Change password' : 'Personal information' }}</h1>
+        <h1>{{ $accountSection === 'password' ? 'Change password' : 'Personal Information' }}</h1>
     </header>
 
     <section class="account-content">
@@ -19,7 +19,7 @@
             <section class="account-card" id="personal-information">
                 <div class="account-section-heading">
                     <div>
-                        <h2>Personal information</h2>
+                        <h2>Personal Information</h2>
                         <p>Update the details used to identify and contact you.</p>
                     </div>
                 </div>
@@ -49,9 +49,9 @@
                     </div>
 
                     <div class="field full">
-                        <label for="email">Verified email</label>
+                        <label for="email">Email address</label>
                         <input class="control" id="email" type="email" value="{{ $customer->email }}" readonly aria-describedby="email-help">
-                        <small id="email-help">This verified address is used for sign-in and account recovery.</small>
+                        <small id="email-help">Your verified email address is visible here but cannot be changed.</small>
                     </div>
 
                     <button class="account-submit" type="submit">Save personal information</button>
@@ -62,13 +62,34 @@
                 <div class="account-section-heading">
                     <div>
                         <h2>Change password</h2>
-                        <p>Confirm your current password before choosing a new one.</p>
+                        <p>Verify your email and confirm your current password before choosing a new one.</p>
                     </div>
+                </div>
+
+                @if(session('verification_sent'))
+                    <div class="account-verification-sent" role="status">{{ session('verification_sent') }}</div>
+                @endif
+
+                <div class="account-verification-step">
+                    <div>
+                        <strong>Email verification</strong>
+                        <small>Send a one-time code to {{ $customer->email }}. The code expires after 10 minutes.</small>
+                    </div>
+                    <form method="POST" action="{{ route('customer.settings.password.email-code') }}">
+                        @csrf
+                        <button type="submit">Send verification code</button>
+                    </form>
                 </div>
 
                 <form class="account-form" method="POST" action="{{ route('customer.settings.password.update') }}">
                     @csrf
                     @method('PUT')
+
+                    <div class="field full">
+                        <label for="verification_code">Email verification code</label>
+                        <input class="control verification-code" id="verification_code" name="verification_code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required>
+                        @error('verification_code')<small class="field-error">{{ $message }}</small>@enderror
+                    </div>
 
                     <div class="field full">
                         <label for="current_password">Current password</label>
@@ -99,7 +120,8 @@
 @push('styles')
     @include('customer.account-styles')
 <style>
-.profile-account-grid{grid-template-columns:minmax(0,680px);align-items:start}.account-section-heading{margin-bottom:24px}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}
+.profile-account-grid{grid-template-columns:minmax(0,680px);align-items:start}.account-section-heading{margin-bottom:24px}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}.account-verification-step{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px;padding:16px;border:1px solid #e2e5d8;border-radius:10px;background:#f9faf5}.account-verification-step>div{display:grid;gap:4px}.account-verification-step small{color:#6d7369;font-size:12px;line-height:1.45}.account-verification-step form{margin:0}.account-verification-step button{min-height:40px;padding:9px 14px;border:1px solid #c8ccc1;border-radius:8px;background:#fff;color:#292b27;font-weight:750;white-space:nowrap;cursor:pointer}.account-verification-step button:hover{border-color:#9ca761;background:#f0f2df}.account-verification-sent{margin-bottom:16px;padding:12px 14px;border-radius:8px;background:#e7f5e9;color:#236b3d;font-size:13px}.verification-code{max-width:190px;font-size:18px!important;font-weight:750;letter-spacing:.24em}
+@media(max-width:620px){.account-verification-step{align-items:stretch;flex-direction:column}.account-verification-step button{width:100%}.verification-code{max-width:none}}
 </style>
 @endpush
 @endsection

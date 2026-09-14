@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateCustomerPasswordRequest;
 use App\Http\Requests\UpdateCustomerProfileRequest;
+use App\Notifications\CustomerPasswordVerification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -32,6 +34,23 @@ class CustomerAccountController extends Controller
         return redirect()->route('customer.profile.edit', ['section' => 'password']);
     }
 
+    public function sendPasswordVerificationCode(Request $request): RedirectResponse
+    {
+        $customer = $request->user();
+        $code = (string) random_int(100000, 999999);
+
+        $request->session()->put('customer_password_verification', [
+            'user_id' => $customer->getKey(),
+            'email' => strtolower($customer->email),
+            'code_hash' => Hash::make($code),
+            'expires_at' => now()->addMinutes(10)->timestamp,
+        ]);
+
+        $customer->notify(new CustomerPasswordVerification($code));
+
+        return back()->with('verification_sent', 'A 6-digit verification code was sent to '.$customer->email.'.');
+    }
+
     public function updatePassword(UpdateCustomerPasswordRequest $request): RedirectResponse
     {
         $customer = $request->user();
@@ -49,6 +68,7 @@ class CustomerAccountController extends Controller
         DB::table('mobile_api_tokens')->where('user_id', $customer->id)->delete();
         DB::table('password_reset_tokens')->where('email', $customer->email)->delete();
 
+        $request->session()->forget('customer_password_verification');
         $request->session()->regenerate();
 
         return back()->with('status', 'Your password was changed. Other web and mobile sessions were signed out.');
