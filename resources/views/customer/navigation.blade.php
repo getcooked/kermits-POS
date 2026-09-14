@@ -7,6 +7,7 @@
     <div class="history-actions">
         <a @class(['active' => ($activeCustomerNav ?? '') === 'menu']) href="{{ route('shop') }}" @if(($activeCustomerNav ?? '') === 'menu') aria-current="page" @endif>Menu</a>
         <a @class(['active' => ($activeCustomerNav ?? '') === 'history']) href="{{ route('customer.history') }}" @if(($activeCustomerNav ?? '') === 'history') aria-current="page" @endif>History</a>
+        @include('customer.notification-link')
         <a @class(['active' => ($activeCustomerNav ?? '') === 'profile']) href="{{ route('customer.profile.edit') }}" @if(($activeCustomerNav ?? '') === 'profile') aria-current="page" @endif>Profile</a>
         <a @class(['active' => ($activeCustomerNav ?? '') === 'settings']) href="{{ route('customer.settings.edit') }}" @if(($activeCustomerNav ?? '') === 'settings') aria-current="page" @endif>Settings</a>
         @if($appDownloadAvailable)

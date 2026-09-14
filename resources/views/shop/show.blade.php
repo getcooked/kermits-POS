@@ -4,11 +4,12 @@
 @php
     $reservation = $order->reservation;
     $isRejected = $order->payment_status === 'rejected';
+    $isAccepted = $order->payment_status === 'paid';
 @endphp
 <main class="online-receipt-page">
     <div class="online-receipt-wrap">
         <header class="receipt-heading">
-            <div><p>{{ $isRejected ? 'ORDER NOT APPROVED' : 'ORDER & RESERVATION RECEIVED' }}</p><h1>{{ $isRejected ? 'Your order was rejected.' : 'Thank you, '.auth()->user()->name.'.' }}</h1></div>
+            <div><p>{{ $isRejected ? 'ORDER NOT APPROVED' : ($isAccepted ? 'ORDER ACCEPTED' : 'ORDER & RESERVATION RECEIVED') }}</p><h1>{{ $isRejected ? 'Your order was rejected.' : ($isAccepted ? 'Your order was accepted.' : 'Thank you, '.auth()->user()->name.'.') }}</h1></div>
         </header>
 
         @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
@@ -29,7 +30,7 @@
                     <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range }}</dd></div>
                 @endif
                 <div><dt>Payment</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
-                <div><dt>Status</dt><dd>{{ $isRejected ? 'Rejected' : 'Pending '.($order->payment_method === 'gcash' ? 'payment verification' : 'counter payment') }}</dd></div>
+                <div><dt>Status</dt><dd>{{ $isRejected ? 'Rejected' : ($isAccepted ? 'Accepted' : 'Pending '.($order->payment_method === 'gcash' ? 'payment verification' : 'counter payment')) }}</dd></div>
                 @if($order->payment_reference)<div><dt>GCash reference</dt><dd>{{ $order->payment_reference }}</dd></div>@endif
             </dl>
 
@@ -44,7 +45,7 @@
                 @if($reservation)<div><span>Table reservation</span><strong>&#8369;{{ number_format($reservation->total_amount, 2) }}</strong></div>@endif
                 <div class="receipt-total"><span>{{ $isRejected ? 'Order total' : 'Total due' }}</span><strong>&#8369;{{ number_format($order->totalDue(), 2) }}</strong></div>
             </div>
-            <p class="receipt-note">{{ $isRejected ? 'This order was rejected. No payment was recorded, and its reserved stock was returned.' : ($order->payment_method === 'gcash' ? 'Your payment details are waiting for verification.' : 'Present this receipt and pay at the counter when collecting your food.') }}</p>
+            <p class="receipt-note">{{ $isRejected ? 'This order was rejected. No payment was recorded, and its reserved stock was returned.' : ($isAccepted ? 'Your order has been accepted and payment was confirmed by the cashier.' : ($order->payment_method === 'gcash' ? 'Your payment details are waiting for verification.' : 'Present this receipt and pay at the counter when collecting your food.')) }}</p>
         </article>
 
         <div class="order-actions">
