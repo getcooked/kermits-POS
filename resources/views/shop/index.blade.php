@@ -21,9 +21,25 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
                     <b data-order-notification-count hidden></b>
                 </a>
-                <a class="shop-profile-button" href="{{ route('customer.profile.edit') }}" aria-label="My profile and password" title="My profile">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
-                </a>
+                <div class="shop-profile-menu" data-profile-menu>
+                    <button class="shop-profile-button" type="button" aria-label="Open profile menu" title="My profile" aria-haspopup="menu" aria-expanded="false" aria-controls="shop-profile-popover" data-profile-trigger>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
+                    </button>
+                    <div class="shop-profile-popover" id="shop-profile-popover" role="menu" aria-label="Profile options" data-profile-popover hidden>
+                        <div class="profile-popover-user">
+                            <span aria-hidden="true">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
+                            <div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->email }}</small></div>
+                        </div>
+                        <a href="{{ route('customer.profile.edit') }}#personal-information" role="menuitem">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
+                            <span><strong>Personal information</strong><small>Update your profile details</small></span>
+                        </a>
+                        <a href="{{ route('customer.profile.edit') }}#change-password" role="menuitem">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3"/></svg>
+                            <span><strong>Change password</strong><small>Update your sign-in password</small></span>
+                        </a>
+                    </div>
+                </div>
                 <script id="customer-order-notification-keys" type="application/json">@json($customerOrderDecisionKeys)</script>
             </div>
         </div>
@@ -1210,6 +1226,119 @@
         display: none
     }
 
+    .shop-profile-menu {
+        position: relative;
+        flex: 0 0 58px
+    }
+
+    .shop-profile-button {
+        cursor: pointer
+    }
+
+    .shop-profile-popover {
+        position: absolute;
+        z-index: 100;
+        top: calc(100% + 13px);
+        right: 0;
+        width: min(310px, calc(100vw - 24px));
+        padding: 10px;
+        border: 1px solid #d7dacf;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 22px 55px rgba(23,24,23,.2)
+    }
+
+    .shop-profile-popover[hidden] {
+        display: none
+    }
+
+    .shop-profile-popover:before {
+        content: "";
+        position: absolute;
+        top: -7px;
+        right: 22px;
+        width: 12px;
+        height: 12px;
+        border-top: 1px solid #d7dacf;
+        border-left: 1px solid #d7dacf;
+        background: #fff;
+        transform: rotate(45deg) !important
+    }
+
+    .profile-popover-user {
+        position: relative;
+        display: grid;
+        grid-template-columns: 42px minmax(0,1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 8px 8px 13px;
+        border-bottom: 1px solid #e3e5dd
+    }
+
+    .profile-popover-user>span {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #171817;
+        color: #c6d229;
+        display: grid;
+        place-items: center;
+        font-weight: 850
+    }
+
+    .profile-popover-user>div,
+    .shop-profile-popover>a>span {
+        min-width: 0;
+        display: grid;
+        gap: 3px
+    }
+
+    .profile-popover-user strong,
+    .shop-profile-popover>a strong {
+        color: #20211f;
+        font-size: 14px
+    }
+
+    .profile-popover-user small,
+    .shop-profile-popover>a small {
+        overflow: hidden;
+        color: #747a70;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap
+    }
+
+    .shop-profile-popover>a {
+        display: grid;
+        grid-template-columns: 34px minmax(0,1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 11px 9px;
+        border-radius: 9px;
+        color: #20211f;
+        text-decoration: none
+    }
+
+    .shop-profile-popover>a:first-of-type {
+        margin-top: 5px
+    }
+
+    .shop-profile-popover>a:hover,
+    .shop-profile-popover>a:focus-visible {
+        background: #f0f1e9
+    }
+
+    .shop-profile-popover>a>svg {
+        width: 20px;
+        height: 20px;
+        justify-self: center;
+        fill: none;
+        stroke: #5d6500;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round
+    }
+
     .shop-category-tabs {
         margin: 0 !important;
         padding-bottom: 0 !important;
@@ -1262,6 +1391,7 @@
         .shop-header-tools {width:100%}
         .shop-header-tools .shop-search {width:auto!important;min-width:0!important;flex:1}
         .shop-notification-button,.shop-profile-button {width:54px;height:54px;flex-basis:54px}
+        .shop-profile-menu {flex-basis:54px}
     }
 
     .shop-search {
@@ -2039,6 +2169,36 @@
     updateUnreadCount();
     window.addEventListener('pageshow', updateUnreadCount);
     window.addEventListener('storage', updateUnreadCount);
+})();
+</script>
+
+<script>
+(() => {
+    const menu = document.querySelector('[data-profile-menu]');
+    const trigger = menu?.querySelector('[data-profile-trigger]');
+    const popover = menu?.querySelector('[data-profile-popover]');
+
+    if (!menu || !trigger || !popover) return;
+
+    function closePopover(returnFocus = false) {
+        popover.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        if (returnFocus) trigger.focus();
+    }
+
+    trigger.addEventListener('click', () => {
+        const willOpen = popover.hidden;
+        popover.hidden = !willOpen;
+        trigger.setAttribute('aria-expanded', String(willOpen));
+        if (willOpen) popover.querySelector('[role="menuitem"]')?.focus();
+    });
+
+    document.addEventListener('pointerdown', event => {
+        if (!popover.hidden && !menu.contains(event.target)) closePopover();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !popover.hidden) closePopover(true);
+    });
 })();
 </script>
 
