@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Reservation;
+use App\Notifications\CustomerDecisionNotification;
 use App\Services\ReservationPushNotifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 
@@ -28,9 +29,26 @@ class ReservationObserver implements ShouldHandleEventsAfterCommit
             array_keys($reservation->getChanges()),
             self::CUSTOMER_VISIBLE_FIELDS,
         ));
+        $handledByOrderNotification = $reservation->order_id
+            && $reservation->wasChanged('payment_status')
+            && in_array($reservation->payment_status, ['paid', 'rejected'], true);
 
-        if ($changedFields !== []) {
+        if ($changedFields !== [] && ! $handledByOrderNotification) {
             $this->notifier->notify($reservation, $changedFields);
+        }
+
+        if (! $handledByOrderNotification
+            && $reservation->wasChanged('status')
+            && in_array($reservation->status, ['confirmed', 'rejected'], true)) {
+            $customer = $reservation->user;
+            if ($customer && ! $customer->trashed()) {
+                $customer->notify(new CustomerDecisionNotification(
+                    subjectType: 'reservation',
+                    subjectId: (int) $reservation->id,
+                    identifier: (string) $reservation->reference,
+                    status: (string) $reservation->status,
+                ));
+            }
         }
     }
 }
