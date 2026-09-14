@@ -20,7 +20,9 @@ class CustomerAccountTest extends TestCase
             ->assertOk()
             ->assertSee('Personal information')
             ->assertSee('Change password')
-            ->assertSeeInOrder(['>1</span>', 'Personal information', '>2</span>', 'Change password'], false)
+            ->assertSeeInOrder(['Personal information', 'Change password'])
+            ->assertDontSee('<span>1</span>', false)
+            ->assertDontSee('<span>2</span>', false)
             ->assertSee(route('customer.profile.update'), false)
             ->assertSee(route('customer.settings.password.update'), false);
 

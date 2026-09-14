@@ -17,7 +17,6 @@
         <div class="account-grid profile-account-grid">
             <section class="account-card">
                 <div class="account-section-heading">
-                    <span>1</span>
                     <div>
                         <h2>Personal information</h2>
                         <p>Update the details used to identify and contact you.</p>
@@ -60,7 +59,6 @@
 
             <section class="account-card" id="change-password">
                 <div class="account-section-heading">
-                    <span>2</span>
                     <div>
                         <h2>Change password</h2>
                         <p>Confirm your current password before choosing a new one.</p>
@@ -99,7 +97,7 @@
 @push('styles')
     @include('customer.account-styles')
 <style>
-.profile-account-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.account-section-heading{display:flex;align-items:flex-start;gap:12px;margin-bottom:24px}.account-section-heading>span{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:#171817;color:#c6d229;display:grid;place-items:center;font-size:13px;font-weight:850}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}
+.profile-account-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.account-section-heading{margin-bottom:24px}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}
 @media(max-width:1050px){.profile-account-grid{grid-template-columns:1fr}}
 </style>
 @endpush
