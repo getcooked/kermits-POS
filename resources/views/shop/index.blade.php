@@ -4,7 +4,7 @@
 <main class="customer-shop">
     <nav>
         <a href="{{ route('home') }}"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT'S</strong></a>
-        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a><a href="{{ route('customer.profile.edit') }}">Profile</a><a href="{{ route('customer.settings.edit') }}">Settings</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
+        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" />
                     </svg></button></form>
@@ -20,6 +20,9 @@
                 <a class="shop-notification-button" href="{{ route('customer.notifications') }}" aria-label="Order notifications" title="Order notifications" data-order-notification-button>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
                     <b data-order-notification-count hidden></b>
+                </a>
+                <a class="shop-profile-button" href="{{ route('customer.profile.edit') }}" aria-label="My profile and password" title="My profile">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
                 </a>
                 <script id="customer-order-notification-keys" type="application/json">@json($customerOrderDecisionKeys)</script>
             </div>
@@ -654,7 +657,7 @@
 
         .customer-shop .customer-actions {
             display: grid !important;
-            grid-template-rows: repeat(5, auto) 1fr auto auto;
+            grid-template-rows: repeat(3, auto) 1fr auto auto;
             align-items: stretch !important;
             gap: 8px !important;
             margin-top: 28px;
@@ -682,7 +685,7 @@
         }
 
         .customer-shop .customer-actions>span {
-            grid-row: 7;
+            grid-row: 5;
             margin-top: 0;
             padding: 15px 12px 4px;
             color: #aeb2a9;
@@ -691,7 +694,7 @@
         }
 
         .customer-shop .customer-actions form {
-            grid-row: 8;
+            grid-row: 6;
             margin-top: 0
         }
 
@@ -807,7 +810,7 @@
     @media(min-width:901px) {
         .customer-shop .customer-actions {
             grid-template-columns: minmax(0, 1fr) 42px !important;
-            grid-template-rows: repeat(5, 46px) 1fr auto !important
+            grid-template-rows: repeat(3, 46px) 1fr auto !important
         }
 
         .customer-shop .customer-actions>a {
@@ -815,7 +818,7 @@
         }
 
         .customer-shop .customer-actions>span {
-            grid-row: 7 !important;
+            grid-row: 5 !important;
             grid-column: 1;
             margin: 0 !important;
             padding: 15px 8px 0 12px !important;
@@ -825,7 +828,7 @@
         }
 
         .customer-shop .customer-actions>form {
-            grid-row: 7 !important;
+            grid-row: 5 !important;
             grid-column: 2;
             margin: 0 !important;
             padding-top: 15px;
@@ -1151,7 +1154,8 @@
         gap: 12px
     }
 
-    .shop-notification-button {
+    .shop-notification-button,
+    .shop-profile-button {
         position: relative;
         width: 58px;
         height: 58px;
@@ -1167,12 +1171,15 @@
     }
 
     .shop-notification-button:hover,
-    .shop-notification-button:focus-visible {
+    .shop-notification-button:focus-visible,
+    .shop-profile-button:hover,
+    .shop-profile-button:focus-visible {
         border-color: #a7b000;
         box-shadow: 0 0 0 3px rgba(199,211,0,.16), 0 14px 28px rgba(33,45,77,.15)
     }
 
-    .shop-notification-button svg {
+    .shop-notification-button svg,
+    .shop-profile-button svg {
         width: 25px;
         height: 25px;
         fill: none;
@@ -1254,7 +1261,7 @@
 
         .shop-header-tools {width:100%}
         .shop-header-tools .shop-search {width:auto!important;min-width:0!important;flex:1}
-        .shop-notification-button {width:54px;height:54px;flex-basis:54px}
+        .shop-notification-button,.shop-profile-button {width:54px;height:54px;flex-basis:54px}
     }
 
     .shop-search {

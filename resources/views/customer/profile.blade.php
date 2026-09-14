@@ -1,9 +1,9 @@
 @extends('layouts.app')
-@section('title', 'My Profile | Kermit\'s')
+@section('title', 'My Account | Kermit\'s')
 
 @section('content')
 <main class="history-page customer-account-page">
-    @include('customer.navigation', ['activeCustomerNav' => 'profile'])
+    @include('customer.navigation')
 
     <header class="account-header">
         <p>MY ACCOUNT</p>
@@ -12,12 +12,17 @@
 
     <section class="account-content">
         @if(session('status'))<div class="account-notice" role="status">{{ session('status') }}</div>@endif
-        @if($errors->any())<div class="account-error" role="alert">Please review the highlighted profile details.</div>@endif
+        @if($errors->any())<div class="account-error" role="alert">Please review the highlighted account details.</div>@endif
 
-        <div class="account-grid">
+        <div class="account-grid profile-account-grid">
             <section class="account-card">
-                <h2>Personal information</h2>
-                <p>Your verified email is protected. You can update the details used to identify and contact you.</p>
+                <div class="account-section-heading">
+                    <span>1</span>
+                    <div>
+                        <h2>Personal information</h2>
+                        <p>Update the details used to identify and contact you.</p>
+                    </div>
+                </div>
 
                 <form class="account-form" method="POST" action="{{ route('customer.profile.update') }}">
                     @csrf
@@ -49,26 +54,53 @@
                         <small id="email-help">This verified address is used for sign-in and account recovery.</small>
                     </div>
 
-                    <button class="account-submit" type="submit">Save profile</button>
+                    <button class="account-submit" type="submit">Save personal information</button>
                 </form>
             </section>
 
-            <aside class="identity-panel">
-                <div class="identity-card">
-                    <div class="identity-avatar" aria-hidden="true">{{ strtoupper(substr($customer->name, 0, 1)) }}</div>
-                    <h2>{{ $customer->name }}</h2>
-                    <p>{{ '@'.($customer->username ?: 'customer') }}</p>
-                    <dl class="identity-list">
-                        <div><dt>Account</dt><dd>Customer</dd></div>
-                        <div><dt>Email</dt><dd class="verified-badge">Verified</dd></div>
-                        <div><dt>Member since</dt><dd>{{ $customer->created_at->format('M Y') }}</dd></div>
-                    </dl>
+            <section class="account-card" id="change-password">
+                <div class="account-section-heading">
+                    <span>2</span>
+                    <div>
+                        <h2>Change password</h2>
+                        <p>Confirm your current password before choosing a new one.</p>
+                    </div>
                 </div>
-            </aside>
+
+                <form class="account-form" method="POST" action="{{ route('customer.settings.password.update') }}">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="field full">
+                        <label for="current_password">Current password</label>
+                        <input class="control" id="current_password" name="current_password" type="password" autocomplete="current-password" required>
+                        @error('current_password')<small class="field-error">{{ $message }}</small>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="password">New password</label>
+                        <input class="control" id="password" name="password" type="password" minlength="12" autocomplete="new-password" required>
+                        @error('password')<small class="field-error">{{ $message }}</small>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="password_confirmation">Confirm new password</label>
+                        <input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required>
+                    </div>
+
+                    <div class="password-rules full">Use at least 12 characters with uppercase and lowercase letters, a number, and a symbol. Changing your password signs out other web browsers and mobile app sessions.</div>
+                    <button class="account-submit" type="submit">Change password</button>
+                </form>
+            </section>
         </div>
     </section>
 </main>
+
 @push('styles')
     @include('customer.account-styles')
+<style>
+.profile-account-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.account-section-heading{display:flex;align-items:flex-start;gap:12px;margin-bottom:24px}.account-section-heading>span{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:#171817;color:#c6d229;display:grid;place-items:center;font-size:13px;font-weight:850}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}
+@media(max-width:1050px){.profile-account-grid{grid-template-columns:1fr}}
+</style>
 @endpush
 @endsection

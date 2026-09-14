@@ -24,9 +24,9 @@ class CustomerAccountController extends Controller
         return back()->with('status', 'Your profile was updated.');
     }
 
-    public function editSettings(Request $request): View
+    public function editSettings(Request $request): RedirectResponse
     {
-        return view('customer.settings', ['customer' => $request->user()]);
+        return redirect()->to(route('customer.profile.edit').'#change-password');
     }
 
     public function updatePassword(UpdateCustomerPasswordRequest $request): RedirectResponse
