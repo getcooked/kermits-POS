@@ -12,30 +12,36 @@ class CustomerAccountTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_opens_the_combined_account_from_the_menu_profile_icon(): void
+    public function test_profile_popover_opens_only_the_selected_account_section(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
         $this->actingAs($customer)->get(route('customer.profile.edit'))
             ->assertOk()
             ->assertSee('Personal information')
-            ->assertSee('Change password')
-            ->assertSeeInOrder(['Personal information', 'Change password'])
+            ->assertDontSee('Change password')
             ->assertDontSee('<span>1</span>', false)
             ->assertDontSee('<span>2</span>', false)
             ->assertSee(route('customer.profile.update'), false)
-            ->assertSee(route('customer.settings.password.update'), false);
+            ->assertDontSee(route('customer.settings.password.update'), false);
+
+        $this->actingAs($customer)->get(route('customer.profile.edit', ['section' => 'password']))
+            ->assertOk()
+            ->assertSee('Change password')
+            ->assertDontSee('Personal information')
+            ->assertSee(route('customer.settings.password.update'), false)
+            ->assertDontSee(route('customer.profile.update'), false);
 
         $this->actingAs($customer)->get(route('customer.settings.edit'))
-            ->assertRedirect(route('customer.profile.edit').'#change-password');
+            ->assertRedirect(route('customer.profile.edit', ['section' => 'password']));
 
         $this->actingAs($customer)->get(route('shop'))
             ->assertOk()
             ->assertSee('shop-profile-button', false)
             ->assertSee('data-profile-popover', false)
             ->assertSee('aria-haspopup="menu"', false)
-            ->assertSee('href="'.route('customer.profile.edit').'#personal-information"', false)
-            ->assertSee('href="'.route('customer.profile.edit').'#change-password"', false)
+            ->assertSee('href="'.route('customer.profile.edit', ['section' => 'personal']).'"', false)
+            ->assertSee('href="'.route('customer.profile.edit', ['section' => 'password']).'"', false)
             ->assertDontSee('>Profile</a>', false)
             ->assertDontSee('>Settings</a>', false);
 

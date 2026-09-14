@@ -30,11 +30,11 @@
                             <span aria-hidden="true">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
                             <div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->email }}</small></div>
                         </div>
-                        <a href="{{ route('customer.profile.edit') }}#personal-information" role="menuitem">
+                        <a href="{{ route('customer.profile.edit', ['section' => 'personal']) }}" role="menuitem">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
                             <span><strong>Personal information</strong><small>Update your profile details</small></span>
                         </a>
-                        <a href="{{ route('customer.profile.edit') }}#change-password" role="menuitem">
+                        <a href="{{ route('customer.profile.edit', ['section' => 'password']) }}" role="menuitem">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3"/></svg>
                             <span><strong>Change password</strong><small>Update your sign-in password</small></span>
                         </a>

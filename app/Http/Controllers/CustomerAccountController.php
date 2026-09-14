@@ -14,7 +14,10 @@ class CustomerAccountController extends Controller
 {
     public function editProfile(Request $request): View
     {
-        return view('customer.profile', ['customer' => $request->user()]);
+        return view('customer.profile', [
+            'customer' => $request->user(),
+            'accountSection' => $request->query('section') === 'password' ? 'password' : 'personal',
+        ]);
     }
 
     public function updateProfile(UpdateCustomerProfileRequest $request): RedirectResponse
@@ -26,7 +29,7 @@ class CustomerAccountController extends Controller
 
     public function editSettings(Request $request): RedirectResponse
     {
-        return redirect()->to(route('customer.profile.edit').'#change-password');
+        return redirect()->route('customer.profile.edit', ['section' => 'password']);
     }
 
     public function updatePassword(UpdateCustomerPasswordRequest $request): RedirectResponse
