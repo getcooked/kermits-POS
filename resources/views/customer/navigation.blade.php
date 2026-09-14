@@ -9,7 +9,6 @@
         <a @class(['active' => ($activeCustomerNav ?? '') === 'history']) href="{{ route('customer.history') }}" @if(($activeCustomerNav ?? '') === 'history') aria-current="page" @endif>History</a>
         <a @class(['active' => ($activeCustomerNav ?? '') === 'profile']) href="{{ route('customer.profile.edit') }}" @if(($activeCustomerNav ?? '') === 'profile') aria-current="page" @endif>Profile</a>
         <a @class(['active' => ($activeCustomerNav ?? '') === 'settings']) href="{{ route('customer.settings.edit') }}" @if(($activeCustomerNav ?? '') === 'settings') aria-current="page" @endif>Settings</a>
-        <a @class(['active' => ($activeCustomerNav ?? '') === 'notifications']) href="{{ route('customer.notifications.index') }}" @if(($activeCustomerNav ?? '') === 'notifications') aria-current="page" @endif>Alerts @if($customerUnreadNotificationCount)<em class="nav-count">{{ $customerUnreadNotificationCount > 99 ? '99+' : $customerUnreadNotificationCount }}</em>@endif</a>
         @if($appDownloadAvailable)
             <a class="history-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>
         @else

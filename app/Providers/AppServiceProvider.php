@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
             ->symbols());
 
         View::composer(
-            ['landing', 'shop.index', 'customer.history', 'customer.profile', 'customer.settings', 'customer.notifications', 'reservations.create'],
+            ['landing', 'shop.index', 'customer.history', 'customer.profile', 'customer.settings', 'reservations.create'],
             function ($view): void {
                 $releasePath = config('mobile.release_path');
                 $appDownloadAvailable = config('mobile.download_enabled')
@@ -48,9 +48,6 @@ class AppServiceProvider extends ServiceProvider
                     'appDownloadUrl' => $appDownloadAvailable
                         ? route('app.download', ['v' => filemtime($releasePath)])
                         : null,
-                    'customerUnreadNotificationCount' => auth()->user()?->hasRole('customer')
-                        ? auth()->user()->unreadNotifications()->count()
-                        : 0,
                 ]);
             },
         );

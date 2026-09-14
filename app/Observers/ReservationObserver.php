@@ -3,7 +3,6 @@
 namespace App\Observers;
 
 use App\Models\Reservation;
-use App\Notifications\CustomerStatusNotification;
 use App\Services\ReservationPushNotifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 
@@ -32,20 +31,6 @@ class ReservationObserver implements ShouldHandleEventsAfterCommit
 
         if ($changedFields !== []) {
             $this->notifier->notify($reservation, $changedFields);
-        }
-
-        if ($reservation->wasChanged('status') && in_array($reservation->status, ['confirmed', 'rejected'], true)) {
-            $customer = $reservation->user;
-            if ($customer) {
-                [$title, $message] = ReservationPushNotifier::message($reservation, ['status']);
-                $customer->notify(new CustomerStatusNotification(
-                    subjectType: 'reservation',
-                    subjectId: (int) $reservation->id,
-                    status: (string) $reservation->status,
-                    title: $title,
-                    message: $message,
-                ));
-            }
         }
     }
 }

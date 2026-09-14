@@ -3,7 +3,6 @@
 namespace App\Observers;
 
 use App\Models\Order;
-use App\Notifications\CustomerStatusNotification;
 use App\Services\OrderPushNotifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 
@@ -17,20 +16,11 @@ class OrderObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
-        $customer = $order->customer;
-        if (! $customer) {
+        if (! $order->customer_id) {
             return;
         }
 
         [$title, $message] = OrderPushNotifier::message($order);
-
-        $customer->notify(new CustomerStatusNotification(
-            subjectType: 'order',
-            subjectId: (int) $order->id,
-            status: (string) $order->payment_status,
-            title: $title,
-            message: $message,
-        ));
         $this->pushNotifier->notify($order, $title, $message);
     }
 }
