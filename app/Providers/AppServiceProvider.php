@@ -54,8 +54,12 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer('shop.index', function ($view): void {
             $view->with(
-                'customerOrderDecisionCount',
-                auth()->user()->purchases()->whereIn('payment_status', ['paid', 'rejected'])->count(),
+                'customerOrderDecisionKeys',
+                auth()->user()->purchases()
+                    ->whereIn('payment_status', ['paid', 'rejected'])
+                    ->get(['id', 'payment_status'])
+                    ->map(fn (Order $order): string => $order->id.':'.$order->payment_status)
+                    ->values(),
             );
         });
     }
