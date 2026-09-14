@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Order;
+use App\Notifications\CustomerDecisionNotification;
 use App\Services\OrderPushNotifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 
@@ -22,5 +23,15 @@ class OrderObserver implements ShouldHandleEventsAfterCommit
 
         [$title, $message] = OrderPushNotifier::message($order);
         $this->pushNotifier->notify($order, $title, $message);
+
+        $customer = $order->customer;
+        if ($customer && ! $customer->trashed()) {
+            $customer->notify(new CustomerDecisionNotification(
+                subjectType: 'order',
+                subjectId: (int) $order->id,
+                identifier: '#'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT),
+                status: (string) $order->payment_status,
+            ));
+        }
     }
 }
