@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminAccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CashierAccountController;
 use App\Http\Controllers\CashierController;
+use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerHistoryController;
 use App\Http\Controllers\CustomerOrderController;
@@ -75,6 +76,12 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/shop/orders', [CustomerOrderController::class, 'store'])->name('shop.orders.store');
         Route::get('/shop/orders/{order}', [CustomerOrderController::class, 'show'])->name('shop.orders.show');
         Route::get('/history', [CustomerHistoryController::class, 'index'])->name('customer.history');
+        Route::get('/profile', [CustomerAccountController::class, 'editProfile'])->name('customer.profile.edit');
+        Route::put('/profile', [CustomerAccountController::class, 'updateProfile'])->name('customer.profile.update');
+        Route::get('/settings', [CustomerAccountController::class, 'editSettings'])->name('customer.settings.edit');
+        Route::put('/settings/password', [CustomerAccountController::class, 'updatePassword'])
+            ->middleware('throttle:5,1')
+            ->name('customer.settings.password.update');
 
         Route::controller(ReservationController::class)
             ->group(function (): void {

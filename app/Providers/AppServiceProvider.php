@@ -34,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
             ->symbols());
 
         View::composer(
-            ['landing', 'shop.index', 'customer.history', 'reservations.create'],
+            ['landing', 'shop.index', 'customer.history', 'customer.profile', 'customer.settings', 'reservations.create'],
             function ($view): void {
                 $releasePath = config('mobile.release_path');
                 $appDownloadAvailable = config('mobile.download_enabled')
