@@ -4,7 +4,7 @@
 <main class="customer-shop">
     <nav>
         <a href="{{ route('home') }}"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT'S</strong></a>
-        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
+        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a><a href="{{ route('customer.profile.edit') }}">Profile</a><a href="{{ route('customer.settings.edit') }}">Settings</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" />
                     </svg></button></form>
@@ -647,7 +647,7 @@
 
         .customer-shop .customer-actions {
             display: grid !important;
-            grid-template-rows: auto auto auto 1fr auto auto;
+            grid-template-rows: repeat(5, auto) 1fr auto auto;
             align-items: stretch !important;
             gap: 8px !important;
             margin-top: 28px;
@@ -675,7 +675,7 @@
         }
 
         .customer-shop .customer-actions>span {
-            grid-row: 5;
+            grid-row: 7;
             margin-top: 0;
             padding: 15px 12px 4px;
             color: #aeb2a9;
@@ -684,7 +684,7 @@
         }
 
         .customer-shop .customer-actions form {
-            grid-row: 6;
+            grid-row: 8;
             margin-top: 0
         }
 
@@ -800,7 +800,7 @@
     @media(min-width:901px) {
         .customer-shop .customer-actions {
             grid-template-columns: minmax(0, 1fr) 42px !important;
-            grid-template-rows: auto auto auto 1fr auto !important
+            grid-template-rows: repeat(5, 46px) 1fr auto !important
         }
 
         .customer-shop .customer-actions>a {
@@ -808,7 +808,7 @@
         }
 
         .customer-shop .customer-actions>span {
-            grid-row: 5 !important;
+            grid-row: 7 !important;
             grid-column: 1;
             margin: 0 !important;
             padding: 15px 8px 0 12px !important;
@@ -818,7 +818,7 @@
         }
 
         .customer-shop .customer-actions>form {
-            grid-row: 5 !important;
+            grid-row: 7 !important;
             grid-column: 2;
             margin: 0 !important;
             padding-top: 15px;
@@ -838,6 +838,12 @@
 
     .customer-shop {
         background: #efefef !important
+    }
+
+    @media(max-width:700px) {
+        .customer-shop .customer-app-link {
+            display: none !important
+        }
     }
 
     .customer-shop>header {
