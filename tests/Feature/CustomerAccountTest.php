@@ -12,27 +12,37 @@ class CustomerAccountTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_can_view_profile_and_settings_from_customer_navigation(): void
+    public function test_customer_opens_the_combined_account_from_the_menu_profile_icon(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
         $this->actingAs($customer)->get(route('customer.profile.edit'))
             ->assertOk()
             ->assertSee('Personal information')
-            ->assertSee(route('customer.settings.edit'), false);
+            ->assertSee('Change password')
+            ->assertSeeInOrder(['>1</span>', 'Personal information', '>2</span>', 'Change password'], false)
+            ->assertSee(route('customer.profile.update'), false)
+            ->assertSee(route('customer.settings.password.update'), false);
 
         $this->actingAs($customer)->get(route('customer.settings.edit'))
-            ->assertOk()
-            ->assertSee('Change password')
-            ->assertSee(route('customer.profile.edit'), false);
+            ->assertRedirect(route('customer.profile.edit').'#change-password');
 
         $this->actingAs($customer)->get(route('shop'))
-            ->assertSee(route('customer.profile.edit'), false)
-            ->assertSee(route('customer.settings.edit'), false);
+            ->assertOk()
+            ->assertSee('shop-profile-button', false)
+            ->assertSee('href="'.route('customer.profile.edit').'"', false)
+            ->assertDontSee('>Profile</a>', false)
+            ->assertDontSee('>Settings</a>', false);
 
         $this->actingAs($customer)->get(route('customer.history'))
-            ->assertSee(route('customer.profile.edit'), false)
-            ->assertSee(route('customer.settings.edit'), false);
+            ->assertOk()
+            ->assertDontSee('>Profile</a>', false)
+            ->assertDontSee('>Settings</a>', false);
+
+        $this->actingAs($customer)->get(route('reservations.create'))
+            ->assertOk()
+            ->assertDontSee('>Profile</a>', false)
+            ->assertDontSee('>Settings</a>', false);
     }
 
     public function test_customer_can_update_their_own_profile_without_changing_verified_email_or_role(): void
