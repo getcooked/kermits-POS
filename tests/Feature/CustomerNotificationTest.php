@@ -57,7 +57,7 @@ class CustomerNotificationTest extends TestCase
             ->assertDontSee(route('shop.orders.show', $other), false);
     }
 
-    public function test_customer_navigation_shows_the_notification_button_and_decision_count(): void
+    public function test_menu_shows_the_floating_notification_icon_and_decision_count(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         foreach (['paid', 'rejected', 'pending'] as $status) {
@@ -70,11 +70,16 @@ class CustomerNotificationTest extends TestCase
             ]);
         }
 
-        $this->actingAs($customer)->get(route('customer.history'))
+        $this->actingAs($customer)->get(route('shop'))
             ->assertOk()
             ->assertSee(route('customer.notifications'), false)
-            ->assertSee('Notifications')
-            ->assertSee('2 order updates');
+            ->assertSee('shop-notification-button', false)
+            ->assertSee('2 order updates')
+            ->assertSee('>2</b>', false);
+
+        $this->actingAs($customer)->get(route('customer.history'))
+            ->assertOk()
+            ->assertDontSee(route('customer.notifications'), false);
     }
 
     public function test_guests_and_staff_cannot_open_customer_notifications(): void

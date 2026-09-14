@@ -4,7 +4,7 @@
 <main class="customer-shop">
     <nav>
         <a href="{{ route('home') }}"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT'S</strong></a>
-        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a>@include('customer.notification-link')<a href="{{ route('customer.profile.edit') }}">Profile</a><a href="{{ route('customer.settings.edit') }}">Settings</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
+        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a><a href="{{ route('customer.profile.edit') }}">Profile</a><a href="{{ route('customer.settings.edit') }}">Settings</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
             <form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" />
                     </svg></button></form>
@@ -15,7 +15,13 @@
             <div class="shop-title">
                 <h1>Menu</h1>
             </div>
-            <div class="shop-search"><button type="button" aria-label="Search products"><span></span></button><input id="shop-search" type="search" placeholder="Search products"></div>
+            <div class="shop-header-tools">
+                <div class="shop-search"><button type="button" aria-label="Search products"><span></span></button><input id="shop-search" type="search" placeholder="Search products"></div>
+                <a class="shop-notification-button" href="{{ route('customer.notifications') }}" aria-label="Notifications{{ $customerOrderDecisionCount ? ' ('.$customerOrderDecisionCount.' order updates)' : '' }}" title="Order notifications">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+                    @if($customerOrderDecisionCount)<b>{{ $customerOrderDecisionCount > 99 ? '99+' : $customerOrderDecisionCount }}</b>@endif
+                </a>
+            </div>
         </div>
         <div class="shop-category-row"><button class="category-arrow" type="button" data-shop-scroll="-1" aria-label="Scroll categories left">‹</button>
             <div class="shop-category-tabs"><button class="active" type="button" data-shop-category="all">All</button>@foreach($products->pluck('category')->unique()->values() as $category)<button type="button" data-shop-category="{{ $category }}">{{ $category }}</button>@endforeach</div><button class="category-arrow" type="button" data-shop-scroll="1" aria-label="Scroll categories right">›</button>
@@ -647,7 +653,7 @@
 
         .customer-shop .customer-actions {
             display: grid !important;
-            grid-template-rows: repeat(6, auto) 1fr auto auto;
+            grid-template-rows: repeat(5, auto) 1fr auto auto;
             align-items: stretch !important;
             gap: 8px !important;
             margin-top: 28px;
@@ -675,7 +681,7 @@
         }
 
         .customer-shop .customer-actions>span {
-            grid-row: 8;
+            grid-row: 7;
             margin-top: 0;
             padding: 15px 12px 4px;
             color: #aeb2a9;
@@ -684,7 +690,7 @@
         }
 
         .customer-shop .customer-actions form {
-            grid-row: 9;
+            grid-row: 8;
             margin-top: 0
         }
 
@@ -800,7 +806,7 @@
     @media(min-width:901px) {
         .customer-shop .customer-actions {
             grid-template-columns: minmax(0, 1fr) 42px !important;
-            grid-template-rows: repeat(6, 46px) 1fr auto !important
+            grid-template-rows: repeat(5, 46px) 1fr auto !important
         }
 
         .customer-shop .customer-actions>a {
@@ -808,7 +814,7 @@
         }
 
         .customer-shop .customer-actions>span {
-            grid-row: 8 !important;
+            grid-row: 7 !important;
             grid-column: 1;
             margin: 0 !important;
             padding: 15px 8px 0 12px !important;
@@ -818,7 +824,7 @@
         }
 
         .customer-shop .customer-actions>form {
-            grid-row: 8 !important;
+            grid-row: 7 !important;
             grid-column: 2;
             margin: 0 !important;
             padding-top: 15px;
@@ -1138,6 +1144,60 @@
         gap: 20px
     }
 
+    .shop-header-tools {
+        display: flex;
+        align-items: center;
+        gap: 12px
+    }
+
+    .shop-notification-button {
+        position: relative;
+        width: 58px;
+        height: 58px;
+        flex: 0 0 58px;
+        border: 1px solid #d7d8d2;
+        border-radius: 50%;
+        background: #fff;
+        color: #202124;
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+        box-shadow: 0 14px 28px rgba(33,45,77,.12)
+    }
+
+    .shop-notification-button:hover,
+    .shop-notification-button:focus-visible {
+        border-color: #a7b000;
+        box-shadow: 0 0 0 3px rgba(199,211,0,.16), 0 14px 28px rgba(33,45,77,.15)
+    }
+
+    .shop-notification-button svg {
+        width: 25px;
+        height: 25px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.9;
+        stroke-linecap: round;
+        stroke-linejoin: round
+    }
+
+    .shop-notification-button b {
+        position: absolute;
+        top: -5px;
+        right: -4px;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border: 2px solid #f5f4ed;
+        border-radius: 999px;
+        background: #b5c019;
+        color: #171817;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        line-height: 1
+    }
+
     .shop-category-tabs {
         margin: 0 !important;
         padding-bottom: 0 !important;
@@ -1187,10 +1247,9 @@
             display: grid
         }
 
-        .shop-search {
-            width: 100%;
-            min-width: 0
-        }
+        .shop-header-tools {width:100%}
+        .shop-header-tools .shop-search {width:auto!important;min-width:0!important;flex:1}
+        .shop-notification-button {width:54px;height:54px;flex-basis:54px}
     }
 
     .shop-search {
