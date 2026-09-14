@@ -17,7 +17,7 @@
     <select class="control" id="{{ $reservationSlotsId }}" data-slots aria-label="Available reservation times" required><option value="">Choose a date first</option></select>
     <small data-schedule-message role="status" aria-live="polite"></small>
 </div>
-<script src="{{ asset('js/reservation-schedule.js') }}" defer></script>
+<script src="{{ asset('js/reservation-schedule.js') }}?v={{ filemtime(public_path('js/reservation-schedule.js')) }}" defer></script>
 
 @once
 @push('styles')
