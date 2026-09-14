@@ -15,6 +15,21 @@ class ReservationsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_booking_form_uses_a_date_picker_and_available_time_selector(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->actingAs($customer)->get('/book')
+            ->assertOk()
+            ->assertSee('type="date"', false)
+            ->assertSee('data-reservation-date', false)
+            ->assertSee('Available times for your selected date')
+            ->assertSee('name="reservation_at" type="hidden"', false)
+            ->assertDontSee('type="datetime-local"', false)
+            ->assertDontSee('Availability is checked automatically for your party size')
+            ->assertDontSee('Pending reservations are held for 30 minutes');
+    }
+
     public function test_customer_can_submit_a_reservation_request(): void
     {
         $customer = User::factory()->create([
