@@ -7,7 +7,7 @@
 
     <header class="account-header">
         <p>MY ACCOUNT</p>
-        <h1>Profile</h1>
+        <h1>{{ $accountSection === 'password' ? 'Change password' : 'Personal information' }}</h1>
     </header>
 
     <section class="account-content">
@@ -15,6 +15,7 @@
         @if($errors->any())<div class="account-error" role="alert">Please review the highlighted account details.</div>@endif
 
         <div class="account-grid profile-account-grid">
+            @if($accountSection === 'personal')
             <section class="account-card" id="personal-information">
                 <div class="account-section-heading">
                     <div>
@@ -56,7 +57,7 @@
                     <button class="account-submit" type="submit">Save personal information</button>
                 </form>
             </section>
-
+            @else
             <section class="account-card" id="change-password">
                 <div class="account-section-heading">
                     <div>
@@ -90,6 +91,7 @@
                     <button class="account-submit" type="submit">Change password</button>
                 </form>
             </section>
+            @endif
         </div>
     </section>
 </main>
@@ -97,8 +99,7 @@
 @push('styles')
     @include('customer.account-styles')
 <style>
-.profile-account-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.account-section-heading{margin-bottom:24px}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}
-@media(max-width:1050px){.profile-account-grid{grid-template-columns:1fr}}
+.profile-account-grid{grid-template-columns:minmax(0,680px);align-items:start}.account-section-heading{margin-bottom:24px}.account-section-heading h2{margin:3px 0 5px}.account-section-heading p{margin:0;color:#6d7369;font-size:14px;line-height:1.5}
 </style>
 @endpush
 @endsection
