@@ -8,7 +8,6 @@
     <header class="account-header">
         <p>MY ACCOUNT</p>
         <h1>Settings</h1>
-        <span>Manage your sign-in security and review account information.</span>
     </header>
 
     <section class="account-content">

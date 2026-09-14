@@ -110,10 +110,12 @@ import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
     private var reservationUpdateId by mutableStateOf<Int?>(null)
+    private var orderUpdateId by mutableStateOf<Int?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         reservationUpdateId = intent.reservationUpdateId()
+        orderUpdateId = intent.orderUpdateId()
         val store = SessionStore(this)
         val api = ApiClient.create(store)
         PushNotifications.createChannel(this)
@@ -124,6 +126,8 @@ class MainActivity : ComponentActivity() {
                     store,
                     reservationUpdateId,
                     onReservationUpdateConsumed = { reservationUpdateId = null },
+                    orderUpdateId,
+                    onOrderUpdateConsumed = { orderUpdateId = null },
                 )
             }
         }
@@ -133,12 +137,18 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         reservationUpdateId = intent.reservationUpdateId()
+        orderUpdateId = intent.orderUpdateId()
     }
 }
 
 private fun Intent?.reservationUpdateId(): Int? = this
     ?.takeIf { it.action == "com.getcooked.kermits.OPEN_RESERVATION_UPDATE" }
     ?.getIntExtra("reservation_id", -1)
+    ?.takeIf { it > 0 }
+
+private fun Intent?.orderUpdateId(): Int? = this
+    ?.takeIf { it.action == "com.getcooked.kermits.OPEN_ORDER_UPDATE" }
+    ?.getIntExtra("order_id", -1)
     ?.takeIf { it > 0 }
 
 private val BRAND_LOGO_URL = BuildConfig.API_BASE_URL.substringBefore("/api/").trimEnd('/') + "/kermits-logo.jpg"
@@ -483,6 +493,8 @@ fun KermitsApp(
     store: SessionStore,
     reservationUpdateId: Int?,
     onReservationUpdateConsumed: () -> Unit,
+    orderUpdateId: Int?,
+    onOrderUpdateConsumed: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -518,6 +530,14 @@ fun KermitsApp(
             tab = 1
             vm.loadReservation(reservationUpdateId) { selectedReservation = it }
             onReservationUpdateConsumed()
+        }
+    }
+    LaunchedEffect(vm.signedIn, orderUpdateId) {
+        if (vm.signedIn && orderUpdateId != null) {
+            tab = 1
+            selectedOrderWasJustSubmitted = false
+            vm.loadOrder(orderUpdateId) { selectedOrder = it }
+            onOrderUpdateConsumed()
         }
     }
     if (!vm.signedIn) {

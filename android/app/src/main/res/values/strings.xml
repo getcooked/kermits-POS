@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">Kermits</string>
-    <string name="reservation_updates_channel_name">Reservation updates</string>
-    <string name="reservation_updates_channel_description">Status, payment, and schedule updates for your reservations</string>
+    <string name="reservation_updates_channel_name">Order and reservation updates</string>
+    <string name="reservation_updates_channel_description">Acceptance, rejection, payment, and schedule updates for your orders and reservations</string>
 </resources>

@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Contracts\FcmMessageSender;
+use App\Models\Order;
 use App\Models\Reservation;
+use App\Observers\OrderObserver;
 use App\Observers\ReservationObserver;
 use App\Services\GoogleFcmMessageSender;
 use Illuminate\Support\Facades\View;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Reservation::observe(ReservationObserver::class);
+        Order::observe(OrderObserver::class);
 
         Password::defaults(fn (): Password => Password::min(12)
             ->mixedCase()
@@ -34,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
             ->symbols());
 
         View::composer(
-            ['landing', 'shop.index', 'customer.history', 'customer.profile', 'customer.settings', 'reservations.create'],
+            ['landing', 'shop.index', 'customer.history', 'customer.profile', 'customer.settings', 'customer.notifications', 'reservations.create'],
             function ($view): void {
                 $releasePath = config('mobile.release_path');
                 $appDownloadAvailable = config('mobile.download_enabled')
@@ -45,6 +48,9 @@ class AppServiceProvider extends ServiceProvider
                     'appDownloadUrl' => $appDownloadAvailable
                         ? route('app.download', ['v' => filemtime($releasePath)])
                         : null,
+                    'customerUnreadNotificationCount' => auth()->user()?->hasRole('customer')
+                        ? auth()->user()->unreadNotifications()->count()
+                        : 0,
                 ]);
             },
         );

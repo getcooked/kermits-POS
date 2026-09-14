@@ -26,7 +26,7 @@ class ReservationPushNotifier
             return;
         }
 
-        [$title, $body] = $this->message($reservation, $changedFields);
+        [$title, $body] = self::message($reservation, $changedFields);
         $eventId = (string) Str::uuid();
 
         foreach ($installationIds as $installationId) {
@@ -47,7 +47,7 @@ class ReservationPushNotifier
      * @param  list<string>  $changedFields
      * @return array{string, string}
      */
-    private function message(Reservation $reservation, array $changedFields): array
+    public static function message(Reservation $reservation, array $changedFields): array
     {
         $reference = (string) $reservation->reference;
 
@@ -56,7 +56,7 @@ class ReservationPushNotifier
                 'confirmed' => ['Reservation accepted', "Your reservation {$reference} was accepted by the admin."],
                 'completed' => ['Reservation completed', "Your reservation {$reference} was marked as completed."],
                 'cancelled' => ['Reservation cancelled', "Your reservation {$reference} was cancelled."],
-                'rejected' => ['Order and reservation rejected', "Your order for reservation {$reference} was rejected."],
+                'rejected' => ['Reservation rejected', "Your reservation {$reference} was rejected by the admin."],
                 default => ['Reservation updated', "Reservation {$reference} has a new status."],
             };
         }
