@@ -8,6 +8,7 @@ use App\Http\Controllers\CashierController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerHistoryController;
+use App\Http\Controllers\CustomerNotificationController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
@@ -82,6 +83,9 @@ Route::middleware('auth')->group(function (): void {
         Route::put('/settings/password', [CustomerAccountController::class, 'updatePassword'])
             ->middleware('throttle:5,1')
             ->name('customer.settings.password.update');
+        Route::get('/notifications', [CustomerNotificationController::class, 'index'])->name('customer.notifications.index');
+        Route::patch('/notifications/read-all', [CustomerNotificationController::class, 'readAll'])->name('customer.notifications.read-all');
+        Route::patch('/notifications/{notification}/read', [CustomerNotificationController::class, 'read'])->name('customer.notifications.read');
 
         Route::controller(ReservationController::class)
             ->group(function (): void {

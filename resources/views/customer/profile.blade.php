@@ -8,7 +8,6 @@
     <header class="account-header">
         <p>MY ACCOUNT</p>
         <h1>Profile</h1>
-        <span>Keep your customer details accurate for reservations and orders.</span>
     </header>
 
     <section class="account-content">

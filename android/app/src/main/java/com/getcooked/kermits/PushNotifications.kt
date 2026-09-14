@@ -21,7 +21,8 @@ import kotlinx.coroutines.launch
 
 object PushNotifications {
     const val CHANNEL_ID = "reservation_updates"
-    private const val MESSAGE_TYPE = "reservation.updated"
+    private const val RESERVATION_MESSAGE_TYPE = "reservation.updated"
+    private const val ORDER_MESSAGE_TYPE = "order.updated"
     private val networkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun createChannel(context: Context) {
@@ -89,8 +90,9 @@ object PushNotifications {
         }
     }
 
-    fun showReservationUpdate(context: Context, data: Map<String, String>) {
-        if (data["type"] != MESSAGE_TYPE) return
+    fun showAccountUpdate(context: Context, data: Map<String, String>) {
+        val messageType = data["type"]
+        if (messageType != RESERVATION_MESSAGE_TYPE && messageType != ORDER_MESSAGE_TYPE) return
 
         val store = SessionStore(context)
         val signedInUserId = store.userId ?: return
@@ -103,11 +105,17 @@ object PushNotifications {
 
         createChannel(context)
         val reservationId = data["reservation_id"]?.toIntOrNull()
-        val notificationKey = data["event_id"] ?: "reservation-${reservationId ?: 0}"
+        val orderId = data["order_id"]?.toIntOrNull()
+        val notificationKey = data["event_id"] ?: "account-update-${reservationId ?: orderId ?: 0}"
         val intent = Intent(context, MainActivity::class.java).apply {
-            action = "com.getcooked.kermits.OPEN_RESERVATION_UPDATE"
+            action = if (messageType == ORDER_MESSAGE_TYPE) {
+                "com.getcooked.kermits.OPEN_ORDER_UPDATE"
+            } else {
+                "com.getcooked.kermits.OPEN_RESERVATION_UPDATE"
+            }
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             reservationId?.let { putExtra("reservation_id", it) }
+            orderId?.let { putExtra("order_id", it) }
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -115,10 +123,10 @@ object PushNotifications {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val title = data["title"].orEmpty().take(100).ifBlank { "Reservation updated" }
+        val title = data["title"].orEmpty().take(100).ifBlank { "Kermit's update" }
         val body = data["body"].orEmpty().take(240).ifBlank {
             data["reference"]?.let { "Reservation $it has been updated." }
-                ?: "Your reservation has been updated."
+                ?: "Your order or reservation has been updated."
         }
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -149,6 +157,6 @@ class KermitsMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        PushNotifications.showReservationUpdate(applicationContext, message.data)
+        PushNotifications.showAccountUpdate(applicationContext, message.data)
     }
 }
