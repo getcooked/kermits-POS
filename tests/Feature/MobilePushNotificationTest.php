@@ -3,16 +3,20 @@
 namespace Tests\Feature;
 
 use App\Contracts\FcmMessageSender;
+use App\Jobs\SendOrderUpdatedPush;
 use App\Jobs\SendReservationUpdatedPush;
 use App\Models\MobileApiToken;
 use App\Models\MobilePushInstallation;
+use App\Models\Order;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Observers\OrderObserver;
 use App\Observers\ReservationObserver;
 use App\Support\FcmSendResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class MobilePushNotificationTest extends TestCase
@@ -105,6 +109,32 @@ class MobilePushNotificationTest extends TestCase
         app(ReservationObserver::class)->updated($reservation);
 
         Queue::assertNothingPushed();
+    }
+
+    public function test_order_acceptance_queues_one_push_per_customer_installation_without_a_notifications_table(): void
+    {
+        Queue::fake();
+        $customer = $this->customer('order-push@example.com');
+        $installation = $this->installation($customer, 'order-installation');
+        $order = Order::query()->create([
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 500,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+        ]);
+
+        $order->payment_status = 'paid';
+        $order->syncChanges();
+        app(OrderObserver::class)->updated($order);
+
+        Queue::assertPushed(SendOrderUpdatedPush::class, function (SendOrderUpdatedPush $job) use ($installation, $order): bool {
+            return $job->installationId === $installation->id
+                && $job->orderId === $order->id
+                && $job->status === 'paid'
+                && $job->title === 'Order accepted';
+        });
+        $this->assertFalse(Schema::hasTable('notifications'));
     }
 
     public function test_push_job_sends_privacy_limited_data_and_removes_an_invalid_installation(): void
