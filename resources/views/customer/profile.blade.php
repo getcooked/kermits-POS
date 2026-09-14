@@ -15,7 +15,7 @@
         @if($errors->any())<div class="account-error" role="alert">Please review the highlighted account details.</div>@endif
 
         <div class="account-grid profile-account-grid">
-            <section class="account-card">
+            <section class="account-card" id="personal-information">
                 <div class="account-section-heading">
                     <div>
                         <h2>Personal information</h2>

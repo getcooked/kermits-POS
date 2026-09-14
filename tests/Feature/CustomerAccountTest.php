@@ -32,7 +32,10 @@ class CustomerAccountTest extends TestCase
         $this->actingAs($customer)->get(route('shop'))
             ->assertOk()
             ->assertSee('shop-profile-button', false)
-            ->assertSee('href="'.route('customer.profile.edit').'"', false)
+            ->assertSee('data-profile-popover', false)
+            ->assertSee('aria-haspopup="menu"', false)
+            ->assertSee('href="'.route('customer.profile.edit').'#personal-information"', false)
+            ->assertSee('href="'.route('customer.profile.edit').'#change-password"', false)
             ->assertDontSee('>Profile</a>', false)
             ->assertDontSee('>Settings</a>', false);
 
