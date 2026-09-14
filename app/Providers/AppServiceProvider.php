@@ -42,19 +42,21 @@ class AppServiceProvider extends ServiceProvider
                 $releasePath = config('mobile.release_path');
                 $appDownloadAvailable = config('mobile.download_enabled')
                     && is_file($releasePath);
-                $customer = auth()->user();
-                $customerOrderDecisionCount = $customer?->hasRole('customer')
-                    ? $customer->purchases()->whereIn('payment_status', ['paid', 'rejected'])->count()
-                    : 0;
 
                 $view->with([
                     'appDownloadAvailable' => $appDownloadAvailable,
                     'appDownloadUrl' => $appDownloadAvailable
                         ? route('app.download', ['v' => filemtime($releasePath)])
                         : null,
-                    'customerOrderDecisionCount' => $customerOrderDecisionCount,
                 ]);
             },
         );
+
+        View::composer('shop.index', function ($view): void {
+            $view->with(
+                'customerOrderDecisionCount',
+                auth()->user()->purchases()->whereIn('payment_status', ['paid', 'rejected'])->count(),
+            );
+        });
     }
 }
