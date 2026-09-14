@@ -2136,6 +2136,46 @@
         }
 
     }
+    /* Keep the shop palette consistent when browser zoom crosses a responsive breakpoint. */
+    .customer-shop,
+    .customer-shop>header {
+        background: #f5f4ed !important
+    }
+
+    @media(max-width:900px) {
+        .customer-shop>nav {
+            box-sizing: border-box;
+            width: 100% !important;
+            margin: 0;
+            padding-inline: 15px;
+            background: linear-gradient(160deg, #151615, #21231f) !important;
+            color: #fff;
+            z-index: 90
+        }
+
+        .customer-shop>nav>a strong,
+        .customer-shop .customer-actions>span {
+            color: #fff !important
+        }
+
+        .customer-shop .customer-actions>a,
+        .customer-shop .customer-actions>a:first-child {
+            border-color: #464941 !important;
+            background: #292b27 !important;
+            color: #eee !important
+        }
+
+        .customer-shop .customer-actions>a.active {
+            background: #34372f !important;
+            box-shadow: inset 0 -3px #b5c019
+        }
+
+        .customer-shop .customer-actions button {
+            border-color: #464941 !important;
+            background: transparent !important;
+            color: #fff
+        }
+    }
 </style>
 @endpush
 
