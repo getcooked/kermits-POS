@@ -37,17 +37,22 @@ class AppServiceProvider extends ServiceProvider
             ->symbols());
 
         View::composer(
-            ['landing', 'shop.index', 'customer.history', 'customer.profile', 'customer.settings', 'reservations.create'],
+            ['landing', 'shop.index', 'customer.history', 'customer.notifications', 'customer.profile', 'customer.settings', 'reservations.create'],
             function ($view): void {
                 $releasePath = config('mobile.release_path');
                 $appDownloadAvailable = config('mobile.download_enabled')
                     && is_file($releasePath);
+                $customer = auth()->user();
+                $customerOrderDecisionCount = $customer?->hasRole('customer')
+                    ? $customer->purchases()->whereIn('payment_status', ['paid', 'rejected'])->count()
+                    : 0;
 
                 $view->with([
                     'appDownloadAvailable' => $appDownloadAvailable,
                     'appDownloadUrl' => $appDownloadAvailable
                         ? route('app.download', ['v' => filemtime($releasePath)])
                         : null,
+                    'customerOrderDecisionCount' => $customerOrderDecisionCount,
                 ]);
             },
         );

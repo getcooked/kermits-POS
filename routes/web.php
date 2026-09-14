@@ -8,6 +8,7 @@ use App\Http\Controllers\CashierController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerHistoryController;
+use App\Http\Controllers\CustomerNotificationController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
@@ -76,6 +77,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/shop/orders', [CustomerOrderController::class, 'store'])->name('shop.orders.store');
         Route::get('/shop/orders/{order}', [CustomerOrderController::class, 'show'])->name('shop.orders.show');
         Route::get('/history', [CustomerHistoryController::class, 'index'])->name('customer.history');
+        Route::get('/notifications', [CustomerNotificationController::class, 'index'])->name('customer.notifications');
         Route::get('/profile', [CustomerAccountController::class, 'editProfile'])->name('customer.profile.edit');
         Route::put('/profile', [CustomerAccountController::class, 'updateProfile'])->name('customer.profile.update');
         Route::get('/settings', [CustomerAccountController::class, 'editSettings'])->name('customer.settings.edit');
