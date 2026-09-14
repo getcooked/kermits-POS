@@ -17,10 +17,11 @@
             </div>
             <div class="shop-header-tools">
                 <div class="shop-search"><button type="button" aria-label="Search products"><span></span></button><input id="shop-search" type="search" placeholder="Search products"></div>
-                <a class="shop-notification-button" href="{{ route('customer.notifications') }}" aria-label="Notifications{{ $customerOrderDecisionCount ? ' ('.$customerOrderDecisionCount.' order updates)' : '' }}" title="Order notifications">
+                <a class="shop-notification-button" href="{{ route('customer.notifications') }}" aria-label="Order notifications" title="Order notifications" data-order-notification-button>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-                    @if($customerOrderDecisionCount)<b>{{ $customerOrderDecisionCount > 99 ? '99+' : $customerOrderDecisionCount }}</b>@endif
+                    <b data-order-notification-count hidden></b>
                 </a>
+                <script id="customer-order-notification-keys" type="application/json">@json($customerOrderDecisionKeys)</script>
             </div>
         </div>
         <div class="shop-category-row"><button class="category-arrow" type="button" data-shop-scroll="-1" aria-label="Scroll categories left">‹</button>
@@ -1198,6 +1199,10 @@
         line-height: 1
     }
 
+    .shop-notification-button b[hidden] {
+        display: none
+    }
+
     .shop-category-tabs {
         margin: 0 !important;
         padding-bottom: 0 !important;
@@ -1996,6 +2001,39 @@
     }
 </style>
 @endpush
+
+<script>
+(() => {
+    const button = document.querySelector('[data-order-notification-button]');
+    const badge = document.querySelector('[data-order-notification-count]');
+    const keysElement = document.getElementById('customer-order-notification-keys');
+    const storageKey = 'kermits-order-notifications-read-v1-{{ auth()->id() }}';
+
+    if (!button || !badge || !keysElement) return;
+
+    const decisionKeys = JSON.parse(keysElement.textContent || '[]');
+
+    function updateUnreadCount() {
+        let readKeys = [];
+        try {
+            readKeys = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        } catch (_) {}
+
+        const read = new Set(Array.isArray(readKeys) ? readKeys : []);
+        const unreadCount = decisionKeys.filter(key => !read.has(key)).length;
+
+        badge.hidden = unreadCount === 0;
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        button.setAttribute('aria-label', unreadCount
+            ? `Order notifications (${unreadCount} unread)`
+            : 'Order notifications');
+    }
+
+    updateUnreadCount();
+    window.addEventListener('pageshow', updateUnreadCount);
+    window.addEventListener('storage', updateUnreadCount);
+})();
+</script>
 
 <script>
     (() => {

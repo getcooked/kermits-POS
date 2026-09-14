@@ -57,7 +57,7 @@ class CustomerNotificationTest extends TestCase
             ->assertDontSee(route('shop.orders.show', $other), false);
     }
 
-    public function test_menu_shows_the_floating_notification_icon_and_decision_count(): void
+    public function test_menu_supplies_decisions_to_the_floating_unread_notification_icon(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         foreach (['paid', 'rejected', 'pending'] as $status) {
@@ -70,16 +70,38 @@ class CustomerNotificationTest extends TestCase
             ]);
         }
 
+        $paidId = $customer->purchases()->where('payment_status', 'paid')->value('id');
+        $rejectedId = $customer->purchases()->where('payment_status', 'rejected')->value('id');
+
         $this->actingAs($customer)->get(route('shop'))
             ->assertOk()
             ->assertSee(route('customer.notifications'), false)
             ->assertSee('shop-notification-button', false)
-            ->assertSee('2 order updates')
-            ->assertSee('>2</b>', false);
+            ->assertSee($paidId.':paid')
+            ->assertSee($rejectedId.':rejected')
+            ->assertSee('data-order-notification-count', false)
+            ->assertSee('localStorage.getItem', false);
 
         $this->actingAs($customer)->get(route('customer.history'))
             ->assertOk()
             ->assertDontSee(route('customer.notifications'), false);
+    }
+
+    public function test_opening_notifications_marks_current_order_decisions_as_read_in_the_browser(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $order = Order::query()->create([
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 100,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+        ]);
+
+        $this->actingAs($customer)->get(route('customer.notifications'))
+            ->assertOk()
+            ->assertSee($order->id.':paid')
+            ->assertSee('localStorage.setItem', false);
     }
 
     public function test_guests_and_staff_cannot_open_customer_notifications(): void

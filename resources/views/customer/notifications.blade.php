@@ -58,6 +58,21 @@
     </section>
 </main>
 
+<script id="customer-order-notification-keys" type="application/json">@json($orderNotifications->map(fn ($order) => $order->id.':'.$order->payment_status)->values())</script>
+<script>
+(() => {
+    const keysElement = document.getElementById('customer-order-notification-keys');
+    if (!keysElement) return;
+
+    const storageKey = 'kermits-order-notifications-read-v1-{{ auth()->id() }}';
+    const decisionKeys = JSON.parse(keysElement.textContent || '[]');
+
+    try {
+        localStorage.setItem(storageKey, JSON.stringify(decisionKeys));
+    } catch (_) {}
+})();
+</script>
+
 @push('styles')
     @include('customer.account-styles')
 <style>
