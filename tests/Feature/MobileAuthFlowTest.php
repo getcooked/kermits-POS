@@ -36,6 +36,7 @@ class MobileAuthFlowTest extends TestCase
             'registration_token' => $token,
             'name' => 'Mobile Customer', 'username' => 'mobile.user',
             'email' => strtoupper($email), 'phone' => '09123456789',
+            'birthday' => '2000-09-15', 'sex' => 'male', 'address' => 'Bantayan, Cebu',
             'password' => 'SecurePass123!', 'password_confirmation' => 'SecurePass123!',
         ])->assertCreated()->assertJsonPath('data.email', $email);
         $this->postJson('/api/v1/login', ['login' => $email, 'password' => 'SecurePass123!'])

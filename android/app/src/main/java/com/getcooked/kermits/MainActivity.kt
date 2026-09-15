@@ -109,6 +109,8 @@ import com.squareup.moshi.JsonEncodingException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.time.OffsetDateTime
+import java.time.LocalDate
+import java.time.Period
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.text.SimpleDateFormat
@@ -971,7 +973,8 @@ private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
 @Composable
 private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }; var challenge by rememberSaveable { mutableStateOf<String?>(null) }; var code by rememberSaveable { mutableStateOf("") }; var token by rememberSaveable { mutableStateOf<String?>(null) }
-    var name by rememberSaveable { mutableStateOf("") }; var username by rememberSaveable { mutableStateOf("") }; var phone by rememberSaveable { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }; var username by rememberSaveable { mutableStateOf("") }; var phone by rememberSaveable { mutableStateOf("") }; var birthday by rememberSaveable { mutableStateOf("") }; var sex by rememberSaveable { mutableStateOf("") }; var address by rememberSaveable { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    val context = LocalContext.current
     var resendSeconds by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(resendSeconds) {
         if (resendSeconds > 0) { delay(1000); resendSeconds-- }
@@ -1000,6 +1003,13 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         !phone.startsWith("09") -> "Phone number must start with 09."
         else -> null
     }
+    val birthdayError = if (calculateAge(birthday) == null) "Select a valid birthday." else null
+    val sexError = if (sex !in setOf("male", "female", "prefer_not_to_say")) "Select your sex." else null
+    val addressError = when {
+        address.isBlank() -> "Enter your address."
+        address.length > 500 -> "Address must not be more than 500 characters."
+        else -> null
+    }
     val passwordError = when {
         password.isBlank() -> "Enter a password."
         password.length !in 12..23 ||
@@ -1015,7 +1025,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         confirmation != password -> "Passwords do not match."
         else -> null
     }
-    val firstRegistrationError = nameError ?: usernameError ?: phoneError ?: passwordError ?: confirmationError
+    val firstRegistrationError = nameError ?: usernameError ?: phoneError ?: birthdayError ?: sexError ?: addressError ?: passwordError ?: confirmationError
     Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).imePadding()) {
         RegistrationBrandPanel(Modifier.fillMaxWidth().height(170.dp))
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp)) {
@@ -1067,6 +1077,38 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 errorText = phoneError.takeIf { showRegistrationErrors },
                 keyboardType = KeyboardType.Number,
             ) { input -> phone = input.filter { it in '0'..'9' }.take(11) }
+            BirthdayPickerField(birthday, birthdayError.takeIf { showRegistrationErrors }) { showBirthdayPicker(context) { birthday = it } }
+            OutlinedTextField(
+                value = calculateAge(birthday)?.let { "$it years old" }.orEmpty(),
+                onValueChange = {},
+                label = { Text("Age") },
+                supportingText = { Text("Calculated automatically from your birthday") },
+                readOnly = true,
+                singleLine = true,
+                colors = loginFieldColors(),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            )
+            Text("Sex", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 5.dp, bottom = 5.dp))
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                listOf("male" to "Male", "female" to "Female", "prefer_not_to_say" to "Prefer not to say").forEach { (value, label) ->
+                    FilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.padding(end = 7.dp))
+                }
+            }
+            if (showRegistrationErrors && sexError != null) Text(sexError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(bottom = 5.dp))
+            OutlinedTextField(
+                value = address,
+                onValueChange = { address = it.take(500) },
+                label = { Text("Address") },
+                placeholder = { Text("House number, street, barangay, city or municipality") },
+                supportingText = { Text(if (showRegistrationErrors && addressError != null) addressError else "${address.length}/500 characters") },
+                isError = showRegistrationErrors && addressError != null,
+                minLines = 3,
+                maxLines = 5,
+                colors = loginFieldColors(),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            )
             RegistrationField(
                 label = "Password",
                 value = password,
@@ -1090,7 +1132,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
                     showRegistrationErrors = true
                     vm.clearError()
                     if (firstRegistrationError == null) {
-                        vm.register(RegisterRequest(token!!, normalizedName, username, email.trim(), phone, password, confirmation)) { ok -> if (ok) onBack() }
+                        vm.register(RegisterRequest(token!!, normalizedName, username, email.trim(), phone, birthday, sex, address.trim(), password, confirmation)) { ok -> if (ok) onBack() }
                     }
                 },
                 enabled = !vm.busy,
@@ -1104,6 +1146,52 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun BirthdayPickerField(value: String, error: String?, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            label = { Text("Birthday") },
+            placeholder = { Text("Select birthday") },
+            supportingText = { Text(error ?: "Your age will be calculated automatically") },
+            isError = error != null,
+            readOnly = true,
+            singleLine = true,
+            trailingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+            colors = loginFieldColors(),
+            shape = shape,
+            modifier = Modifier.fillMaxWidth().clearAndSetSemantics {},
+        )
+        Box(
+            Modifier.matchParentSize()
+                .clip(shape)
+                .clickable(role = Role.Button, onClick = onClick)
+                .semantics { contentDescription = if (value.isBlank()) "Select birthday" else "Birthday selected $value" },
+        )
+    }
+}
+
+private fun showBirthdayPicker(context: Context, onSelected: (String) -> Unit) {
+    val selected = LocalDate.now().minusYears(18)
+    DatePickerDialog(
+        context,
+        { _, year, month, day -> onSelected("%04d-%02d-%02d".format(Locale.US, year, month + 1, day)) },
+        selected.year,
+        selected.monthValue - 1,
+        selected.dayOfMonth,
+    ).apply {
+        datePicker.minDate = java.util.GregorianCalendar(1900, Calendar.JANUARY, 1).timeInMillis
+        datePicker.maxDate = System.currentTimeMillis()
+    }.show()
+}
+
+private fun calculateAge(birthday: String): Int? = runCatching {
+    val birthDate = LocalDate.parse(birthday)
+    if (birthDate.isAfter(LocalDate.now())) null else Period.between(birthDate, LocalDate.now()).years.takeIf { it >= 0 }
+}.getOrNull()
 
 @Composable
 private fun RegistrationBrandPanel(modifier: Modifier = Modifier) {

@@ -39,7 +39,11 @@ class MobileAccountController extends Controller
 
         return response()->json([
             'message' => 'Your personal information was updated.',
-            'data' => $customer->fresh()->only(['id', 'name', 'username', 'email', 'phone', 'role']),
+            'data' => [
+                ...$customer->fresh()->only(['id', 'name', 'username', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
+                'birthday' => $customer->birthday?->format('Y-m-d'),
+                'age' => $customer->birthday?->age,
+            ],
         ]);
     }
 

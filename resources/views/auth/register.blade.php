@@ -48,6 +48,10 @@
                     <div class="field"><label>Username</label><input class="control" name="username" value="{{ old('username') }}" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" autocomplete="username" required @disabled(! $verifiedEmail)><small>Letters, numbers, dots, underscores, and hyphens only.</small></div>
                     <div class="field"><label>Email address</label><input class="control" name="email" type="email" value="{{ old('email', $verifiedEmail) }}" autocomplete="email" readonly required></div>
                     <div class="field"><label>Phone number</label><input class="control" name="phone" type="tel" inputmode="numeric" value="{{ old('phone') }}" minlength="11" maxlength="11" pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" required @disabled(! $verifiedEmail)><small>11 digits starting with 09.</small></div>
+                    <div class="field"><label for="birthday">Birthday</label><input class="control" id="birthday" name="birthday" type="date" value="{{ old('birthday') }}" min="1900-01-01" max="{{ now()->toDateString() }}" required @disabled(! $verifiedEmail)></div>
+                    <div class="field"><label for="age">Age</label><input class="control" id="age" type="text" value="" placeholder="Calculated from birthday" readonly aria-describedby="age-help"><small id="age-help">Age is calculated automatically from your birthday.</small></div>
+                    <div class="field"><label for="sex">Sex</label><select class="control" id="sex" name="sex" required @disabled(! $verifiedEmail)><option value="">Select sex</option><option value="male" @selected(old('sex') === 'male')>Male</option><option value="female" @selected(old('sex') === 'female')>Female</option><option value="prefer_not_to_say" @selected(old('sex') === 'prefer_not_to_say')>Prefer not to say</option></select></div>
+                    <div class="field"><label for="address">Address</label><textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="House number, street, barangay, city or municipality" required @disabled(! $verifiedEmail)>{{ old('address') }}</textarea></div>
                     <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
                     <div class="field"><label>Confirm password</label><input class="control" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
                     @unless($verifiedEmail)<p class="locked-note">Verify your Gmail first to unlock account creation.</p>@endunless
@@ -63,6 +67,32 @@
 body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0}.register-shell{width:100%;height:100dvh;min-height:680px;grid-template-columns:minmax(350px,44%) minmax(0,56%);border:0;border-radius:0;background:#f7f7f1}.register-shell aside{padding:clamp(36px,5vw,72px);background:radial-gradient(circle at 15% 15%,#30332b 0,transparent 28%),linear-gradient(145deg,#131413,#1c1e1a)}.register-shell aside img{width:clamp(88px,8vw,120px);height:clamp(88px,8vw,120px)}.register-shell aside h1{font-size:clamp(42px,4vw,62px);letter-spacing:-.04em}.register-form{padding:clamp(28px,5vw,72px);background:radial-gradient(circle at 100% 0,#f0f1d8 0,transparent 32%),#f7f7f1}.register-form>div{width:min(520px,100%)}.register-form>div>.global-back{width:max-content;margin-bottom:34px;background:#fffefa;box-shadow:0 8px 24px rgba(22,24,20,.08)}.register-form h2{font-size:clamp(31px,3vw,42px)}.register-form .control{min-height:50px;border-radius:12px}.register-button{min-height:54px;border-radius:13px;font-size:16px;box-shadow:0 10px 24px rgba(23,24,23,.16)}
 @media(max-width:800px){.register-shell{height:auto;min-height:100dvh;grid-template-columns:1fr}.register-shell aside{min-height:170px;padding:22px}.register-shell aside img{width:62px;height:62px}.register-shell aside div{margin:14px 0 0}.register-shell aside h1{font-size:27px}.register-shell aside p{display:none}.register-form{overflow:visible;padding:24px 18px 44px}.register-form>div>.global-back{margin-bottom:24px}}
 </style>
+@endpush
+
+@push('scripts')
+<script>
+(() => {
+    const birthday = document.getElementById('birthday');
+    const age = document.getElementById('age');
+    if (!birthday || !age) return;
+
+    const updateAge = () => {
+        const parts = birthday.value.split('-').map(Number);
+        if (parts.length !== 3 || parts.some(Number.isNaN)) {
+            age.value = '';
+            return;
+        }
+
+        const today = new Date();
+        let years = today.getFullYear() - parts[0];
+        if (today.getMonth() + 1 < parts[1] || (today.getMonth() + 1 === parts[1] && today.getDate() < parts[2])) years--;
+        age.value = years >= 0 ? `${years} years old` : '';
+    };
+
+    birthday.addEventListener('change', updateAge);
+    updateAge();
+})();
+</script>
 @endpush
 
 @endsection

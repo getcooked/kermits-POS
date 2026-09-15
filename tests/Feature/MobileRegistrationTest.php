@@ -33,6 +33,7 @@ class MobileRegistrationTest extends TestCase
     {
         $challenge = str_repeat('a', 64);
         $password = str_repeat('A', 20).'a1!';
+        $birthday = now()->subYears(26)->toDateString();
         Cache::put('mobile-registration-challenge:'.hash('sha256', $challenge), [
             'email' => 'new.customer@gmail.com',
             'code_hash' => Hash::make('123456'),
@@ -51,10 +52,18 @@ class MobileRegistrationTest extends TestCase
             'username' => str_repeat('u', 13),
             'email' => 'new.customer@gmail.com',
             'phone' => '09171234567',
+            'birthday' => $birthday,
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
             'password' => $password,
             'password_confirmation' => $password,
             'role' => User::ROLE_SUPER_ADMIN,
-        ])->assertCreated()->assertJsonPath('data.role', User::ROLE_CUSTOMER);
+        ])->assertCreated()
+            ->assertJsonPath('data.role', User::ROLE_CUSTOMER)
+            ->assertJsonPath('data.birthday', $birthday)
+            ->assertJsonPath('data.age', 26)
+            ->assertJsonPath('data.sex', 'female')
+            ->assertJsonPath('data.address', 'Bantayan, Cebu');
 
         $this->assertDatabaseHas('users', [
             'email' => 'new.customer@gmail.com',
@@ -79,10 +88,13 @@ class MobileRegistrationTest extends TestCase
             'username' => str_repeat('u', 14),
             'email' => 'invalid-limits@gmail.com',
             'phone' => '0817123456a',
+            'birthday' => now()->addDay()->toDateString(),
+            'sex' => 'invalid',
+            'address' => str_repeat('A', 501),
             'password' => $password,
             'password_confirmation' => $password,
         ])->assertUnprocessable()->assertJsonValidationErrors([
-            'name', 'username', 'phone', 'password',
+            'name', 'username', 'phone', 'birthday', 'sex', 'address', 'password',
         ]);
 
         $this->assertDatabaseMissing('users', ['email' => 'invalid-limits@gmail.com']);
@@ -96,6 +108,9 @@ class MobileRegistrationTest extends TestCase
             'username' => 'unverified',
             'email' => 'unverified@gmail.com',
             'phone' => '09171234567',
+            'birthday' => '2000-09-15',
+            'sex' => 'prefer_not_to_say',
+            'address' => 'Bantayan, Cebu',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ])->assertUnprocessable();

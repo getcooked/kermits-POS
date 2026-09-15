@@ -1,0 +1,161 @@
+<mxfile host="Electron" agent="Kermit Flowchart Generator" pages="1">
+  <diagram id="page-1" name="1. System access and login">
+    <mxGraphModel dx="1069" dy="643" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="border" parent="1" style="rounded=0;fillColor=none;strokeColor=#000000;strokeWidth=1;connectable=0;" value="" vertex="1">
+          <mxGeometry height="990" width="790" x="30" y="92" as="geometry" />
+        </mxCell>
+        <mxCell id="heading" parent="1" style="text;strokeColor=none;fillColor=none;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;spacing=5;strokeColor=none;fillColor=none;" value="Flowchart 1 — System access and login" vertex="1">
+          <mxGeometry height="28" width="780" x="35" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;strokeColor=none;fillColor=none;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacing=5;strokeColor=none;fillColor=none;" value="Kermit's Ordering and Reservation System" vertex="1">
+          <mxGeometry height="22" width="780" x="35" y="53" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="text;strokeColor=none;fillColor=none;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=9;align=center;verticalAlign=middle;spacing=5;strokeColor=none;fillColor=none;" value="A = login retry  |  R / F / L → page 2" vertex="1">
+          <mxGeometry height="14" width="780" x="35" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-0" edge="1" parent="1" source="start" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="open" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-1" edge="1" parent="1" source="open" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="account" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-2" edge="1" parent="1" source="account" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+            <mxPoint x="579" y="372" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-3" edge="1" parent="1" source="account" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="login" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-4" edge="1" parent="1" source="retry" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="login" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-5" edge="1" parent="1" source="login" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="valid" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-6" edge="1" parent="1" source="login" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="Forgot password">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+            <mxPoint x="649" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-7" edge="1" parent="1" source="valid" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="invalid" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-8" edge="1" parent="1" source="invalid" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="retry2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-9" edge="1" parent="1" source="valid" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="locked" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-10" edge="1" parent="1" source="locked" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="wait" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-11" edge="1" parent="1" source="wait" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="retry3" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-12" edge="1" parent="1" source="locked" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="match" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-13" edge="1" parent="1" source="match" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="failure" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-14" edge="1" parent="1" source="failure" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="retry4" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-15" edge="1" parent="1" source="match" style="edgeStyle=none;noEdgeStyle=1;rounded=0;html=0;endArrow=block;endFill=1;endSize=8;strokeColor=#000000;strokeWidth=1.3;fontFamily=Arial;fontSize=12;fontColor=#000000;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="role" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="start" parent="1" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=23;align=center;verticalAlign=middle;spacing=5;" value="Start" vertex="1">
+          <mxGeometry height="68" width="160" x="225" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="open" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Open the system website" vertex="1">
+          <mxGeometry height="60" width="180" x="215" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="account" parent="1" style="rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Have an&#xA;account?" vertex="1">
+          <mxGeometry height="104" width="180" x="215" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="register" parent="1" style="shape=offPageConnector;direction=south;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="R" vertex="1">
+          <mxGeometry height="52" width="52" x="580" y="346" as="geometry" />
+        </mxCell>
+        <mxCell id="regnote" parent="1" style="text;strokeColor=none;fillColor=none;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacing=5;strokeColor=none;fillColor=none;" value="Register&#xA;Page 2" vertex="1">
+          <mxGeometry height="40" width="180" x="525" y="407" as="geometry" />
+        </mxCell>
+        <mxCell id="retry" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="A" vertex="1">
+          <mxGeometry height="38" width="38" x="132" y="482" as="geometry" />
+        </mxCell>
+        <mxCell id="login" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Enter username / email&#xA;and password" vertex="1">
+          <mxGeometry height="60" width="180" x="215" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="forgot" parent="1" style="shape=offPageConnector;direction=south;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="F" vertex="1">
+          <mxGeometry height="52" width="52" x="650" y="474" as="geometry" />
+        </mxCell>
+        <mxCell id="valid" parent="1" style="rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Input and enabled&#xA;reCAPTCHA valid?" vertex="1">
+          <mxGeometry height="104" width="180" x="215" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="invalid" parent="1" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Show input error" vertex="1">
+          <mxGeometry height="60" width="180" x="535" y="596" as="geometry" />
+        </mxCell>
+        <mxCell id="retry2" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="A" vertex="1">
+          <mxGeometry height="38" width="38" x="606" y="692" as="geometry" />
+        </mxCell>
+        <mxCell id="locked" parent="1" style="rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Login temporarily&#xA;locked?" vertex="1">
+          <mxGeometry height="104" width="180" x="215" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="wait" parent="1" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Show retry delay" vertex="1">
+          <mxGeometry height="60" width="180" x="535" y="742" as="geometry" />
+        </mxCell>
+        <mxCell id="retry3" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="A" vertex="1">
+          <mxGeometry height="38" width="38" x="606" y="832" as="geometry" />
+        </mxCell>
+        <mxCell id="match" parent="1" style="rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Credentials&#xA;correct?" vertex="1">
+          <mxGeometry height="104" width="180" x="215" y="860" as="geometry" />
+        </mxCell>
+        <mxCell id="failure" parent="1" style="rounded=0;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Record failure; show&#xA;error or lockout" vertex="1">
+          <mxGeometry height="60" width="180" x="535" y="878" as="geometry" />
+        </mxCell>
+        <mxCell id="retry4" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="A" vertex="1">
+          <mxGeometry height="38" width="38" x="735" y="889" as="geometry" />
+        </mxCell>
+        <mxCell id="role" parent="1" style="shape=offPageConnector;direction=south;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="L" vertex="1">
+          <mxGeometry height="52" width="52" x="279" y="986" as="geometry" />
+        </mxCell>
+        <mxCell id="rolenote" parent="1" style="text;strokeColor=none;fillColor=none;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=12;align=center;verticalAlign=middle;spacing=5;strokeColor=none;fillColor=none;" value="L → role routing on page 2" vertex="1">
+          <mxGeometry height="30" width="250" x="350" y="992" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

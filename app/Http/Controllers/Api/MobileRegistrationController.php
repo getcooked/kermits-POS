@@ -100,6 +100,9 @@ class MobileRegistrationController extends Controller
             'username' => ['required', 'string', 'min:3', 'max:13', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
             'phone' => ['required', 'string', 'size:11', 'regex:/^09[0-9]{9}$/'],
+            'birthday' => ['required', 'date_format:Y-m-d', 'after_or_equal:1900-01-01', 'before_or_equal:today'],
+            'sex' => ['required', 'in:male,female,prefer_not_to_say'],
+            'address' => ['required', 'string', 'max:500'],
             'password' => ['required', 'string', 'confirmed', Password::defaults()->max(23)],
         ], [
             'name.max' => 'The full name must not be more than 30 characters.',
@@ -122,15 +125,20 @@ class MobileRegistrationController extends Controller
             'username' => $validated['username'],
             'email' => $email,
             'phone' => $validated['phone'],
+            'birthday' => $validated['birthday'],
+            'sex' => $validated['sex'],
+            'address' => $validated['address'],
             'role' => User::ROLE_CUSTOMER,
             'password' => $validated['password'],
             'email_verified_at' => now(),
         ]);
         Cache::forget($key);
 
-        return response()->json(['data' => $user->only([
-            'id', 'name', 'username', 'email', 'phone', 'role',
-        ])], 201);
+        return response()->json(['data' => [
+            ...$user->only(['id', 'name', 'username', 'email', 'phone', 'sex', 'address', 'role']),
+            'birthday' => $user->birthday?->format('Y-m-d'),
+            'age' => $user->birthday?->age,
+        ]], 201);
     }
 
     private function normalizeEmail(Request $request): void
