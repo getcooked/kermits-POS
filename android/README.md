@@ -29,6 +29,9 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 - Encrypted bearer-token persistence and logout/revocation
 - Live product catalog with stock-aware cart
 - Persistent top-right cart with item badge and in-place checkout sheet
+- In-app accepted/rejected order notifications with a persistent unread badge beside the cart
+- Customer Personal Information editing with a read-only verified email address
+- Email-code verification before changing a customer password
 - GCash payment-proof preview with replace and remove controls before submission
 - Immediate submission confirmation popup for mobile orders and reservations
 - Cash and GCash order receipts available after checkout and from purchase history

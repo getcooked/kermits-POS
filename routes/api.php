@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MobileAccountController;
 use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\MobileCatalogController;
 use App\Http\Controllers\Api\MobileOrderController;
@@ -18,6 +19,9 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/register', [MobileRegistrationController::class, 'register'])->middleware('throttle:3,1,mobile-registration-create');
     Route::middleware('mobile.auth')->group(function (): void {
         Route::get('/me', [MobileAuthController::class, 'me']);
+        Route::put('/account/profile', [MobileAccountController::class, 'updateProfile'])->middleware('throttle:10,1');
+        Route::post('/account/password/email-code', [MobileAccountController::class, 'sendPasswordVerificationCode'])->middleware('throttle:3,1,mobile-account-password-email');
+        Route::put('/account/password', [MobileAccountController::class, 'updatePassword'])->middleware('throttle:5,1,mobile-account-password-update');
         Route::post('/logout', [MobileAuthController::class, 'logout']);
         Route::put('/push-installation', [MobilePushInstallationController::class, 'update'])->middleware('throttle:30,1');
         Route::delete('/push-installation', [MobilePushInstallationController::class, 'destroy'])->middleware('throttle:30,1');
