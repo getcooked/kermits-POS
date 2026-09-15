@@ -71,7 +71,7 @@ class PasswordResetTest extends TestCase
     public function test_reset_link_can_be_requested_for_an_active_user(): void
     {
         Notification::fake();
-        $user = User::factory()->unverified()->create();
+        $user = User::factory()->unverified()->create(['role' => User::ROLE_CUSTOMER]);
 
         $this->post(route('password.email'), ['email' => $user->email])
             ->assertSessionHas('status');
@@ -115,32 +115,50 @@ class PasswordResetTest extends TestCase
         $this->assertDatabaseCount('password_reset_tokens', 0);
     }
 
-    public function test_web_password_recovery_rejects_an_unknown_or_deleted_account(): void
+    public function test_web_password_recovery_rejects_an_unknown_deleted_or_staff_account(): void
     {
         Notification::fake();
-        $deletedUser = User::factory()->create();
+        $deletedUser = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $deletedUser->delete();
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
 
-        $this->post(route('password.email'), ['email' => 'not-a-kermits-account@example.com'])
-            ->assertSessionHasErrors([
-                'email' => 'No registered account was found with that email address.',
-            ])
-            ->assertSessionMissing('status');
-
-        $this->post(route('password.email'), ['email' => $deletedUser->email])
-            ->assertSessionHasErrors([
-                'email' => 'No registered account was found with that email address.',
-            ])
-            ->assertSessionMissing('status');
+        foreach (['not-a-kermits-account@example.com', $deletedUser->email, $cashier->email] as $email) {
+            $this->post(route('password.email'), ['email' => $email])
+                ->assertSessionHasErrors([
+                    'email' => 'No registered customer account was found with that email address.',
+                ])
+                ->assertSessionMissing('status');
+        }
 
         Notification::assertNothingSent();
         $this->assertDatabaseCount('password_reset_tokens', 0);
     }
 
+    public function test_reset_form_rejects_an_unknown_email_or_invalid_token(): void
+    {
+        $this->get(route('password.reset', [
+            'token' => 'not-a-valid-token',
+            'email' => 'not-registered@example.com',
+        ]))
+            ->assertRedirect(route('password.request'))
+            ->assertSessionHasErrors([
+                'email' => 'This password reset link is invalid, expired, or does not belong to a registered account.',
+            ]);
+
+        $this->post(route('password.update'), [
+            'token' => 'not-a-valid-token',
+            'email' => 'not-registered@example.com',
+            'password' => 'SecurePass123!',
+            'password_confirmation' => 'SecurePass123!',
+        ])->assertSessionHasErrors([
+            'email' => 'No registered account was found with that email address.',
+        ]);
+    }
+
     public function test_password_can_be_reset_with_a_valid_token(): void
     {
         Notification::fake();
-        $user = User::factory()->unverified()->create();
+        $user = User::factory()->unverified()->create(['role' => User::ROLE_CUSTOMER]);
         DB::table('sessions')->insert([
             'id' => 'active-web-session',
             'user_id' => $user->id,
@@ -162,6 +180,14 @@ class PasswordResetTest extends TestCase
             $user,
             ResetPassword::class,
             function (ResetPassword $notification) use ($user): bool {
+                $this->get(route('password.reset', [
+                    'token' => $notification->token,
+                    'email' => $user->email,
+                ]))
+                    ->assertOk()
+                    ->assertSee('Registered email address')
+                    ->assertSee('readonly', false);
+
                 $response = $this->post(route('password.update'), [
                     'token' => $notification->token,
                     'email' => $user->email,
