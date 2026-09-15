@@ -1,16 +1,21 @@
-# Enable reCAPTCHA on the online login
+# Enable reCAPTCHA on the online authentication forms
 
-The live login page currently renders without the reCAPTCHA markup. This means the deployed Laravel application does not have the complete reCAPTCHA code/configuration or its cached configuration still has reCAPTCHA disabled.
+This update protects the online login, customer registration-code request, regular password recovery, and Super Admin password recovery forms. Verification occurs on the server before credentials are checked or email is sent.
 
 ## 1. Upload the application files
 
 Upload the contents of `recaptcha-online-update.zip` into the Laravel project root while preserving the included paths. The package contains:
 
 - `app/Http/Middleware/AddSecurityHeaders.php`
+- `app/Http/Controllers/AuthController.php`
+- `app/Http/Controllers/PasswordResetController.php`
 - `app/Http/Requests/LoginRequest.php`
 - `app/Rules/Recaptcha.php`
 - `config/services.php`
+- `resources/views/components/recaptcha.blade.php`
+- `resources/views/auth/forgot-password.blade.php`
 - `resources/views/auth/login.blade.php`
+- `resources/views/auth/register.blade.php`
 
 Do not upload a local `.env` file and do not replace the live server's existing `.env`.
 
@@ -48,6 +53,13 @@ If hPanel has no terminal, delete only the generated PHP files inside `bootstrap
 
 ## 4. Verify
 
-Open `https://kermits-pos.com/login` in a private/incognito tab. The checkbox must appear above the Log in button. Submit once without checking it and confirm the page says `Please complete the reCAPTCHA checkbox.` Then complete the checkbox and log in.
+Open these pages in a private/incognito tab and confirm the checkbox appears:
+
+- `https://kermits-pos.com/login`
+- `https://kermits-pos.com/register`
+- `https://kermits-pos.com/forgot-password`
+- `https://kermits-pos.com/admin/forgot-password`
+
+Submit once without checking it and confirm the page says `Please complete the reCAPTCHA checkbox.` Then complete the checkbox and submit normally.
 
 If Google displays `ERROR for site owner: Invalid domain for site key`, add `kermits-pos.com` to that key in the reCAPTCHA console and wait a few minutes. If the page reports that reCAPTCHA cannot load, check browser content blockers and confirm the updated security-header middleware was uploaded.

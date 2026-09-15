@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Rules\Recaptcha;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,8 @@ class PasswordResetController extends Controller
     {
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160'],
-        ]);
+            'g-recaptcha-response' => Recaptcha::rules($request),
+        ], Recaptcha::messages());
 
         $email = Str::lower($validated['email']);
         $acceptedEmails = $requiredRole === User::ROLE_SUPER_ADMIN && $email === self::SUPER_ADMIN_EMAIL
