@@ -31,7 +31,7 @@ class PasswordResetController extends Controller
 
     public function email(Request $request): RedirectResponse
     {
-        return $this->sendResetLink($request);
+        return $this->sendResetLink($request, User::ROLE_CUSTOMER);
     }
 
     public function emailSuperAdmin(Request $request): RedirectResponse
@@ -55,7 +55,7 @@ class PasswordResetController extends Controller
             ->first();
 
         if (! $user) {
-            $accountType = $requiredRole === User::ROLE_SUPER_ADMIN ? 'Super Admin account' : 'account';
+            $accountType = $requiredRole === User::ROLE_SUPER_ADMIN ? 'Super Admin account' : 'customer account';
 
             return back()
                 ->withInput($request->only('email'))
@@ -77,11 +77,26 @@ class PasswordResetController extends Controller
         );
     }
 
-    public function reset(Request $request, string $token): View
+    public function reset(Request $request, string $token): View|RedirectResponse
     {
+        $email = Str::lower($request->string('email')->trim()->toString());
+        $user = User::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->whereIn('role', [User::ROLE_CUSTOMER, User::ROLE_SUPER_ADMIN])
+            ->first();
+
+        if (! $user || ! Password::tokenExists($user, $token)) {
+            return redirect()
+                ->route('password.request')
+                ->withInput(['email' => $email])
+                ->withErrors([
+                    'email' => 'This password reset link is invalid, expired, or does not belong to a registered account.',
+                ]);
+        }
+
         return view('auth.reset-password', [
             'token' => $token,
-            'email' => $request->string('email')->toString(),
+            'email' => $user->email,
         ]);
     }
 
@@ -96,6 +111,19 @@ class PasswordResetController extends Controller
                 PasswordRule::defaults(),
             ],
         ]);
+
+        $user = User::query()
+            ->whereRaw('LOWER(email) = ?', [Str::lower($validated['email'])])
+            ->whereIn('role', [User::ROLE_CUSTOMER, User::ROLE_SUPER_ADMIN])
+            ->first();
+
+        if (! $user) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'No registered account was found with that email address.']);
+        }
+
+        $validated['email'] = $user->email;
 
         $status = Password::reset(
             $validated,

@@ -14,7 +14,7 @@
         <form method="POST" action="{{ route('password.update') }}">
             @csrf
             <input type="hidden" name="token" value="{{ $token }}">
-            <div class="field"><label for="email">Email address</label><input class="control" id="email" name="email" type="email" value="{{ old('email', $email) }}" autocomplete="email" maxlength="160" required>@error('email')<p class="error">{{ $message }}</p>@enderror</div>
+            <div class="field"><label for="email">Registered email address</label><input class="control" id="email" name="email" type="email" value="{{ $email }}" autocomplete="email" maxlength="160" readonly required>@error('email')<p class="error">{{ $message }}</p>@enderror</div>
             <div class="field"><label for="password">New password</label><input class="control" id="password" name="password" type="password" minlength="12" autocomplete="new-password" required>@error('password')<p class="error">{{ $message }}</p>@enderror</div>
             <div class="field"><label for="password_confirmation">Confirm new password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required></div>
             <button class="reset-button" type="submit">Save new password <span>&rarr;</span></button>
