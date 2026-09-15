@@ -54,6 +54,9 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'buyer.account',
             'email' => 'buyer@gmail.com',
             'phone' => '09171234567',
+            'birthday' => '2000-09-15',
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
             'role' => User::ROLE_SUPER_ADMIN,
@@ -63,6 +66,9 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'buyer.account',
             'email' => 'buyer@gmail.com',
             'phone' => '09171234567',
+            'birthday' => '2000-09-15 00:00:00',
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
             'role' => User::ROLE_CUSTOMER,
         ]);
     }

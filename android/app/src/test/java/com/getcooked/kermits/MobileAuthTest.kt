@@ -89,7 +89,7 @@ class MobileAuthTest {
         assertEquals("Could not confirm the reset request. Please try again.", failureOf { auth.requestPasswordReset("customer@gmail.com") }.message)
     }
 
-    private fun registration() = RegisterRequest("token", "Customer", "customer", "customer@gmail.com", "09123456789", "SecurePass123!", "SecurePass123!")
+    private fun registration() = RegisterRequest("token", "Customer", "customer", "customer@gmail.com", "09123456789", "2000-09-15", "female", "Bantayan, Cebu", "SecurePass123!", "SecurePass123!")
 
     private fun failure(status: Int, json: String): Response<Any> = Response.error(status, json.toResponseBody("application/json".toMediaType()))
 

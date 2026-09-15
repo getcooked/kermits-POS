@@ -31,6 +31,7 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 - Persistent top-right cart with item badge and in-place checkout sheet
 - In-app accepted/rejected order notifications with a persistent unread badge beside the cart
 - Customer Personal Information editing with a read-only verified email address
+- Birthday, automatically calculated age, sex, and address during customer registration
 - Email-code verification before changing a customer password
 - GCash payment-proof preview with replace and remove controls before submission
 - Immediate submission confirmation popup for mobile orders and reservations

@@ -76,7 +76,11 @@ class MobileAuthController extends Controller
 
     private function userData(User $user): array
     {
-        return $user->only(['id', 'name', 'username', 'email', 'phone', 'role']);
+        return [
+            ...$user->only(['id', 'name', 'username', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
+            'birthday' => $user->birthday?->format('Y-m-d'),
+            'age' => $user->birthday?->age,
+        ];
     }
 
     private function lockoutResponse(
