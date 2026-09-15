@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
         foreach ([
             ['name' => 'Super Admin', 'email' => 'kermitsbantayan1@gmail.com', 'role' => 'super_admin'],
             ['name' => 'Administrator', 'email' => 'admin@gmail.com', 'role' => 'admin'],
-            ['name' => 'Cashier User', 'email' => 'cashier@gmail.com', 'role' => 'cashier'],
+            ['name' => 'Cashier User', 'email' => 'kermitscashier@gmail.com', 'role' => 'cashier'],
         ] as $account) {
             User::query()->updateOrCreate(['email' => $account['email']], [...$account, 'password' => 'password']);
         }
