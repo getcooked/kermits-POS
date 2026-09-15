@@ -51,7 +51,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
@@ -63,6 +68,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -170,6 +176,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var reservations by mutableStateOf<List<Reservation>>(emptyList()); private set
     var gcashQrUrl by mutableStateOf<String?>(null); private set
     var cart by mutableStateOf<Map<Int, Int>>(emptyMap()); private set
+    var readOrderNotificationKeys by mutableStateOf<Set<String>>(emptySet()); private set
     var busy by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
@@ -214,6 +221,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 }
                 store.saveSession(result.token, keepSignedIn, result.user.id)
                 user = result.user
+                readOrderNotificationKeys = store.orderNotificationReadKeys(result.user.id)
                 signedIn = true
                 try {
                     load()
@@ -283,6 +291,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         products = emptyList()
         orders = emptyList()
         reservations = emptyList()
+        readOrderNotificationKeys = emptySet()
         signedIn = false
     }
     fun refresh() = viewModelScope.launch {
@@ -293,6 +302,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             // app on its signed-in screen, making the login form inaccessible.
             user = api.me()["data"] ?: throw IllegalStateException("Missing account data")
             store.userId = user?.id
+            readOrderNotificationKeys = user?.id?.let(store::orderNotificationReadKeys).orEmpty()
             load()
         } catch (exception: HttpException) {
             if (exception.code() == 401) {
@@ -301,6 +311,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 products = emptyList()
                 orders = emptyList()
                 reservations = emptyList()
+                readOrderNotificationKeys = emptySet()
                 signedIn = false
                 error = "Your session has expired. Please log in again."
             } else {
@@ -377,7 +388,91 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             }
         }
     }
-    fun loadOrder(id: Int, done: (Order?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.order(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this order"; done(null) } finally { busy = false } }
+    fun updateProfile(name: String, username: String, phone: String, done: (String?) -> Unit) = viewModelScope.launch {
+        if (busy) return@launch
+        busy = true
+        error = null
+        try {
+            val response = api.updateProfile(UpdateProfileRequest(name.trim(), username.trim(), phone.trim()))
+            if (!response.isSuccessful) {
+                error = apiError(response.errorBody()?.string()) ?: "Your personal information could not be updated."
+                done(null)
+                return@launch
+            }
+            user = response.body()?.data ?: throw IllegalStateException("Missing account data")
+            done(response.body()?.message ?: "Your personal information was updated.")
+        } catch (_: Exception) {
+            error = "Unable to update your account. Check your internet connection."
+            done(null)
+        } finally {
+            busy = false
+        }
+    }
+    fun sendPasswordVerificationCode(done: (String?) -> Unit) = viewModelScope.launch {
+        if (busy) return@launch
+        busy = true
+        error = null
+        try {
+            val response = api.sendPasswordVerificationCode()
+            if (!response.isSuccessful) {
+                error = apiError(response.errorBody()?.string()) ?: "The verification code could not be sent."
+                done(null)
+                return@launch
+            }
+            done(response.body()?.message ?: "A verification code was sent to your email.")
+        } catch (_: Exception) {
+            error = "Unable to send the verification email. Check your internet connection."
+            done(null)
+        } finally {
+            busy = false
+        }
+    }
+    fun changePassword(code: String, currentPassword: String, newPassword: String, confirmation: String, done: (Boolean) -> Unit) = viewModelScope.launch {
+        if (busy) return@launch
+        busy = true
+        error = null
+        try {
+            val response = api.updatePassword(ChangePasswordRequest(code.trim(), currentPassword, newPassword, confirmation))
+            if (!response.isSuccessful) {
+                error = apiError(response.errorBody()?.string()) ?: "Your password could not be changed."
+                done(false)
+                return@launch
+            }
+            registrationMessage = response.body()?.message ?: "Your password was changed. Log in with your new password."
+            store.clear()
+            user = null
+            products = emptyList()
+            orders = emptyList()
+            reservations = emptyList()
+            cart = emptyMap()
+            readOrderNotificationKeys = emptySet()
+            signedIn = false
+            done(true)
+        } catch (_: Exception) {
+            error = "Unable to change your password. Check your internet connection."
+            done(false)
+        } finally {
+            busy = false
+        }
+    }
+    fun markOrderNotificationsRead(keys: Set<String>) {
+        val customerId = user?.id ?: return
+        readOrderNotificationKeys = readOrderNotificationKeys + keys
+        store.saveOrderNotificationReadKeys(customerId, readOrderNotificationKeys)
+    }
+    fun loadOrder(id: Int, done: (Order?) -> Unit) = viewModelScope.launch {
+        busy = true
+        try {
+            val order = api.order(id).body()?.get("data")
+            if (order != null) orders = listOf(order) + orders.filterNot { it.id == order.id }
+            done(order)
+        } catch (_: Exception) {
+            error = "Could not load this order"
+            done(null)
+        } finally {
+            busy = false
+        }
+    }
     fun loadReservation(id: Int, done: (Reservation?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.reservation(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this reservation"; done(null) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
@@ -591,7 +686,10 @@ fun KermitsApp(
                             selectedOrderWasJustSubmitted = true
                             selectedOrder = order
                         },
-                        onReserve = { tab = 2 },
+                        onNotificationOrder = { id ->
+                            selectedOrderWasJustSubmitted = false
+                            vm.loadOrder(id) { order -> selectedOrder = order }
+                        },
                     )
                     1 -> CustomerHistoryScreen(vm, onOrder = {
                         selectedOrderWasJustSubmitted = false
@@ -716,18 +814,131 @@ private fun CustomerBottomBar(selected: Int, select: (Int) -> Unit) {
 
 @Composable
 private fun AccountScreen(vm: AppViewModel) {
-    Column(Modifier.fillMaxSize()) {
-        Text("Account", fontSize = 30.sp, fontWeight = FontWeight.Black)
-        Text("Your Kermit's customer profile", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
-            Column(Modifier.padding(18.dp)) {
-                Text(vm.user?.name.orEmpty(), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp))
-                vm.user?.phone?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp)) }
-                Spacer(Modifier.height(20.dp))
-                Button(onClick = vm::logout, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(7.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Log out", fontWeight = FontWeight.Bold) }
+    var section by rememberSaveable { mutableStateOf("account") }
+    BackHandler(enabled = section != "account") { section = "account"; vm.clearError() }
+
+    when (section) {
+        "personal" -> PersonalInformationScreen(vm) { section = "account"; vm.clearError() }
+        "password" -> ChangePasswordScreen(vm) { section = "account"; vm.clearError() }
+        else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Text("Account", fontSize = 30.sp, fontWeight = FontWeight.Black)
+            Text("Manage your customer account", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
+                Column(Modifier.padding(18.dp)) {
+                    Text(vm.user?.name.orEmpty(), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp, bottom = 18.dp))
+                    AccountOption(Icons.Default.Person, "Personal Information", "Update your name, username, and phone number") { vm.clearError(); section = "personal" }
+                    Spacer(Modifier.height(10.dp))
+                    AccountOption(Icons.Default.Lock, "Change Password", "Verify your email before choosing a new password") { vm.clearError(); section = "password" }
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = vm::logout, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(7.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Log out", fontWeight = FontWeight.Bold) }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun AccountOption(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(9.dp), color = Color(0xFFF4F5EE), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDDE0D5))) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = Color(0xFF202124), modifier = Modifier.size(42.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = Color(0xFFB5C019), modifier = Modifier.size(21.dp)) }
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 3.dp))
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF777D72))
+        }
+    }
+}
+
+@Composable
+private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
+    val customer = vm.user
+    var name by rememberSaveable(customer?.id) { mutableStateOf(customer?.name.orEmpty()) }
+    var username by rememberSaveable(customer?.id) { mutableStateOf(customer?.username.orEmpty()) }
+    var phone by rememberSaveable(customer?.id) { mutableStateOf(customer?.phone.orEmpty()) }
+    var status by rememberSaveable { mutableStateOf<String?>(null) }
+    val canSave = name.isNotBlank() && username.length >= 3 && Regex("^[A-Za-z0-9._-]+$").matches(username) && Regex("^09\\d{9}$").matches(phone)
+
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
+        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+        Text("Personal Information", fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 8.dp))
+        Text("Update the details used to identify and contact you.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
+            Column(Modifier.padding(18.dp)) {
+                RegistrationField("Full name", name, "Your customer display name") { name = it.take(120); status = null; vm.clearError() }
+                RegistrationField("Username", username, "Letters, numbers, dots, underscores, and hyphens") { username = it.filter { character -> character.isLetterOrDigit() || character in "._-" }.take(50); status = null; vm.clearError() }
+                RegistrationField("Phone number", phone, "11 digits starting with 09", keyboardType = KeyboardType.Number) { phone = it.filter(Char::isDigit).take(11); status = null; vm.clearError() }
+                OutlinedTextField(
+                    value = customer?.email.orEmpty(),
+                    onValueChange = {},
+                    label = { Text("Email address") },
+                    supportingText = { Text("Your verified email address cannot be changed.") },
+                    readOnly = true,
+                    singleLine = true,
+                    colors = loginFieldColors(),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                status?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp)) }
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { status = null; vm.updateProfile(name, username, phone) { status = it } },
+                    enabled = canSave && !vm.busy,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                ) { Text(if (vm.busy) "Saving..." else "Save Personal Information", fontWeight = FontWeight.Bold) }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
+    var code by rememberSaveable { mutableStateOf("") }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var sentMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    val passwordIsStrong = newPassword.length in 12..23 && newPassword.any(Char::isUpperCase) && newPassword.any(Char::isLowerCase) && newPassword.any(Char::isDigit) && Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(newPassword)
+    val canChange = code.length == 6 && currentPassword.isNotBlank() && passwordIsStrong && confirmation == newPassword
+
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
+        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+        Text("Change Password", fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 8.dp))
+        Text("Verify your email and confirm your current password before choosing a new one.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
+            Column(Modifier.padding(18.dp)) {
+                Text("Email verification", fontWeight = FontWeight.Bold)
+                Text("Send a one-time code to ${vm.user?.email.orEmpty()}. The code expires after 10 minutes.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
+                OutlinedButton(
+                    onClick = { sentMessage = null; vm.sendPasswordVerificationCode { sentMessage = it } },
+                    enabled = !vm.busy,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) { Text(if (vm.busy) "Sending..." else "Send verification code", fontWeight = FontWeight.Bold) }
+                sentMessage?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 10.dp)) }
+                Spacer(Modifier.height(14.dp))
+                RegistrationField("Email verification code", code, "Enter the 6-digit code", keyboardType = KeyboardType.NumberPassword) { code = it.filter(Char::isDigit).take(6); vm.clearError() }
+                RegistrationField("Current password", currentPassword, "Enter your current password", password = true, keyboardType = KeyboardType.Password) { currentPassword = it; vm.clearError() }
+                RegistrationField("New password", newPassword, "12-23 characters with uppercase, lowercase, number, and symbol", password = true, keyboardType = KeyboardType.Password) { newPassword = it.take(23); vm.clearError() }
+                RegistrationField("Confirm new password", confirmation, "Enter the new password again", password = true, keyboardType = KeyboardType.Password, imeAction = ImeAction.Done) { confirmation = it.take(23); vm.clearError() }
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { vm.changePassword(code, currentPassword, newPassword, confirmation) {} },
+                    enabled = canChange && !vm.busy,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                ) { Text(if (vm.busy) "Changing password..." else "Change Password", fontWeight = FontWeight.Bold) }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -1001,10 +1212,11 @@ private fun showDateTimePicker(context: Context, calendar: Calendar, dateFormat:
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, onOrderSubmitted: (Order) -> Unit, onReserve: () -> Unit) {
+private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -> Unit, onOrderSubmitted: (Order) -> Unit, onNotificationOrder: (Int) -> Unit) {
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("All") }
     var cartOpen by rememberSaveable { mutableStateOf(false) }
+    var notificationsOpen by rememberSaveable { mutableStateOf(false) }
     var checkingOut by rememberSaveable { mutableStateOf(false) }
     var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }
     var date by remember { mutableStateOf("") }
@@ -1019,6 +1231,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
         uri?.let { proofUri = it }
     }
     val cartSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val notificationSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val categories = remember(vm.products) { listOf("All") + vm.products.mapNotNull { it.category }.distinct() }
     val filtered = remember(vm.products, category, query) {
         vm.products.filter { product ->
@@ -1030,22 +1243,39 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     val cartProducts = remember(vm.products, vm.cart) { vm.products.filter { it.id in vm.cart } }
     val cartItemCount = vm.cart.values.sum()
     val cartTotal = vm.cart.entries.sumOf { (productId, quantity) -> productsById[productId]?.price?.times(quantity) ?: 0.0 }
+    val decisionOrders = remember(vm.orders) { vm.orders.filter { it.payment_status in setOf("paid", "rejected") } }
+    val decisionKeys = remember(decisionOrders) { decisionOrders.map { "${it.id}:${it.payment_status}" }.toSet() }
+    val unreadNotificationCount = decisionKeys.count { it !in vm.readOrderNotificationKeys }
     val canPay = payment == "cash" || (paymentReference.length == 13 && proofUri != null)
 
     LaunchedEffect(vm.cart.isEmpty()) {
         if (vm.cart.isEmpty()) checkingOut = false
     }
+    LaunchedEffect(notificationsOpen, decisionKeys) {
+        if (notificationsOpen) vm.markOrderNotificationsRead(decisionKeys)
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Menu", fontSize = 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-            Button(
-                onClick = onReserve,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF202124)),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+            BadgedBox(
+                badge = {
+                    if (unreadNotificationCount > 0) {
+                        Badge(
+                            modifier = Modifier.clearAndSetSemantics { },
+                            containerColor = Color(0xFFB5C019),
+                            contentColor = Color(0xFF171817),
+                        ) { Text(if (unreadNotificationCount > 99) "99+" else unreadNotificationCount.toString()) }
+                    }
+                },
             ) {
-                Text("Reserve", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                FilledIconButton(
+                    onClick = { notificationsOpen = true },
+                    modifier = Modifier.semantics {
+                        contentDescription = if (unreadNotificationCount == 0) "Order notifications" else "Order notifications, $unreadNotificationCount unread"
+                    },
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color(0xFF202124)),
+                ) { Icon(Icons.Default.Notifications, contentDescription = null) }
             }
             Spacer(Modifier.width(10.dp))
             BadgedBox(
@@ -1147,6 +1377,66 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                                         IconButton(onClick = { vm.add(product) }, enabled = quantity < product.stock, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Add, "Add", Modifier.size(19.dp)) }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (notificationsOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { notificationsOpen = false },
+            sheetState = notificationSheetState,
+            containerColor = Color(0xFFF8F7F1),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.78f),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+            ) {
+                item(key = "notification-title") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("NOTIFICATIONS", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Order updates", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(onClick = { notificationsOpen = false }) { Text("Close") }
+                    }
+                    Text("Accepted and rejected orders appear here.", color = Color(0xFF6E746B), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 14.dp))
+                }
+                if (decisionOrders.isEmpty()) {
+                    item(key = "empty-notifications") {
+                        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color.White) {
+                            Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFF747D00), modifier = Modifier.size(36.dp))
+                                Text("No order notifications yet", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                                Text("You will see an update when the cashier accepts or rejects an order.", color = Color(0xFF6E746B), fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 5.dp))
+                            }
+                        }
+                    }
+                } else {
+                    items(decisionOrders, key = { order -> "notification-${order.id}:${order.payment_status}" }) { order ->
+                        val accepted = order.payment_status == "paid"
+                        Surface(
+                            onClick = { notificationsOpen = false; onNotificationOrder(order.id) },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                            shape = RoundedCornerShape(11.dp),
+                            color = Color.White,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF)),
+                        ) {
+                            Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(shape = androidx.compose.foundation.shape.CircleShape, color = if (accepted) Color(0xFFE5F4E9) else Color(0xFFFDEAEA), modifier = Modifier.size(44.dp)) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(if (accepted) Icons.Default.CheckCircle else Icons.Default.Close, contentDescription = null, tint = if (accepted) Color(0xFF257342) else Color(0xFFB72C2C), modifier = Modifier.size(23.dp))
+                                    }
+                                }
+                                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                    Text(if (accepted) "Order accepted" else "Order rejected", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text("Order #${order.id} - ${money(order.total_due)}", color = Color(0xFF555B52), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                                    order.created_at?.let { Text(receiptDate(it), color = Color(0xFF858A81), fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF777D72))
                             }
                         }
                     }

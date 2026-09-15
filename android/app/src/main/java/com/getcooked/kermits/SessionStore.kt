@@ -82,6 +82,13 @@ class SessionStore(context: Context) {
             .apply()
     }
 
+    fun orderNotificationReadKeys(userId: Int): Set<String> =
+        prefs.getStringSet("order_notifications_read_$userId", emptySet())?.toSet().orEmpty()
+
+    fun saveOrderNotificationReadKeys(userId: Int, keys: Set<String>) {
+        prefs.edit().putStringSet("order_notifications_read_$userId", keys.toSet()).apply()
+    }
+
     /** Clears customer authentication without discarding this app installation's FCM identity. */
     fun clear() = prefs.edit()
         .remove("token")

@@ -6,8 +6,12 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\CustomerPasswordVerification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -138,6 +142,96 @@ class MobileApiTest extends TestCase
             ->getJson('/api/v1/me')
             ->assertOk()
             ->assertJsonPath('data.id', $customer->id);
+    }
+
+    public function test_customer_can_update_mobile_personal_information_without_changing_email_or_role(): void
+    {
+        $customer = User::factory()->create([
+            'name' => 'Old Name',
+            'username' => 'old.username',
+            'email' => 'verified@example.com',
+            'phone' => '09171234567',
+            'role' => User::ROLE_CUSTOMER,
+            'password' => 'MobilePassword123!',
+        ]);
+
+        $this->withToken($this->login($customer))->putJson('/api/v1/account/profile', [
+            'name' => 'Updated Name',
+            'username' => 'updated.username',
+            'phone' => '09181234567',
+            'email' => 'changed@example.com',
+            'role' => User::ROLE_SUPER_ADMIN,
+        ])->assertOk()
+            ->assertJsonPath('data.name', 'Updated Name')
+            ->assertJsonPath('data.username', 'updated.username')
+            ->assertJsonPath('data.email', 'verified@example.com')
+            ->assertJsonPath('data.role', User::ROLE_CUSTOMER);
+
+        $customer->refresh();
+        $this->assertSame('Updated Name', $customer->name);
+        $this->assertSame('09181234567', $customer->phone);
+        $this->assertSame('verified@example.com', $customer->email);
+        $this->assertSame(User::ROLE_CUSTOMER, $customer->role);
+    }
+
+    public function test_customer_can_request_a_mobile_password_verification_code(): void
+    {
+        Notification::fake();
+        $customer = User::factory()->create([
+            'email' => 'mobile.account@example.com',
+            'role' => User::ROLE_CUSTOMER,
+            'password' => 'MobilePassword123!',
+        ]);
+
+        $this->withToken($this->login($customer))
+            ->postJson('/api/v1/account/password/email-code')
+            ->assertOk()
+            ->assertJsonPath('data.email', $customer->email)
+            ->assertJsonPath('data.expires_in', 600);
+
+        $verification = Cache::get('mobile-customer-password-verification:'.$customer->id);
+        $this->assertIsArray($verification);
+        $this->assertSame($customer->email, $verification['email']);
+        $this->assertIsString($verification['code_hash']);
+        Notification::assertSentTo(
+            $customer,
+            CustomerPasswordVerification::class,
+            fn (CustomerPasswordVerification $notification): bool => preg_match('/^\d{6}$/', $notification->code) === 1,
+        );
+    }
+
+    public function test_mobile_password_change_requires_email_code_and_revokes_mobile_sessions(): void
+    {
+        $customer = User::factory()->create([
+            'email' => 'password.mobile@example.com',
+            'role' => User::ROLE_CUSTOMER,
+            'password' => 'MobilePassword123!',
+        ]);
+        $token = $this->login($customer);
+        $data = [
+            'verification_code' => '123456',
+            'current_password' => 'MobilePassword123!',
+            'password' => 'NewMobilePassword456!',
+            'password_confirmation' => 'NewMobilePassword456!',
+        ];
+
+        $this->withToken($token)->putJson('/api/v1/account/password', $data)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('verification_code');
+
+        Cache::put('mobile-customer-password-verification:'.$customer->id, [
+            'email' => strtolower($customer->email),
+            'code_hash' => Hash::make('123456'),
+        ], now()->addMinutes(10));
+
+        $this->withToken($token)->putJson('/api/v1/account/password', $data)
+            ->assertOk()
+            ->assertJsonPath('message', 'Your password was changed. Please log in again with your new password.');
+
+        $this->assertTrue(Hash::check('NewMobilePassword456!', $customer->fresh()->password));
+        $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $customer->id]);
+        $this->assertNull(Cache::get('mobile-customer-password-verification:'.$customer->id));
+        $this->withToken($token)->getJson('/api/v1/me')->assertUnauthorized();
     }
 
     public function test_customer_can_load_products_place_an_order_and_view_only_their_history(): void

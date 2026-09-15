@@ -19,7 +19,13 @@ data class VerifyCodeRequest(val challenge: String, val email: String, val code:
 @JsonClass(generateAdapter = true)
 data class RegisterRequest(val registration_token: String, val name: String, val username: String, val email: String, val phone: String, val password: String, val password_confirmation: String)
 @JsonClass(generateAdapter = true)
+data class UpdateProfileRequest(val name: String, val username: String, val phone: String)
+@JsonClass(generateAdapter = true)
+data class ChangePasswordRequest(val verification_code: String, val current_password: String, val password: String, val password_confirmation: String)
+@JsonClass(generateAdapter = true)
 data class User(val id: Int, val name: String, val username: String, val email: String, val phone: String?, val role: String)
+@JsonClass(generateAdapter = true)
+data class UserResponse(val data: User, val message: String? = null)
 @JsonClass(generateAdapter = true)
 data class Product(val id: Int, val name: String, val category: String?, val description: String?, val price: Double, val stock: Int, val image_url: String?)
 @JsonClass(generateAdapter = true)
@@ -91,6 +97,9 @@ interface KermitsApi {
     @POST("register/email/verify") suspend fun verifyRegistrationCode(@Body request: VerifyCodeRequest): Response<VerifyCodeResponse>
     @POST("register") suspend fun register(@Body request: RegisterRequest): Response<Map<String, User>>
     @GET("me") suspend fun me(): Map<String, User>
+    @PUT("account/profile") suspend fun updateProfile(@Body request: UpdateProfileRequest): Response<UserResponse>
+    @POST("account/password/email-code") suspend fun sendPasswordVerificationCode(): Response<ApiError>
+    @PUT("account/password") suspend fun updatePassword(@Body request: ChangePasswordRequest): Response<ApiError>
     @POST("logout") suspend fun logout(): Response<Unit>
     @PUT("push-installation") suspend fun registerPushInstallation(@Body request: PushInstallationRequest): Response<Unit>
     @DELETE("push-installation") suspend fun deletePushInstallation(): Response<Unit>
