@@ -44,6 +44,7 @@ class AuthenticationAndAccessTest extends TestCase
     {
         $this->get('/register')
             ->assertOk()
+            ->assertSee('Personal details')
             ->assertSee('name="birthday"', false)
             ->assertSee('id="age"', false)
             ->assertSee('name="sex"', false)
