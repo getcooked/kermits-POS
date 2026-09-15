@@ -15,6 +15,7 @@
         <form method="POST" action="{{ route($superAdminRecovery ? 'superadmin.password.email' : 'password.email') }}">
             @csrf
             <div class="field"><label for="email">Email address</label><input class="control" id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" placeholder="name@gmail.com" maxlength="160" required autofocus>@error('email')<p class="error">{{ $message }}</p>@enderror</div>
+            <x-recaptcha id="password-reset-recaptcha" />
             <button class="reset-button" type="submit">Send reset link <span>&rarr;</span></button>
         </form>
         <a class="return-login" href="{{ route('login') }}">&larr; Return to login</a>

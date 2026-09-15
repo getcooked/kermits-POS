@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterCustomerRequest;
 use App\Models\User;
+use App\Rules\Recaptcha;
 use App\Services\LoginAttemptLimiter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,8 +39,10 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
+            'g-recaptcha-response' => Recaptcha::rules($request),
         ], [
             'email.regex' => 'Please use a Gmail address.',
+            ...Recaptcha::messages(),
         ]);
 
         $code = (string) random_int(100000, 999999);

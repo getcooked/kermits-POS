@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -141,5 +144,62 @@ class RecaptchaLoginTest extends TestCase
         config(['services.recaptcha.enabled' => false]);
 
         $this->get('/login')->assertOk()->assertDontSee('id="login-recaptcha"', false);
+    }
+
+    public function test_registration_and_password_recovery_pages_display_recaptcha_without_exposing_secret(): void
+    {
+        $this->get('/register')->assertOk()
+            ->assertSee('id="registration-recaptcha"', false)
+            ->assertSee('test-site-key')
+            ->assertDontSee('test-secret-key');
+
+        foreach (['/forgot-password', '/admin/forgot-password'] as $path) {
+            $this->get($path)->assertOk()
+                ->assertSee('id="password-reset-recaptcha"', false)
+                ->assertSee('test-site-key')
+                ->assertSee('https://www.google.com/recaptcha/api.js', false)
+                ->assertDontSee('test-secret-key');
+        }
+    }
+
+    public function test_missing_captcha_blocks_registration_email_and_password_reset_messages(): void
+    {
+        Mail::fake();
+        Notification::fake();
+        Http::fake();
+        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->post('/register/email', ['email' => 'new.customer@gmail.com'])
+            ->assertSessionHasErrors('g-recaptcha-response');
+        $this->post('/forgot-password', ['email' => $user->email])
+            ->assertSessionHasErrors('g-recaptcha-response');
+
+        $this->assertNull(session('registration_email_verification'));
+        Notification::assertNothingSent();
+        Http::assertNothingSent();
+    }
+
+    public function test_valid_captcha_allows_registration_email_and_registered_account_recovery(): void
+    {
+        Mail::fake();
+        Notification::fake();
+        Http::fake(['www.google.com/recaptcha/api/siteverify' => Http::response([
+            'success' => true, 'hostname' => 'localhost',
+        ])]);
+        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->post('/register/email', [
+            'email' => 'new.customer@gmail.com',
+            'g-recaptcha-response' => 'registration-token',
+        ])->assertSessionHas('status')->assertSessionDoesntHaveErrors();
+        $this->assertSame('new.customer@gmail.com', session('registration_email_verification.email'));
+
+        $this->post('/forgot-password', [
+            'email' => $user->email,
+            'g-recaptcha-response' => 'password-reset-token',
+        ])->assertSessionHas('status')->assertSessionDoesntHaveErrors();
+
+        Notification::assertSentTo($user, ResetPassword::class);
+        Http::assertSentCount(2);
     }
 }

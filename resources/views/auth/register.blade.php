@@ -28,6 +28,7 @@
                         <form method="POST" action="{{ route('register.email') }}">
                             @csrf
                             <div class="field"><label for="verify-email">Gmail address</label><input class="control" id="verify-email" name="email" type="email" value="{{ old('email', $pendingVerification) }}" autocomplete="email" placeholder="name@gmail.com" required></div>
+                            <x-recaptcha id="registration-recaptcha" />
                             <button class="verify-button" type="submit">Send code</button>
                         </form>
                         @if($pendingVerification)
