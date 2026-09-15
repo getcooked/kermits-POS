@@ -40,6 +40,16 @@ class AuthenticationAndAccessTest extends TestCase
         $this->get('/login')->assertOk()->assertSee('Log in to your account');
     }
 
+    public function test_customer_registration_form_shows_personal_details_fields(): void
+    {
+        $this->get('/register')
+            ->assertOk()
+            ->assertSee('name="birthday"', false)
+            ->assertSee('id="age"', false)
+            ->assertSee('name="sex"', false)
+            ->assertSee('name="address"', false);
+    }
+
     public function test_customer_registration_cannot_choose_a_staff_role(): void
     {
         $this->withSession([
