@@ -55,7 +55,7 @@ class WebSeederTest extends TestCase
         $this->assertDatabaseCount('users', 4);
         $this->assertDatabaseHas('users', ['username' => 'superadmin', 'email' => 'kermitsbantayan1@gmail.com', 'role' => User::ROLE_SUPER_ADMIN]);
         $this->assertDatabaseHas('users', ['username' => 'admin', 'role' => User::ROLE_ADMIN]);
-        $this->assertDatabaseHas('users', ['username' => 'cashier', 'role' => User::ROLE_CASHIER]);
+        $this->assertDatabaseHas('users', ['username' => 'cashier', 'email' => 'kermitscashier@gmail.com', 'role' => User::ROLE_CASHIER]);
         $this->assertDatabaseHas('users', ['username' => 'customer', 'role' => User::ROLE_CUSTOMER]);
         $this->assertFileExists($this->lockPath);
 
@@ -78,5 +78,23 @@ class WebSeederTest extends TestCase
         $this->assertSame('kermitsbantayan1@gmail.com', $superAdmin->email);
         $this->assertSame('superadmin', $superAdmin->username);
         $this->assertSame($password, $superAdmin->getRawOriginal('password'));
+    }
+
+    public function test_existing_cashier_email_is_changed_without_replacing_the_account(): void
+    {
+        $cashier = User::factory()->create([
+            'username' => 'cashier',
+            'email' => 'cashier@gmail.com',
+            'role' => User::ROLE_CASHIER,
+        ]);
+        $password = $cashier->getRawOriginal('password');
+        $migration = require database_path('migrations/2026_09_15_000002_change_cashier_email.php');
+
+        $migration->up();
+
+        $cashier->refresh();
+        $this->assertSame('kermitscashier@gmail.com', $cashier->email);
+        $this->assertSame('cashier', $cashier->username);
+        $this->assertSame($password, $cashier->getRawOriginal('password'));
     }
 }
