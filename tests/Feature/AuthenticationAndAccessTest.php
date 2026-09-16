@@ -49,8 +49,34 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee('id="age"', false)
             ->assertSee('name="sex"', false)
             ->assertSee('name="address"', false)
+            ->assertSee('maxlength="100"', false)
+            ->assertSee('minlength="3" maxlength="30"', false)
             ->assertSee('Use my current location')
             ->assertDontSee('Prefer not to say');
+    }
+
+    public function test_customer_registration_enforces_name_and_username_length_limits(): void
+    {
+        $this->withSession([
+            'registration_email_verification' => [
+                'email' => 'limits@gmail.com',
+                'code_hash' => Hash::make('123456'),
+                'expires_at' => now()->addMinutes(10)->timestamp,
+                'verified' => true,
+            ],
+        ])->post('/register', [
+            'name' => str_repeat('A', 101),
+            'username' => str_repeat('u', 31),
+            'email' => 'limits@gmail.com',
+            'phone' => '09171234567',
+            'birthday' => '2000-09-15',
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ])->assertSessionHasErrors(['name', 'username']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'limits@gmail.com']);
     }
 
     public function test_customer_registration_cannot_choose_a_staff_role(): void

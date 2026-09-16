@@ -30,14 +30,15 @@
 
                     <div class="field full">
                         <label for="name">Full name</label>
-                        <input class="control" id="name" name="name" value="{{ old('name', $customer->name) }}" maxlength="120" autocomplete="name" required>
+                        <input class="control" id="name" name="name" value="{{ old('name', $customer->name) }}" maxlength="100" autocomplete="name" required>
+                        <small>Maximum 100 characters.</small>
                         @error('name')<small class="field-error">{{ $message }}</small>@enderror
                     </div>
 
                     <div class="field">
                         <label for="username">Username</label>
-                        <input class="control" id="username" name="username" value="{{ old('username', $customer->username) }}" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" autocomplete="username" required>
-                        <small>Letters, numbers, dots, underscores, and hyphens.</small>
+                        <input class="control" id="username" name="username" value="{{ old('username', $customer->username) }}" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" autocomplete="username" required>
+                        <small>3–30 characters: letters, numbers, dots, underscores, and hyphens.</small>
                         @error('username')<small class="field-error">{{ $message }}</small>@enderror
                     </div>
 

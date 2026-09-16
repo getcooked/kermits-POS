@@ -16,12 +16,12 @@ class UpdateCustomerProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:100'],
             'username' => [
                 'required',
                 'string',
                 'min:3',
-                'max:50',
+                'max:30',
                 'regex:/^[A-Za-z0-9._-]+$/',
                 Rule::unique('users', 'username')->ignore($this->user()),
             ],

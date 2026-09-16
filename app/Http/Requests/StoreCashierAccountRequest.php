@@ -16,8 +16,8 @@ class StoreCashierAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:120'],
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
+            'name' => ['required', 'string', 'max:100'],
+            'username' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'email' => ['required', 'email', 'max:160', 'unique:users,email'],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
             'password' => ['required', 'confirmed', Password::defaults()],

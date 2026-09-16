@@ -32,8 +32,8 @@
                 @csrf
                 @method('PUT')
                 <h3>Edit customer account</h3>
-                <div class="field"><label for="name">Full name</label><input class="control" id="name" name="name" value="{{ old('name', $customer->name) }}" required></div>
-                <div class="field"><label for="username">Username</label><input class="control" id="username" name="username" value="{{ old('username', $customer->username) }}" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" required></div>
+                <div class="field"><label for="name">Full name</label><input class="control" id="name" name="name" value="{{ old('name', $customer->name) }}" maxlength="100" required></div>
+                <div class="field"><label for="username">Username</label><input class="control" id="username" name="username" value="{{ old('username', $customer->username) }}" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" required></div>
                 <div class="field"><label for="email">Email</label><input class="control" id="email" name="email" type="email" value="{{ old('email', $customer->email) }}" required></div>
                 <div class="field"><label for="phone">Phone</label><input class="control" id="phone" name="phone" type="tel" inputmode="numeric" minlength="11" maxlength="11" pattern="09[0-9]{9}" value="{{ old('phone', $customer->phone) }}" placeholder="09XXXXXXXXX" required></div>
                 <div class="field"><label for="birthday">Birthday</label><input class="control" id="birthday" name="birthday" type="date" value="{{ old('birthday', $customer->birthday?->format('Y-m-d')) }}" min="1900-01-01" max="{{ now()->toDateString() }}" required></div>
