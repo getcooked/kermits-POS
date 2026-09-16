@@ -80,7 +80,7 @@
                         <label for="address">Present address</label>
                         <textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="e.g. Binaobao, Bantayan, Cebu, Philippines" aria-describedby="address-help location-status" required>{{ old('address', $customer->address) }}</textarea>
                         <button class="profile-location-button" id="use-current-location" type="button">Use my current location</button>
-                        <small id="address-help">Use a named location—not latitude and longitude. Clicking the button sends your coordinates to <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> to find the location name.</small>
+                        <small id="address-help">Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</small>
                         <small id="location-status" class="location-status" role="status" aria-live="polite"></small>
                         @error('address')<small class="field-error">{{ $message }}</small>@enderror
                     </div>
@@ -215,7 +215,7 @@
                     if (!response.ok || !result.address) throw new Error(result.message);
 
                     address.value = result.address;
-                    setLocationStatus('Named location added. Check the address and add a house number if needed.', 'success');
+                    setLocationStatus('');
                 } catch (error) {
                     setLocationStatus(error.message || 'A named location could not be found. Enter your address manually.', 'error');
                 }

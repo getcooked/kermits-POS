@@ -57,7 +57,7 @@
                         <label for="address">Present address</label>
                         <textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="e.g. Binaobao, Bantayan, Cebu, Philippines" aria-describedby="address-help location-status" required @disabled(! $verifiedEmail)>{{ old('address') }}</textarea>
                         <button class="location-button" id="use-current-location" type="button" @disabled(! $verifiedEmail)>Use my current location</button>
-                        <small id="address-help">Use a named location—not latitude and longitude. Clicking the button sends your coordinates to <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> to find the location name.</small>
+                        <small id="address-help">Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</small>
                         <small id="location-status" class="location-status" role="status" aria-live="polite"></small>
                     </div>
                     <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
@@ -137,7 +137,7 @@ body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0
                     if (!response.ok || !result.address) throw new Error(result.message);
 
                     address.value = result.address;
-                    setLocationStatus('Named location added. Check the address and add a house number if needed.', 'success');
+                    setLocationStatus('');
                 } catch (error) {
                     setLocationStatus(error.message || 'A named location could not be found. Enter your address manually.', 'error');
                 }
