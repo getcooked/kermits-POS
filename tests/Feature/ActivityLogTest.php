@@ -248,7 +248,10 @@ class ActivityLogTest extends TestCase
             ->assertSee(e($unsafeAgent), false);
 
         $response->assertDontSee($unsafeDescription, false)
-            ->assertDontSee($unsafeAgent, false);
+            ->assertDontSee($unsafeAgent, false)
+            ->assertDontSee('Recorded today')
+            ->assertDontSee('Find an activity')
+            ->assertDontSee('Apply filters');
     }
 
     public function test_activity_logs_can_be_filtered_without_leaking_unmatched_rows(): void

@@ -57,14 +57,6 @@ class ActivityLogController extends Controller
             'role' => $role,
             'method' => $method,
             'action' => $action,
-            'roles' => $roles,
-            'methods' => $methods,
-            'actions' => ActivityLog::query()
-                ->distinct()
-                ->orderBy('action')
-                ->pluck('action'),
-            'todayCount' => ActivityLog::query()->whereDate('created_at', today())->count(),
-            'failedCount' => ActivityLog::query()->where('status_code', '>=', 400)->count(),
         ]);
     }
 }
