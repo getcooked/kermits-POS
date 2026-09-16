@@ -26,6 +26,9 @@ class UpdateCustomerProfileRequest extends FormRequest
                 Rule::unique('users', 'username')->ignore($this->user()),
             ],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
+            'birthday' => ['required', 'date_format:Y-m-d', 'after_or_equal:1900-01-01', 'before_or_equal:today'],
+            'sex' => ['required', 'in:male,female'],
+            'address' => ['required', 'string', 'max:500'],
         ];
     }
 

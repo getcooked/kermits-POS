@@ -124,6 +124,9 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'updated.customer',
             'email' => 'updated@gmail.com',
             'phone' => '09181234567',
+            'birthday' => '1995-04-12',
+            'sex' => 'male',
+            'address' => 'Updated present address',
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ];
@@ -136,8 +139,24 @@ class AuthenticationAndAccessTest extends TestCase
             'username' => 'updated.customer',
             'email' => 'updated@gmail.com',
             'phone' => '09181234567',
+            'birthday' => '1995-04-12 00:00:00',
+            'sex' => 'male',
+            'address' => 'Updated present address',
             'role' => User::ROLE_CUSTOMER,
         ]);
+
+        $this->actingAs($superAdmin)->get(route('customers.show', $customer))
+            ->assertOk()
+            ->assertSee('Birthday')
+            ->assertSee('Apr 12, 1995')
+            ->assertSee('Age')
+            ->assertSee('Sex')
+            ->assertSee('Male')
+            ->assertSee('Present address')
+            ->assertSee('Updated present address')
+            ->assertSee('name="birthday"', false)
+            ->assertSee('name="sex"', false)
+            ->assertSee('name="address"', false);
 
         $this->post('/logout');
         $this->post('/login', ['email' => 'updated.customer', 'password' => 'SecurePass123!'])
@@ -167,6 +186,10 @@ class AuthenticationAndAccessTest extends TestCase
         $this->actingAs($superAdmin)->delete('/customers/'.$customer->id)->assertRedirect('/customers');
 
         $this->assertSoftDeleted('users', ['id' => $customer->id]);
+        $deletedCustomer = User::withTrashed()->findOrFail($customer->id);
+        $this->assertNull($deletedCustomer->birthday);
+        $this->assertNull($deletedCustomer->sex);
+        $this->assertNull($deletedCustomer->address);
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'customer_id' => $customer->id]);
         $this->assertSame('Deleted Customer #'.$customer->id, $order->fresh()->customer->name);
 

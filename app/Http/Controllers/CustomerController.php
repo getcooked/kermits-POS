@@ -89,6 +89,9 @@ class CustomerController extends Controller
                 'username' => $deletedIdentity,
                 'email' => $deletedIdentity.'@invalid.local',
                 'phone' => null,
+                'birthday' => null,
+                'sex' => null,
+                'address' => null,
                 'password' => Str::random(64),
                 'remember_token' => null,
             ])->save();

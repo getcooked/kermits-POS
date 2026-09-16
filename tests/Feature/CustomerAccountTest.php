@@ -16,7 +16,12 @@ class CustomerAccountTest extends TestCase
 
     public function test_profile_popover_opens_only_the_selected_account_section(): void
     {
-        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $customer = User::factory()->create([
+            'role' => User::ROLE_CUSTOMER,
+            'birthday' => '2000-09-15',
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
+        ]);
 
         $this->actingAs($customer)->get(route('customer.profile.edit'))
             ->assertOk()
@@ -26,6 +31,11 @@ class CustomerAccountTest extends TestCase
             ->assertDontSee('<span>2</span>', false)
             ->assertSee('id="email" type="email" value="'.$customer->email.'" readonly', false)
             ->assertSee('cannot be changed')
+            ->assertSee('name="birthday"', false)
+            ->assertSee('name="sex"', false)
+            ->assertSee('name="address"', false)
+            ->assertSee('Bantayan, Cebu')
+            ->assertSee('Use my current location')
             ->assertSee(route('customer.profile.update'), false)
             ->assertDontSee(route('customer.settings.password.update'), false);
 
@@ -69,6 +79,9 @@ class CustomerAccountTest extends TestCase
             'username' => 'old.name',
             'email' => 'verified@gmail.com',
             'phone' => '09171234567',
+            'birthday' => '2000-09-15',
+            'sex' => 'female',
+            'address' => 'Old address',
             'role' => User::ROLE_CUSTOMER,
         ]);
 
@@ -76,6 +89,9 @@ class CustomerAccountTest extends TestCase
             'name' => 'New Name',
             'username' => 'new.name',
             'phone' => '09181234567',
+            'birthday' => '1999-05-20',
+            'sex' => 'male',
+            'address' => 'New present address',
             'email' => 'changed@gmail.com',
             'role' => User::ROLE_SUPER_ADMIN,
         ])->assertRedirect()->assertSessionHas('status');
@@ -84,6 +100,9 @@ class CustomerAccountTest extends TestCase
         $this->assertSame('New Name', $customer->name);
         $this->assertSame('new.name', $customer->username);
         $this->assertSame('09181234567', $customer->phone);
+        $this->assertSame('1999-05-20', $customer->birthday->format('Y-m-d'));
+        $this->assertSame('male', $customer->sex);
+        $this->assertSame('New present address', $customer->address);
         $this->assertSame('verified@gmail.com', $customer->email);
         $this->assertSame(User::ROLE_CUSTOMER, $customer->role);
     }
@@ -97,6 +116,9 @@ class CustomerAccountTest extends TestCase
             'name' => 'Customer',
             'username' => 'already.used',
             'phone' => '12345',
+            'birthday' => '2000-09-15',
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
         ])->assertSessionHasErrors(['username', 'phone']);
     }
 
