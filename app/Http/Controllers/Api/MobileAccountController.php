@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Notifications\CustomerPasswordVerification;
+use App\Services\CustomerDetailsSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,7 @@ use Throwable;
 
 class MobileAccountController extends Controller
 {
-    public function updateProfile(Request $request): JsonResponse
+    public function updateProfile(Request $request, CustomerDetailsSchema $customerDetailsSchema): JsonResponse
     {
         $customer = $request->user();
         $validated = $request->validate([
@@ -35,6 +36,7 @@ class MobileAccountController extends Controller
             'phone.regex' => 'Enter an 11-digit Philippine mobile number starting with 09.',
         ]);
 
+        $customerDetailsSchema->ensure();
         $customer->update($validated);
 
         return response()->json([

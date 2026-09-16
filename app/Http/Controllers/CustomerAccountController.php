@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateCustomerPasswordRequest;
 use App\Http\Requests\UpdateCustomerProfileRequest;
 use App\Notifications\CustomerPasswordVerification;
+use App\Services\CustomerDetailsSchema;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,8 +23,11 @@ class CustomerAccountController extends Controller
         ]);
     }
 
-    public function updateProfile(UpdateCustomerProfileRequest $request): RedirectResponse
-    {
+    public function updateProfile(
+        UpdateCustomerProfileRequest $request,
+        CustomerDetailsSchema $customerDetailsSchema,
+    ): RedirectResponse {
+        $customerDetailsSchema->ensure();
         $request->user()->update($request->validated());
 
         return back()->with('status', 'Your profile was updated.');
