@@ -48,7 +48,9 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee('name="birthday"', false)
             ->assertSee('id="age"', false)
             ->assertSee('name="sex"', false)
-            ->assertSee('name="address"', false);
+            ->assertSee('name="address"', false)
+            ->assertSee('Use my current location')
+            ->assertDontSee('Prefer not to say');
     }
 
     public function test_customer_registration_cannot_choose_a_staff_role(): void

@@ -52,8 +52,14 @@
                     <p class="personal-details-heading">Personal details</p>
                     <div class="field"><label for="birthday">Birthday</label><input class="control" id="birthday" name="birthday" type="date" value="{{ old('birthday') }}" min="1900-01-01" max="{{ now()->toDateString() }}" required @disabled(! $verifiedEmail)></div>
                     <div class="field"><label for="age">Age</label><input class="control" id="age" type="text" value="" placeholder="Calculated from birthday" readonly aria-describedby="age-help"><small id="age-help">Age is calculated automatically from your birthday.</small></div>
-                    <div class="field"><label for="sex">Sex</label><select class="control" id="sex" name="sex" required @disabled(! $verifiedEmail)><option value="">Select sex</option><option value="male" @selected(old('sex') === 'male')>Male</option><option value="female" @selected(old('sex') === 'female')>Female</option><option value="prefer_not_to_say" @selected(old('sex') === 'prefer_not_to_say')>Prefer not to say</option></select></div>
-                    <div class="field"><label for="address">Address</label><textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="House number, street, barangay, city or municipality" required @disabled(! $verifiedEmail)>{{ old('address') }}</textarea></div>
+                    <div class="field"><label for="sex">Sex</label><select class="control" id="sex" name="sex" required @disabled(! $verifiedEmail)><option value="">Select sex</option><option value="male" @selected(old('sex') === 'male')>Male</option><option value="female" @selected(old('sex') === 'female')>Female</option></select></div>
+                    <div class="field">
+                        <label for="address">Present address</label>
+                        <textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="House number, street, barangay, city or municipality" aria-describedby="address-help location-status" required @disabled(! $verifiedEmail)>{{ old('address') }}</textarea>
+                        <button class="location-button" id="use-current-location" type="button" @disabled(! $verifiedEmail)>Use my current location</button>
+                        <small id="address-help">You can use your device location or enter your address manually.</small>
+                        <small id="location-status" class="location-status" role="status" aria-live="polite"></small>
+                    </div>
                     <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
                     <div class="field"><label>Confirm password</label><input class="control" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
                     @unless($verifiedEmail)<p class="locked-note">Verify your Gmail first to unlock account creation.</p>@endunless
@@ -68,6 +74,7 @@
 .register-page{min-height:100dvh;display:grid;place-items:center;padding:12px;background:#dfe2de}.register-shell{width:min(1050px,100%);height:min(760px,calc(100dvh - 24px));min-height:620px;display:grid;grid-template-columns:1fr 1.05fr;border:8px solid #181918;border-radius:28px;overflow:hidden;background:#f5f6ef}.register-shell aside{background:#171817;color:#fff;padding:42px;display:flex;flex-direction:column}.register-shell aside img{width:86px;height:86px;border-radius:50%;object-fit:contain;background:#fff;padding:7px}.register-shell aside div{margin:auto 0}.register-shell aside span,.eyebrow{font-size:12px;letter-spacing:.16em;color:#aab514}.register-shell aside h1{font-size:40px;line-height:1.08;margin:12px 0}.register-shell aside p{color:#b9bcb5;line-height:1.7}.register-form{display:grid;place-items:center;padding:26px;overflow:auto}.register-form>div{width:min(410px,100%)}.register-form h2{font-size:29px;margin:7px 0}.register-error,.register-notice{padding:12px;border-radius:9px;margin-bottom:14px}.register-error{background:#fff0f0}.register-notice{background:#edf8f0;border:1px solid #b8dbc4}.register-button{width:100%;border:0;border-radius:11px;padding:14px 17px;background:#171817;color:#fff;font-weight:700;display:flex;justify-content:space-between}.register-button:disabled{opacity:.45;cursor:not-allowed}.verify-card{border:1px solid #daddd1;border-radius:14px;background:#fffefa;padding:14px;margin:18px 0}.verify-head{display:flex;gap:10px;align-items:center;margin-bottom:12px}.verify-head>span{width:52px;height:28px;border-radius:999px;background:#f0f1ed;color:#667000;display:grid;place-items:center;font-size:11px;font-weight:800}.verify-head>span.done{background:#e5f5e9;color:#267444}.verify-head div{display:grid}.verify-head small{color:#687286;margin-top:2px}.verify-button{width:100%;border:1px solid #cfd2c8;border-radius:10px;background:#f5f6ef;color:#171817;padding:12px 14px;font-weight:800}.verify-button.dark{background:#171817;color:#fff;border-color:#171817}.code-input{text-align:center;font-size:22px!important;letter-spacing:.24em}.verified-email{padding:12px;border-radius:10px;background:#e5f5e9;color:#267444;font-weight:800;text-align:center}.locked-form{opacity:.62}.locked-note{text-align:center;color:#687286;font-size:13px;margin:8px 0 12px}@media(max-width:760px){.register-page{padding:0}.register-shell{height:auto;min-height:100dvh;border:0;border-radius:0;grid-template-columns:1fr}.register-shell aside{padding:18px;min-height:140px}.register-shell aside img{width:54px;height:54px}.register-shell aside div{margin:10px 0}.register-shell aside h1{font-size:23px;margin:4px 0}.register-shell aside p{display:none}.register-form{padding:24px 20px}}
 body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0}.register-shell{width:100%;height:100dvh;min-height:680px;grid-template-columns:minmax(350px,44%) minmax(0,56%);border:0;border-radius:0;background:#f7f7f1}.register-shell aside{padding:clamp(36px,5vw,72px);background:radial-gradient(circle at 15% 15%,#30332b 0,transparent 28%),linear-gradient(145deg,#131413,#1c1e1a)}.register-shell aside img{width:clamp(88px,8vw,120px);height:clamp(88px,8vw,120px)}.register-shell aside h1{font-size:clamp(42px,4vw,62px);letter-spacing:-.04em}.register-form{padding:clamp(28px,5vw,72px);background:radial-gradient(circle at 100% 0,#f0f1d8 0,transparent 32%),#f7f7f1}.register-form>div{width:min(520px,100%)}.register-form>div>.global-back{width:max-content;margin-bottom:34px;background:#fffefa;box-shadow:0 8px 24px rgba(22,24,20,.08)}.register-form h2{font-size:clamp(31px,3vw,42px)}.register-form .control{min-height:50px;border-radius:12px}.register-button{min-height:54px;border-radius:13px;font-size:16px;box-shadow:0 10px 24px rgba(23,24,23,.16)}
 .personal-details-heading{margin:26px 0 16px;padding-top:20px;border-top:1px solid #daddd1;color:#667000;font-size:12px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
+.location-button{width:100%;min-height:44px;margin-top:8px;border:1px solid #cfd2c8;border-radius:10px;background:#fffefa;color:#3f4700;font-weight:800;cursor:pointer}.location-button:hover{border-color:#aab514;background:#f7f9e9}.location-button:disabled{opacity:.45;cursor:not-allowed}.location-status{display:block;min-height:18px;margin-top:5px;color:#687286}.location-status.is-error{color:#b42318}.location-status.is-success{color:#267444}
 @media(max-width:800px){.register-shell{height:auto;min-height:100dvh;grid-template-columns:1fr}.register-shell aside{min-height:170px;padding:22px}.register-shell aside img{width:62px;height:62px}.register-shell aside div{margin:14px 0 0}.register-shell aside h1{font-size:27px}.register-shell aside p{display:none}.register-form{overflow:visible;padding:24px 18px 44px}.register-form>div>.global-back{margin-bottom:24px}}
 </style>
 @endpush
@@ -94,6 +101,46 @@ body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0
 
     birthday.addEventListener('change', updateAge);
     updateAge();
+
+    const address = document.getElementById('address');
+    const locationButton = document.getElementById('use-current-location');
+    const locationStatus = document.getElementById('location-status');
+
+    if (!address || !locationButton || !locationStatus) return;
+
+    const setLocationStatus = (message, state = '') => {
+        locationStatus.textContent = message;
+        locationStatus.className = `location-status${state ? ` is-${state}` : ''}`;
+    };
+
+    locationButton.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+            setLocationStatus('Location is not supported by this browser. Enter your address manually.', 'error');
+            return;
+        }
+
+        locationButton.disabled = true;
+        setLocationStatus('Requesting permission to access your current location...');
+
+        navigator.geolocation.getCurrentPosition(
+            ({ coords }) => {
+                const latitude = coords.latitude.toFixed(6);
+                const longitude = coords.longitude.toFixed(6);
+                address.value = `Current location: ${latitude}, ${longitude}`;
+                setLocationStatus('Current location added. You may add your street or barangay for a clearer address.', 'success');
+                locationButton.disabled = false;
+                address.focus();
+            },
+            (error) => {
+                const message = error.code === error.PERMISSION_DENIED
+                    ? 'Location permission was denied. Enter your address manually or allow location access in your browser.'
+                    : 'Your location could not be detected. Enter your address manually.';
+                setLocationStatus(message, 'error');
+                locationButton.disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+        );
+    });
 })();
 </script>
 @endpush
