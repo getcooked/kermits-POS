@@ -19,7 +19,7 @@ data class VerifyCodeRequest(val challenge: String, val email: String, val code:
 @JsonClass(generateAdapter = true)
 data class RegisterRequest(val registration_token: String, val name: String, val username: String, val email: String, val phone: String, val birthday: String, val sex: String, val address: String, val password: String, val password_confirmation: String)
 @JsonClass(generateAdapter = true)
-data class UpdateProfileRequest(val name: String, val username: String, val phone: String)
+data class UpdateProfileRequest(val name: String, val username: String, val phone: String, val address: String)
 @JsonClass(generateAdapter = true)
 data class ChangePasswordRequest(val verification_code: String, val password: String, val password_confirmation: String)
 @JsonClass(generateAdapter = true)

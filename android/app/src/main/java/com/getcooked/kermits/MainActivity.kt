@@ -1,6 +1,7 @@
 package com.getcooked.kermits
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 
@@ -8,9 +9,15 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Geocoder
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.Looper
 import android.os.SystemClock
 import android.print.PrintAttributes
 import android.print.PrintJob
@@ -97,8 +104,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -115,6 +126,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
     private var reservationUpdateId by mutableStateOf<Int?>(null)
@@ -390,12 +402,12 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             }
         }
     }
-    fun updateProfile(name: String, username: String, phone: String, done: (String?) -> Unit) = viewModelScope.launch {
+    fun updateProfile(name: String, username: String, phone: String, address: String, done: (String?) -> Unit) = viewModelScope.launch {
         if (busy) return@launch
         busy = true
         error = null
         try {
-            val response = api.updateProfile(UpdateProfileRequest(name.trim(), username.trim(), phone.trim()))
+            val response = api.updateProfile(UpdateProfileRequest(name.trim(), username.trim(), phone.trim(), address.trim()))
             if (!response.isSuccessful) {
                 error = apiError(response.errorBody()?.string()) ?: "Your personal information could not be updated."
                 done(null)
@@ -857,13 +869,127 @@ private fun AccountOption(icon: ImageVector, title: String, subtitle: String, on
 }
 
 @Composable
+private fun CurrentLocationAddressButton(onAddressFound: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var locating by rememberSaveable { mutableStateOf(false) }
+    var locationMessage by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val findAddress: () -> Unit = {
+        scope.launch {
+            locating = true
+            locationMessage = "Finding your present location..."
+            val address = currentNamedAddress(context)
+
+            if (address == null) {
+                locationMessage = "Your location name could not be found. Enter your address manually."
+            } else {
+                onAddressFound(address)
+                locationMessage = "Present location added."
+            }
+
+            locating = false
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        if (permissions.values.any { it }) {
+            findAddress()
+        } else {
+            locationMessage = "Location permission was denied. Enter your address manually."
+        }
+    }
+    val hasLocationPermission = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    OutlinedButton(
+        onClick = {
+            locationMessage = null
+            if (hasLocationPermission()) {
+                findAddress()
+            } else {
+                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            }
+        },
+        enabled = !locating,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+    ) {
+        Text(if (locating) "Finding location..." else "Use my current location", fontWeight = FontWeight.Bold)
+    }
+    locationMessage?.let {
+        Text(it, color = if (it == "Present location added.") Color(0xFF267444) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+    }
+}
+
+@SuppressLint("MissingPermission")
+private suspend fun currentDeviceLocation(context: Context): Location? {
+    val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        .filter { provider -> runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false) }
+    val cachedLocation = providers
+        .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
+        .maxByOrNull(Location::getTime)
+    val provider = providers.firstOrNull() ?: return cachedLocation
+
+    return withTimeoutOrNull(12_000) {
+        suspendCancellableCoroutine { continuation ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val cancellationSignal = CancellationSignal()
+                continuation.invokeOnCancellation { cancellationSignal.cancel() }
+                manager.getCurrentLocation(provider, cancellationSignal, ContextCompat.getMainExecutor(context)) { location ->
+                    if (continuation.isActive) continuation.resume(location ?: cachedLocation)
+                }
+            } else {
+                val listener = object : LocationListener {
+                    override fun onLocationChanged(location: Location) {
+                        manager.removeUpdates(this)
+                        if (continuation.isActive) continuation.resume(location)
+                    }
+
+                    override fun onProviderDisabled(provider: String) {
+                        manager.removeUpdates(this)
+                        if (continuation.isActive) continuation.resume(cachedLocation)
+                    }
+
+                    @Deprecated("Deprecated by Android")
+                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+                }
+                continuation.invokeOnCancellation { manager.removeUpdates(listener) }
+                manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+            }
+        }
+    } ?: cachedLocation
+}
+
+@Suppress("DEPRECATION")
+private suspend fun currentNamedAddress(context: Context): String? {
+    val location = currentDeviceLocation(context) ?: return null
+
+    return withContext(Dispatchers.IO) {
+        if (!Geocoder.isPresent()) return@withContext null
+
+        runCatching {
+            Geocoder(context, Locale.ENGLISH)
+                .getFromLocation(location.latitude, location.longitude, 1)
+                ?.firstOrNull()
+                ?.getAddressLine(0)
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+        }.getOrNull()
+    }
+}
+
+@Composable
 private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
     val customer = vm.user
     var name by rememberSaveable(customer?.id) { mutableStateOf(customer?.name.orEmpty()) }
     var username by rememberSaveable(customer?.id) { mutableStateOf(customer?.username.orEmpty()) }
     var phone by rememberSaveable(customer?.id) { mutableStateOf(customer?.phone.orEmpty()) }
+    var address by rememberSaveable(customer?.id) { mutableStateOf(customer?.address.orEmpty()) }
     var status by rememberSaveable { mutableStateOf<String?>(null) }
-    val canSave = name.isNotBlank() && name.length <= 100 && username.length in 3..30 && Regex("^[A-Za-z0-9._-]+$").matches(username) && Regex("^09\\d{9}$").matches(phone)
+    val canSave = name.isNotBlank() && name.length <= 100 && username.length in 3..30 && Regex("^[A-Za-z0-9._-]+$").matches(username) && Regex("^09\\d{9}$").matches(phone) && address.isNotBlank() && address.length <= 500
 
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
         TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
@@ -874,6 +1000,19 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 RegistrationField("Full name", name, "Maximum 100 characters") { name = it.take(100); status = null; vm.clearError() }
                 RegistrationField("Username", username, "3–30 characters: letters, numbers, dots, underscores, and hyphens") { username = it.filter { character -> character.isLetterOrDigit() || character in "._-" }.take(30); status = null; vm.clearError() }
                 RegistrationField("Phone number", phone, "11 digits starting with 09", keyboardType = KeyboardType.Number) { phone = it.filter(Char::isDigit).take(11); status = null; vm.clearError() }
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it.take(500); status = null; vm.clearError() },
+                    label = { Text("Present address") },
+                    placeholder = { Text("e.g. Binaobao, Bantayan, Cebu, Philippines") },
+                    supportingText = { Text("${address.length}/500 characters") },
+                    minLines = 3,
+                    maxLines = 5,
+                    colors = loginFieldColors(),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                )
+                CurrentLocationAddressButton { foundAddress -> address = foundAddress.take(500); status = null; vm.clearError() }
                 OutlinedTextField(
                     value = customer?.email.orEmpty(),
                     onValueChange = {},
@@ -888,7 +1027,7 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 status?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp)) }
                 Spacer(Modifier.height(16.dp))
                 Button(
-                    onClick = { status = null; vm.updateProfile(name, username, phone) { status = it } },
+                    onClick = { status = null; vm.updateProfile(name, username, phone, address) { status = it } },
                     enabled = canSave && !vm.busy,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
                     shape = RoundedCornerShape(8.dp),
@@ -1002,7 +1141,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         else -> null
     }
     val birthdayError = if (calculateAge(birthday) == null) "Select a valid birthday." else null
-    val sexError = if (sex !in setOf("male", "female", "prefer_not_to_say")) "Select your sex." else null
+    val sexError = if (sex !in setOf("male", "female")) "Select your sex." else null
     val addressError = when {
         address.isBlank() -> "Enter your address."
         address.length > 500 -> "Address must not be more than 500 characters."
@@ -1089,7 +1228,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
             )
             Text("Sex", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 5.dp, bottom = 5.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                listOf("male" to "Male", "female" to "Female", "prefer_not_to_say" to "Prefer not to say").forEach { (value, label) ->
+                listOf("male" to "Male", "female" to "Female").forEach { (value, label) ->
                     FilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.padding(end = 7.dp))
                 }
             }
@@ -1107,6 +1246,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
             )
+            CurrentLocationAddressButton { foundAddress -> address = foundAddress.take(500); vm.clearError() }
             RegistrationField(
                 label = "Password",
                 value = password,

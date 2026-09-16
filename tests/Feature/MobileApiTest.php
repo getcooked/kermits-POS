@@ -159,17 +159,20 @@ class MobileApiTest extends TestCase
             'name' => 'Updated Name',
             'username' => 'updated.username',
             'phone' => '09181234567',
+            'address' => 'Binaobao, Bantayan, Cebu, Philippines',
             'email' => 'changed@example.com',
             'role' => User::ROLE_SUPER_ADMIN,
         ])->assertOk()
             ->assertJsonPath('data.name', 'Updated Name')
             ->assertJsonPath('data.username', 'updated.username')
+            ->assertJsonPath('data.address', 'Binaobao, Bantayan, Cebu, Philippines')
             ->assertJsonPath('data.email', 'verified@example.com')
             ->assertJsonPath('data.role', User::ROLE_CUSTOMER);
 
         $customer->refresh();
         $this->assertSame('Updated Name', $customer->name);
         $this->assertSame('09181234567', $customer->phone);
+        $this->assertSame('Binaobao, Bantayan, Cebu, Philippines', $customer->address);
         $this->assertSame('verified@example.com', $customer->email);
         $this->assertSame(User::ROLE_CUSTOMER, $customer->role);
     }
