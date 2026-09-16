@@ -101,7 +101,7 @@ class MobileRegistrationController extends Controller
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
             'phone' => ['required', 'string', 'size:11', 'regex:/^09[0-9]{9}$/'],
             'birthday' => ['required', 'date_format:Y-m-d', 'after_or_equal:1900-01-01', 'before_or_equal:today'],
-            'sex' => ['required', 'in:male,female,prefer_not_to_say'],
+            'sex' => ['required', 'in:male,female'],
             'address' => ['required', 'string', 'max:500'],
             'password' => ['required', 'string', 'confirmed', Password::defaults()->max(23)],
         ], [

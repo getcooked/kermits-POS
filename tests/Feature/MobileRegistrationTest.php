@@ -109,7 +109,7 @@ class MobileRegistrationTest extends TestCase
             'email' => 'unverified@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',
-            'sex' => 'prefer_not_to_say',
+            'sex' => 'female',
             'address' => 'Bantayan, Cebu',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',

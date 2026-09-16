@@ -29,8 +29,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table): void {
-            $table->dropColumn(['birthday', 'sex', 'address']);
-        });
+        // This repair migration must not remove columns that may predate it.
     }
 };
