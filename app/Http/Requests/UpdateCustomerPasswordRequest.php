@@ -19,8 +19,7 @@ class UpdateCustomerPasswordRequest extends FormRequest
     {
         return [
             'verification_code' => ['required', 'digits:6'],
-            'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', 'different:current_password', Password::defaults()],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }
 
@@ -44,6 +43,11 @@ class UpdateCustomerPasswordRequest extends FormRequest
             if (! $valid) {
                 $validator->errors()->add('verification_code', 'The email verification code is invalid or has expired. Request a new code.');
             }
+
+            if (! $validator->errors()->has('password')
+                && Hash::check($this->string('password')->toString(), (string) $this->user()?->password)) {
+                $validator->errors()->add('password', 'Choose a new password that is different from your current password.');
+            }
         }];
     }
 
@@ -51,8 +55,6 @@ class UpdateCustomerPasswordRequest extends FormRequest
     {
         return [
             'verification_code.required' => 'Enter the verification code sent to your email.',
-            'current_password.current_password' => 'The current password is incorrect.',
-            'password.different' => 'Choose a new password that is different from your current password.',
         ];
     }
 }

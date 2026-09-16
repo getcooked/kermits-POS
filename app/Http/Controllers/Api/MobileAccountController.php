@@ -81,19 +81,11 @@ class MobileAccountController extends Controller
     {
         $validated = $request->validate([
             'verification_code' => ['required', 'digits:6'],
-            'current_password' => ['required', 'string'],
-            'password' => ['required', 'confirmed', 'different:current_password', Password::defaults()],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ], [
             'verification_code.required' => 'Enter the verification code sent to your email.',
-            'password.different' => 'Choose a new password that is different from your current password.',
         ]);
         $customer = $request->user();
-
-        if (! Hash::check($validated['current_password'], $customer->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => 'The current password is incorrect.',
-            ]);
-        }
 
         $key = $this->verificationKey($customer->getKey());
         $verification = Cache::get($key);
@@ -107,6 +99,12 @@ class MobileAccountController extends Controller
         if (! $validCode) {
             throw ValidationException::withMessages([
                 'verification_code' => 'The email verification code is invalid or has expired. Request a new code.',
+            ]);
+        }
+
+        if (Hash::check($validated['password'], $customer->password)) {
+            throw ValidationException::withMessages([
+                'password' => 'Choose a new password that is different from your current password.',
             ]);
         }
 

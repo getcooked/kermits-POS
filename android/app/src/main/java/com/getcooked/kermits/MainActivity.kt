@@ -429,12 +429,12 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             busy = false
         }
     }
-    fun changePassword(code: String, currentPassword: String, newPassword: String, confirmation: String, done: (Boolean) -> Unit) = viewModelScope.launch {
+    fun changePassword(code: String, newPassword: String, confirmation: String, done: (Boolean) -> Unit) = viewModelScope.launch {
         if (busy) return@launch
         busy = true
         error = null
         try {
-            val response = api.updatePassword(ChangePasswordRequest(code.trim(), currentPassword, newPassword, confirmation))
+            val response = api.updatePassword(ChangePasswordRequest(code.trim(), newPassword, confirmation))
             if (!response.isSuccessful) {
                 error = apiError(response.errorBody()?.string()) ?: "Your password could not be changed."
                 done(false)
@@ -903,17 +903,16 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
 @Composable
 private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
-    var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var sentMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val passwordIsStrong = newPassword.length in 12..23 && newPassword.any(Char::isUpperCase) && newPassword.any(Char::isLowerCase) && newPassword.any(Char::isDigit) && Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(newPassword)
-    val canChange = code.length == 6 && currentPassword.isNotBlank() && passwordIsStrong && confirmation == newPassword
+    val canChange = code.length == 6 && passwordIsStrong && confirmation == newPassword
 
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
         TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
         Text("Change Password", fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 8.dp))
-        Text("Verify your email and confirm your current password before choosing a new one.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
+        Text("Verify your email before choosing a new password.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
             Column(Modifier.padding(18.dp)) {
                 Text("Email verification", fontWeight = FontWeight.Bold)
@@ -927,12 +926,11 @@ private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
                 sentMessage?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 10.dp)) }
                 Spacer(Modifier.height(14.dp))
                 RegistrationField("Email verification code", code, "Enter the 6-digit code", keyboardType = KeyboardType.NumberPassword) { code = it.filter(Char::isDigit).take(6); vm.clearError() }
-                RegistrationField("Current password", currentPassword, "Enter your current password", password = true, keyboardType = KeyboardType.Password) { currentPassword = it; vm.clearError() }
                 RegistrationField("New password", newPassword, "12-23 characters with uppercase, lowercase, number, and symbol", password = true, keyboardType = KeyboardType.Password) { newPassword = it.take(23); vm.clearError() }
                 RegistrationField("Confirm new password", confirmation, "Enter the new password again", password = true, keyboardType = KeyboardType.Password, imeAction = ImeAction.Done) { confirmation = it.take(23); vm.clearError() }
                 Spacer(Modifier.height(10.dp))
                 Button(
-                    onClick = { vm.changePassword(code, currentPassword, newPassword, confirmation) {} },
+                    onClick = { vm.changePassword(code, newPassword, confirmation) {} },
                     enabled = canChange && !vm.busy,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
                     shape = RoundedCornerShape(8.dp),
