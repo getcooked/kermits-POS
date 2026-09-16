@@ -863,7 +863,7 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
     var username by rememberSaveable(customer?.id) { mutableStateOf(customer?.username.orEmpty()) }
     var phone by rememberSaveable(customer?.id) { mutableStateOf(customer?.phone.orEmpty()) }
     var status by rememberSaveable { mutableStateOf<String?>(null) }
-    val canSave = name.isNotBlank() && username.length >= 3 && Regex("^[A-Za-z0-9._-]+$").matches(username) && Regex("^09\\d{9}$").matches(phone)
+    val canSave = name.isNotBlank() && name.length <= 100 && username.length in 3..30 && Regex("^[A-Za-z0-9._-]+$").matches(username) && Regex("^09\\d{9}$").matches(phone)
 
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
         TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
@@ -871,8 +871,8 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
         Text("Update the details used to identify and contact you.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
             Column(Modifier.padding(18.dp)) {
-                RegistrationField("Full name", name, "Your customer display name") { name = it.take(120); status = null; vm.clearError() }
-                RegistrationField("Username", username, "Letters, numbers, dots, underscores, and hyphens") { username = it.filter { character -> character.isLetterOrDigit() || character in "._-" }.take(50); status = null; vm.clearError() }
+                RegistrationField("Full name", name, "Maximum 100 characters") { name = it.take(100); status = null; vm.clearError() }
+                RegistrationField("Username", username, "3–30 characters: letters, numbers, dots, underscores, and hyphens") { username = it.filter { character -> character.isLetterOrDigit() || character in "._-" }.take(30); status = null; vm.clearError() }
                 RegistrationField("Phone number", phone, "11 digits starting with 09", keyboardType = KeyboardType.Number) { phone = it.filter(Char::isDigit).take(11); status = null; vm.clearError() }
                 OutlinedTextField(
                     value = customer?.email.orEmpty(),
@@ -987,14 +987,14 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
     val normalizedName = name.trim()
     val nameError = when {
         normalizedName.isBlank() -> "Enter your full name."
-        name.length > 30 || !normalizedName.matches(Regex("^\\p{L}[\\p{L}\\p{M}]*(?: \\p{L}[\\p{L}\\p{M}]*)*$")) ->
-            "Full name can contain only letters and single spaces, up to 30 characters."
+        name.length > 100 || !normalizedName.matches(Regex("^\\p{L}[\\p{L}\\p{M}]*(?: \\p{L}[\\p{L}\\p{M}]*)*$")) ->
+            "Full name can contain only letters and single spaces, up to 100 characters."
         else -> null
     }
     val usernameError = when {
         username.isBlank() -> "Enter a username."
         username.length < 3 -> "Username must contain at least 3 characters."
-        !username.matches(Regex("^[A-Za-z0-9._-]{3,13}$")) -> "Username can use only letters, numbers, dots, underscores, and hyphens, up to 13 characters."
+        !username.matches(Regex("^[A-Za-z0-9._-]{3,30}$")) -> "Username can use only letters, numbers, dots, underscores, and hyphens, up to 30 characters."
         else -> null
     }
     val phoneError = when {
@@ -1059,17 +1059,17 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
             RegistrationField(
                 label = "Full name",
                 value = name,
-                helperText = "Letters and single spaces only (${name.length}/30)",
+                helperText = "Letters and single spaces only (${name.length}/100)",
                 errorText = nameError.takeIf { showRegistrationErrors },
                 keyboardType = KeyboardType.Text,
-            ) { input -> name = input.filter { it.isLetter() || it == ' ' }.take(30) }
+            ) { input -> name = input.filter { it.isLetter() || it == ' ' }.take(100) }
             RegistrationField(
                 label = "Username",
                 value = username,
-                helperText = "3-13 characters: letters, numbers, dot, underscore, or hyphen (${username.length}/13)",
+                helperText = "3–30 characters: letters, numbers, dot, underscore, or hyphen (${username.length}/30)",
                 errorText = usernameError.takeIf { showRegistrationErrors },
                 keyboardType = KeyboardType.Ascii,
-            ) { input -> username = input.filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it in "._-" }.take(13) }
+            ) { input -> username = input.filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it in "._-" }.take(30) }
             RegistrationField(
                 label = "Phone number",
                 value = phone,

@@ -96,8 +96,8 @@ class MobileRegistrationController extends Controller
         $this->normalizeEmail($request);
         $validated = $request->validate([
             'registration_token' => ['required', 'string', 'size:64'],
-            'name' => ['required', 'string', 'max:30', 'regex:/^\p{L}[\p{L}\p{M}]*(?: \p{L}[\p{L}\p{M}]*)*$/u'],
-            'username' => ['required', 'string', 'min:3', 'max:13', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
+            'name' => ['required', 'string', 'max:100', 'regex:/^\p{L}[\p{L}\p{M}]*(?: \p{L}[\p{L}\p{M}]*)*$/u'],
+            'username' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
             'phone' => ['required', 'string', 'size:11', 'regex:/^09[0-9]{9}$/'],
             'birthday' => ['required', 'date_format:Y-m-d', 'after_or_equal:1900-01-01', 'before_or_equal:today'],
@@ -105,9 +105,9 @@ class MobileRegistrationController extends Controller
             'address' => ['required', 'string', 'max:500'],
             'password' => ['required', 'string', 'confirmed', Password::defaults()->max(23)],
         ], [
-            'name.max' => 'The full name must not be more than 30 characters.',
+            'name.max' => 'The full name must not be more than 100 characters.',
             'name.regex' => 'The full name may only contain letters and single spaces.',
-            'username.max' => 'The username must not be more than 13 characters.',
+            'username.max' => 'The username must not be more than 30 characters.',
             'phone.size' => 'The phone number must contain exactly 11 digits.',
             'phone.regex' => 'The phone number must contain exactly 11 digits and start with 09.',
             'password.max' => 'The password must not be more than 23 characters.',

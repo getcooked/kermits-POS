@@ -20,12 +20,12 @@ class MobileAccountController extends Controller
     {
         $customer = $request->user();
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:100'],
             'username' => [
                 'required',
                 'string',
                 'min:3',
-                'max:50',
+                'max:30',
                 'regex:/^[A-Za-z0-9._-]+$/',
                 Rule::unique('users', 'username')->ignore($customer),
             ],

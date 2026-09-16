@@ -45,8 +45,8 @@
 
                 <form method="POST" action="{{ route('register.store') }}" class="{{ $verifiedEmail ? '' : 'locked-form' }}">
                     @csrf
-                    <div class="field"><label>Full name</label><input class="control" name="name" value="{{ old('name') }}" maxlength="120" required @disabled(! $verifiedEmail)></div>
-                    <div class="field"><label>Username</label><input class="control" name="username" value="{{ old('username') }}" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" autocomplete="username" required @disabled(! $verifiedEmail)><small>Letters, numbers, dots, underscores, and hyphens only.</small></div>
+                    <div class="field"><label>Full name</label><input class="control" name="name" value="{{ old('name') }}" maxlength="100" required @disabled(! $verifiedEmail)><small>Maximum 100 characters.</small></div>
+                    <div class="field"><label>Username</label><input class="control" name="username" value="{{ old('username') }}" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" autocomplete="username" required @disabled(! $verifiedEmail)><small>3–30 characters: letters, numbers, dots, underscores, and hyphens.</small></div>
                     <div class="field"><label>Email address</label><input class="control" name="email" type="email" value="{{ old('email', $verifiedEmail) }}" autocomplete="email" readonly required></div>
                     <div class="field"><label>Phone number</label><input class="control" name="phone" type="tel" inputmode="numeric" value="{{ old('phone') }}" minlength="11" maxlength="11" pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" required @disabled(! $verifiedEmail)><small>11 digits starting with 09.</small></div>
                     <p class="personal-details-heading">Personal details</p>

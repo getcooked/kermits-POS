@@ -48,8 +48,8 @@ class MobileRegistrationTest extends TestCase
 
         $this->postJson('/api/v1/register', [
             'registration_token' => $token,
-            'name' => str_repeat('A', 14).' '.str_repeat('B', 15),
-            'username' => str_repeat('u', 13),
+            'name' => str_repeat('A', 49).' '.str_repeat('B', 50),
+            'username' => str_repeat('u', 30),
             'email' => 'new.customer@gmail.com',
             'phone' => '09171234567',
             'birthday' => $birthday,
@@ -84,8 +84,8 @@ class MobileRegistrationTest extends TestCase
 
         $this->postJson('/api/v1/register', [
             'registration_token' => $registrationToken,
-            'name' => str_repeat('A', 31),
-            'username' => str_repeat('u', 14),
+            'name' => str_repeat('A', 101),
+            'username' => str_repeat('u', 31),
             'email' => 'invalid-limits@gmail.com',
             'phone' => '0817123456a',
             'birthday' => now()->addDay()->toDateString(),
