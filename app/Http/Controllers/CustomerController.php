@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateCustomerAccountRequest;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\CustomerDetailsSchema;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -46,8 +47,11 @@ class CustomerController extends Controller
         return view('customers.show', compact('customer'));
     }
 
-    public function update(UpdateCustomerAccountRequest $request, User $customer): RedirectResponse
-    {
+    public function update(
+        UpdateCustomerAccountRequest $request,
+        User $customer,
+        CustomerDetailsSchema $customerDetailsSchema,
+    ): RedirectResponse {
         abort_unless($customer->hasRole(User::ROLE_CUSTOMER), 404);
 
         $data = $request->safe()->except(['password', 'password_confirmation']);
@@ -55,15 +59,18 @@ class CustomerController extends Controller
             $data['password'] = $request->validated('password');
         }
 
+        $customerDetailsSchema->ensure();
         $customer->update($data);
 
         return back()->with('status', 'Customer account updated securely.');
     }
 
-    public function destroy(User $customer): RedirectResponse
+    public function destroy(User $customer, CustomerDetailsSchema $customerDetailsSchema): RedirectResponse
     {
         abort_unless(request()->user()->hasRole(User::ROLE_SUPER_ADMIN), 403);
         abort_unless($customer->hasRole(User::ROLE_CUSTOMER), 404);
+
+        $customerDetailsSchema->ensure();
 
         DB::transaction(function () use ($customer): void {
             $deletedIdentity = 'deleted-'.$customer->id.'-'.Str::lower(Str::random(10));

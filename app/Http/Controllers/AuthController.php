@@ -6,6 +6,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterCustomerRequest;
 use App\Models\User;
 use App\Rules\Recaptcha;
+use App\Services\CustomerDetailsSchema;
 use App\Services\LoginAttemptLimiter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,8 +89,10 @@ class AuthController extends Controller
         return back()->with('status', 'Gmail verified. You can now create your account.');
     }
 
-    public function storeRegistration(RegisterCustomerRequest $request): RedirectResponse
-    {
+    public function storeRegistration(
+        RegisterCustomerRequest $request,
+        CustomerDetailsSchema $customerDetailsSchema,
+    ): RedirectResponse {
         $verification = session('registration_email_verification');
         $email = strtolower($request->validated('email'));
 
@@ -98,6 +101,8 @@ class AuthController extends Controller
                 ->withInput($request->except('password', 'password_confirmation'))
                 ->withErrors(['email' => 'Please verify this Gmail address before creating your account.']);
         }
+
+        $customerDetailsSchema->ensure();
 
         $user = User::query()->create([
             ...$request->validated(),

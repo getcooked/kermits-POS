@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\CustomerDetailsSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -91,7 +92,7 @@ class MobileRegistrationController extends Controller
         ]]);
     }
 
-    public function register(Request $request): JsonResponse
+    public function register(Request $request, CustomerDetailsSchema $customerDetailsSchema): JsonResponse
     {
         $this->normalizeEmail($request);
         $validated = $request->validate([
@@ -119,6 +120,8 @@ class MobileRegistrationController extends Controller
         if (! $verifiedEmail || ! hash_equals($verifiedEmail, $email)) {
             return response()->json(['code' => 'verification_expired', 'message' => 'Email verification has expired. Please verify your Gmail address again.'], 422);
         }
+
+        $customerDetailsSchema->ensure();
 
         $user = User::query()->create([
             'name' => $validated['name'],
