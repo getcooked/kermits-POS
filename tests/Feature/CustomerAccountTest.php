@@ -44,6 +44,10 @@ class CustomerAccountTest extends TestCase
             ->assertSee('Change password')
             ->assertDontSee('Personal Information')
             ->assertSee('Send verification code')
+            ->assertSee('autocomplete="off" value="" required', false)
+            ->assertDontSee('placeholder="000000"', false)
+            ->assertDontSee('current_password', false)
+            ->assertDontSee('Use at least 12 characters with uppercase and lowercase letters')
             ->assertSee(route('customer.settings.password.email-code'), false)
             ->assertSee(route('customer.settings.password.update'), false)
             ->assertDontSee(route('customer.profile.update'), false);
@@ -122,7 +126,7 @@ class CustomerAccountTest extends TestCase
         ])->assertSessionHasErrors(['username', 'phone']);
     }
 
-    public function test_customer_can_change_password_with_current_password_and_mobile_sessions_are_revoked(): void
+    public function test_customer_can_change_password_with_email_code_and_mobile_sessions_are_revoked(): void
     {
         $customer = User::factory()->create([
             'password' => 'CurrentPassword123!',
@@ -139,7 +143,6 @@ class CustomerAccountTest extends TestCase
             ->withSession($this->passwordVerificationSession($customer))
             ->put(route('customer.settings.password.update'), [
                 'verification_code' => '123456',
-                'current_password' => 'CurrentPassword123!',
                 'password' => 'NewSecurePassword456!',
                 'password_confirmation' => 'NewSecurePassword456!',
             ])->assertRedirect()
@@ -150,7 +153,7 @@ class CustomerAccountTest extends TestCase
         $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $customer->id]);
     }
 
-    public function test_password_change_rejects_an_incorrect_current_password(): void
+    public function test_password_change_rejects_reusing_the_current_password(): void
     {
         $customer = User::factory()->create([
             'password' => 'CurrentPassword123!',
@@ -161,10 +164,9 @@ class CustomerAccountTest extends TestCase
             ->withSession($this->passwordVerificationSession($customer))
             ->put(route('customer.settings.password.update'), [
                 'verification_code' => '123456',
-                'current_password' => 'WrongPassword123!',
-                'password' => 'NewSecurePassword456!',
-                'password_confirmation' => 'NewSecurePassword456!',
-            ])->assertSessionHasErrors('current_password');
+                'password' => 'CurrentPassword123!',
+                'password_confirmation' => 'CurrentPassword123!',
+            ])->assertSessionHasErrors('password');
 
         $this->assertTrue(Hash::check('CurrentPassword123!', $customer->fresh()->password));
     }
@@ -203,7 +205,6 @@ class CustomerAccountTest extends TestCase
         ]);
         $passwordData = [
             'verification_code' => '654321',
-            'current_password' => 'CurrentPassword123!',
             'password' => 'NewSecurePassword456!',
             'password_confirmation' => 'NewSecurePassword456!',
         ];

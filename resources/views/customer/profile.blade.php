@@ -94,7 +94,7 @@
                 <div class="account-section-heading">
                     <div>
                         <h2>Change password</h2>
-                        <p>Verify your email and confirm your current password before choosing a new one.</p>
+                        <p>Verify your email before choosing a new password.</p>
                     </div>
                 </div>
 
@@ -119,14 +119,8 @@
 
                     <div class="field full">
                         <label for="verification_code">Email verification code</label>
-                        <input class="control verification-code" id="verification_code" name="verification_code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required>
+                        <input class="control verification-code" id="verification_code" name="verification_code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" value="" required>
                         @error('verification_code')<small class="field-error">{{ $message }}</small>@enderror
-                    </div>
-
-                    <div class="field full">
-                        <label for="current_password">Current password</label>
-                        <input class="control" id="current_password" name="current_password" type="password" autocomplete="current-password" required>
-                        @error('current_password')<small class="field-error">{{ $message }}</small>@enderror
                     </div>
 
                     <div class="field">
@@ -140,7 +134,6 @@
                         <input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required>
                     </div>
 
-                    <div class="password-rules full">Use at least 12 characters with uppercase and lowercase letters, a number, and a symbol. Changing your password signs out other web browsers and mobile app sessions.</div>
                     <button class="account-submit" type="submit">Change password</button>
                 </form>
             </section>

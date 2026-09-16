@@ -210,7 +210,6 @@ class MobileApiTest extends TestCase
         $token = $this->login($customer);
         $data = [
             'verification_code' => '123456',
-            'current_password' => 'MobilePassword123!',
             'password' => 'NewMobilePassword456!',
             'password_confirmation' => 'NewMobilePassword456!',
         ];
@@ -223,6 +222,12 @@ class MobileApiTest extends TestCase
             'email' => strtolower($customer->email),
             'code_hash' => Hash::make('123456'),
         ], now()->addMinutes(10));
+
+        $this->withToken($token)->putJson('/api/v1/account/password', [
+            ...$data,
+            'password' => 'MobilePassword123!',
+            'password_confirmation' => 'MobilePassword123!',
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
 
         $this->withToken($token)->putJson('/api/v1/account/password', $data)
             ->assertOk()

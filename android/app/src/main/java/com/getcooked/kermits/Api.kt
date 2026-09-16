@@ -21,7 +21,7 @@ data class RegisterRequest(val registration_token: String, val name: String, val
 @JsonClass(generateAdapter = true)
 data class UpdateProfileRequest(val name: String, val username: String, val phone: String)
 @JsonClass(generateAdapter = true)
-data class ChangePasswordRequest(val verification_code: String, val current_password: String, val password: String, val password_confirmation: String)
+data class ChangePasswordRequest(val verification_code: String, val password: String, val password_confirmation: String)
 @JsonClass(generateAdapter = true)
 data class User(val id: Int, val name: String, val username: String, val email: String, val phone: String?, val role: String, val birthday: String? = null, val age: Int? = null, val sex: String? = null, val address: String? = null)
 @JsonClass(generateAdapter = true)
