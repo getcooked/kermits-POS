@@ -21,6 +21,7 @@ use App\Http\Controllers\PublicStorageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationAvailabilityController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\ReverseGeocodingController;
 use App\Http\Controllers\SuperAdminSecurityController;
 use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,9 @@ Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
 Route::get('/menu-images/{product}', ProductImageController::class)->name('products.image');
 Route::get('/media/{path}', PublicStorageController::class)->where('path', '.*')->name('public.media');
+Route::get('/location/reverse', ReverseGeocodingController::class)
+    ->middleware('throttle:6,1')
+    ->name('location.reverse');
 Route::get('/seeder', [WebSeederController::class, 'show'])->name('web-seeder.show');
 Route::post('/seeder', [WebSeederController::class, 'store'])
     ->middleware('throttle:5,1')

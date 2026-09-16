@@ -2,6 +2,11 @@
 
 return [
 
+    'reverse_geocoding' => [
+        'url' => env('REVERSE_GEOCODING_URL', 'https://nominatim.openstreetmap.org'),
+        'user_agent' => env('REVERSE_GEOCODING_USER_AGENT', 'KermitsPOS/1.0 (+https://kermits-pos.com)'),
+    ],
+
     'recaptcha' => [
         'enabled' => env('RECAPTCHA_ENABLED', false),
         'site_key' => env('RECAPTCHA_SITE_KEY'),

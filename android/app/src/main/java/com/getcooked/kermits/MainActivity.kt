@@ -1100,7 +1100,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 value = address,
                 onValueChange = { address = it.take(500) },
                 label = { Text("Address") },
-                placeholder = { Text("House number, street, barangay, city or municipality") },
+                placeholder = { Text("e.g. Binaobao, Bantayan, Cebu, Philippines") },
                 supportingText = { Text(if (showRegistrationErrors && addressError != null) addressError else "${address.length}/500 characters") },
                 isError = showRegistrationErrors && addressError != null,
                 minLines = 3,
