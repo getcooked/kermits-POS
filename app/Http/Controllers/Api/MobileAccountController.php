@@ -31,6 +31,7 @@ class MobileAccountController extends Controller
                 Rule::unique('users', 'username')->ignore($customer),
             ],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
+            'address' => ['sometimes', 'required', 'string', 'max:500'],
         ], [
             'username.regex' => 'The username may only contain letters, numbers, dots, underscores, and hyphens.',
             'phone.regex' => 'Enter an 11-digit Philippine mobile number starting with 09.',
