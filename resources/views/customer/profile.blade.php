@@ -78,9 +78,9 @@
 
                     <div class="field full">
                         <label for="address">Present address</label>
-                        <textarea class="control" id="address" name="address" rows="3" maxlength="500" aria-describedby="address-help location-status" required>{{ old('address', $customer->address) }}</textarea>
+                        <textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="e.g. Binaobao, Bantayan, Cebu, Philippines" aria-describedby="address-help location-status" required>{{ old('address', $customer->address) }}</textarea>
                         <button class="profile-location-button" id="use-current-location" type="button">Use my current location</button>
-                        <small id="address-help">You can use your device location or enter your address manually.</small>
+                        <small id="address-help">Use a named location—not latitude and longitude. Clicking the button sends your coordinates to <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> to find the location name.</small>
                         <small id="location-status" class="location-status" role="status" aria-live="polite"></small>
                         @error('address')<small class="field-error">{{ $message }}</small>@enderror
                     </div>
@@ -183,6 +183,7 @@
     const address = document.getElementById('address');
     const locationButton = document.getElementById('use-current-location');
     const locationStatus = document.getElementById('location-status');
+    const reverseGeocodingUrl = @json(route('location.reverse'));
 
     if (!address || !locationButton || !locationStatus) return;
 
@@ -201,9 +202,24 @@
         setLocationStatus('Requesting permission to access your current location...');
 
         navigator.geolocation.getCurrentPosition(
-            ({ coords }) => {
-                address.value = `Current location: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
-                setLocationStatus('Current location added. You may add your street or barangay for a clearer address.', 'success');
+            async ({ coords }) => {
+                setLocationStatus('Finding the name of your current location...');
+
+                try {
+                    const url = new URL(reverseGeocodingUrl, window.location.origin);
+                    url.searchParams.set('latitude', coords.latitude);
+                    url.searchParams.set('longitude', coords.longitude);
+                    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                    const result = await response.json();
+
+                    if (!response.ok || !result.address) throw new Error(result.message);
+
+                    address.value = result.address;
+                    setLocationStatus('Named location added. Check the address and add a house number if needed.', 'success');
+                } catch (error) {
+                    setLocationStatus(error.message || 'A named location could not be found. Enter your address manually.', 'error');
+                }
+
                 locationButton.disabled = false;
                 address.focus();
             },

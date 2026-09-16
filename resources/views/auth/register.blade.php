@@ -55,9 +55,9 @@
                     <div class="field"><label for="sex">Sex</label><select class="control" id="sex" name="sex" required @disabled(! $verifiedEmail)><option value="">Select sex</option><option value="male" @selected(old('sex') === 'male')>Male</option><option value="female" @selected(old('sex') === 'female')>Female</option></select></div>
                     <div class="field">
                         <label for="address">Present address</label>
-                        <textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="House number, street, barangay, city or municipality" aria-describedby="address-help location-status" required @disabled(! $verifiedEmail)>{{ old('address') }}</textarea>
+                        <textarea class="control" id="address" name="address" rows="3" maxlength="500" placeholder="e.g. Binaobao, Bantayan, Cebu, Philippines" aria-describedby="address-help location-status" required @disabled(! $verifiedEmail)>{{ old('address') }}</textarea>
                         <button class="location-button" id="use-current-location" type="button" @disabled(! $verifiedEmail)>Use my current location</button>
-                        <small id="address-help">You can use your device location or enter your address manually.</small>
+                        <small id="address-help">Use a named location—not latitude and longitude. Clicking the button sends your coordinates to <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> to find the location name.</small>
                         <small id="location-status" class="location-status" role="status" aria-live="polite"></small>
                     </div>
                     <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
@@ -105,6 +105,7 @@ body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0
     const address = document.getElementById('address');
     const locationButton = document.getElementById('use-current-location');
     const locationStatus = document.getElementById('location-status');
+    const reverseGeocodingUrl = @json(route('location.reverse'));
 
     if (!address || !locationButton || !locationStatus) return;
 
@@ -123,11 +124,24 @@ body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0
         setLocationStatus('Requesting permission to access your current location...');
 
         navigator.geolocation.getCurrentPosition(
-            ({ coords }) => {
-                const latitude = coords.latitude.toFixed(6);
-                const longitude = coords.longitude.toFixed(6);
-                address.value = `Current location: ${latitude}, ${longitude}`;
-                setLocationStatus('Current location added. You may add your street or barangay for a clearer address.', 'success');
+            async ({ coords }) => {
+                setLocationStatus('Finding the name of your current location...');
+
+                try {
+                    const url = new URL(reverseGeocodingUrl, window.location.origin);
+                    url.searchParams.set('latitude', coords.latitude);
+                    url.searchParams.set('longitude', coords.longitude);
+                    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                    const result = await response.json();
+
+                    if (!response.ok || !result.address) throw new Error(result.message);
+
+                    address.value = result.address;
+                    setLocationStatus('Named location added. Check the address and add a house number if needed.', 'success');
+                } catch (error) {
+                    setLocationStatus(error.message || 'A named location could not be found. Enter your address manually.', 'error');
+                }
+
                 locationButton.disabled = false;
                 address.focus();
             },
