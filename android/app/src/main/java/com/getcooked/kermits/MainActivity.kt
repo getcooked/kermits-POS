@@ -2233,7 +2233,6 @@ private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String,
             }
         }
     }
-    Text("Availability is checked automatically for your party size. Reservations last up to 2 hours and end by 11 PM. Pending bookings are held for 30 minutes, or until arrival if sooner.", fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
     if (message.isNotEmpty()) Text(message, fontSize = 12.sp)
     Row(Modifier.horizontalScroll(rememberScrollState())) {
         slots.forEach { slot ->
