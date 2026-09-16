@@ -242,8 +242,8 @@ class ActivityLogTest extends TestCase
             ->assertSeeInOrder([$unsafeDescription, 'Newest activity', 'Oldest activity'])
             ->assertSee('2001:db8::99')
             ->assertSee('Kermits-Browser/2.0')
-            ->assertSee('POST')
-            ->assertSee('logout')
+            ->assertSee('IP address')
+            ->assertSee('Device')
             ->assertSee(e($unsafeDescription), false)
             ->assertSee(e($unsafeAgent), false);
 
@@ -251,7 +251,10 @@ class ActivityLogTest extends TestCase
             ->assertDontSee($unsafeAgent, false)
             ->assertDontSee('Recorded today')
             ->assertDontSee('Find an activity')
-            ->assertDontSee('Apply filters');
+            ->assertDontSee('Apply filters')
+            ->assertDontSee('Network and device')
+            ->assertDontSee('activity-log-method', false)
+            ->assertDontSee('activity-log-status', false);
     }
 
     public function test_activity_logs_can_be_filtered_without_leaking_unmatched_rows(): void
