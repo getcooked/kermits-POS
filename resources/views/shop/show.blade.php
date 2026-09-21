@@ -9,10 +9,11 @@
 <main class="online-receipt-page">
     <div class="online-receipt-wrap">
         <header class="receipt-heading">
-            <div><p>{{ $isRejected ? 'ORDER NOT APPROVED' : ($isAccepted ? 'ORDER ACCEPTED' : 'ORDER & RESERVATION RECEIVED') }}</p><h1>{{ $isRejected ? 'Your order was rejected.' : ($isAccepted ? 'Your order was accepted.' : 'Thank you, '.auth()->user()->name.'.') }}</h1></div>
+            <div><p>{{ $isRejected ? 'ORDER NOT APPROVED' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'PAYMENT CONFIRMED' : 'ORDER ACCEPTED') : 'ORDER & RESERVATION RECEIVED') }}</p><h1>{{ $isRejected ? 'Your order was rejected.' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'Your payment was received.' : 'Your order was accepted.') : 'Thank you, '.auth()->user()->name.'.') }}</h1></div>
         </header>
 
         @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
+        @if(session('payment_error'))<div class="notice" role="alert">{{ session('payment_error') }}</div>@endif
 
         <article class="online-receipt">
             <div class="receipt-brand">
@@ -29,9 +30,9 @@
                     <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }}</dd></div>
                     <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range }}</dd></div>
                 @endif
-                <div><dt>Payment</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
-                <div><dt>Status</dt><dd>{{ $isRejected ? 'Rejected' : ($isAccepted ? 'Accepted' : 'Pending '.($order->payment_method === 'gcash' ? 'payment verification' : 'counter payment')) }}</dd></div>
-                @if($order->payment_reference)<div><dt>GCash reference</dt><dd>{{ $order->payment_reference }}</dd></div>@endif
+                <div><dt>Payment</dt><dd>{{ match($order->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>
+                <div><dt>Status</dt><dd>{{ $isRejected ? 'Rejected' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'Paid' : 'Accepted') : 'Pending '.match($order->payment_method) { 'gcash' => 'payment verification', 'paymongo' => 'PayMongo payment', default => 'counter payment' }) }}</dd></div>
+                @if($order->payment_reference)<div><dt>{{ $order->payment_method === 'paymongo' ? 'PayMongo payment ID' : 'GCash reference' }}</dt><dd>{{ $order->payment_reference }}</dd></div>@endif
             </dl>
 
             <div class="receipt-items">
@@ -45,10 +46,13 @@
                 @if($reservation)<div><span>Table reservation</span><strong>&#8369;{{ number_format($reservation->total_amount, 2) }}</strong></div>@endif
                 <div class="receipt-total"><span>{{ $isRejected ? 'Order total' : 'Total due' }}</span><strong>&#8369;{{ number_format($order->totalDue(), 2) }}</strong></div>
             </div>
-            <p class="receipt-note">{{ $isRejected ? 'This order was rejected. No payment was recorded, and its reserved stock was returned.' : ($isAccepted ? 'Your order has been accepted and payment was confirmed by the cashier.' : ($order->payment_method === 'gcash' ? 'Your payment details are waiting for verification.' : 'Present this receipt and pay at the counter when collecting your food.')) }}</p>
+            <p class="receipt-note">{{ $isRejected ? 'This order was rejected. No payment was recorded, and its reserved stock was returned.' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'PayMongo confirmed your payment. Your reservation is awaiting approval.' : 'Your order has been accepted and payment was confirmed by the cashier.') : match($order->payment_method) { 'gcash' => 'Your payment details are waiting for verification.', 'paymongo' => 'Your PayMongo payment is pending. This page will show Paid after PayMongo confirms it.', default => 'Present this receipt and pay at the counter when collecting your food.' }) }}</p>
         </article>
 
         <div class="order-actions">
+            @if($order->payment_method === 'paymongo' && $order->payment_status === 'pending')
+                <form method="POST" action="{{ route('shop.orders.paymongo', $order) }}">@csrf<button class="button" type="submit">Continue to PayMongo</button></form>
+            @endif
             <button class="button" type="button" id="print-order">Print receipt</button>
             <a class="logout" href="{{ route('shop') }}">Order more</a>
         </div>

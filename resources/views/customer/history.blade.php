@@ -88,7 +88,7 @@
                         </div>
 
                         <div class="activity-actions-row reservation-actions">
-                            <span>{{ $reservation->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}@if($reservation->payment_reference) &middot; {{ $reservation->payment_reference }}@endif</span>
+                            <span>{{ match($reservation->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}@if($reservation->payment_reference) &middot; {{ $reservation->payment_reference }}@endif</span>
                             <div>
                                 <a class="secondary-action" href="{{ route('reservations.show', $reservation) }}">View reservation</a>
                                 <a href="{{ route('reservations.receipt', $reservation) }}">Print receipt</a>
@@ -126,7 +126,7 @@
                         <div class="activity-main">
                             <div class="activity-title">
                                 <div>
-                                    <span class="activity-kind">{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }} payment</span>
+                                    <span class="activity-kind">{{ match($order->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }} payment</span>
                                     <h3>Order #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</h3>
                                 </div>
                                 <span class="status {{ $order->payment_status }}">{{ $orderStatusLabel }}</span>

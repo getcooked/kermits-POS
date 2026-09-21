@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
 use App\Services\OrderService;
+use App\Services\PayMongoCheckout;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -34,10 +35,11 @@ class CustomerOrderController extends Controller
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'gcashQrSrc' => $gcashQrSrc,
             'tableFees' => self::TABLE_FEES,
+            'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
 
-    public function store(OrderRequest $request, OrderService $orders, ReservationSchedule $schedules): RedirectResponse
+    public function store(OrderRequest $request, OrderService $orders, ReservationSchedule $schedules, PayMongoCheckout $checkout): RedirectResponse
     {
         $paymentMethod = $request->validated('payment_method');
         $paymentReference = $paymentMethod === 'gcash'
@@ -98,6 +100,17 @@ class CustomerOrderController extends Controller
             }
 
             throw $exception;
+        }
+
+        if ($paymentMethod === 'paymongo') {
+            try {
+                return redirect()->away($checkout->urlFor($order));
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return redirect()->route('shop.orders.show', $order)
+                    ->with('payment_error', 'Your order was saved, but PayMongo checkout is unavailable. Please try the payment link on your order.');
+            }
         }
 
         return redirect()

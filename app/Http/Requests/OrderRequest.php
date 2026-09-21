@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Rules\ReservationHours;
+use App\Services\PayMongoCheckout;
 use App\Services\ReservationSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -25,7 +26,7 @@ class OrderRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'food_request' => ['prohibited'],
             'menu_items' => ['prohibited'],
-            'payment_method' => ['required', 'in:cash,gcash'],
+            'payment_method' => ['required', 'in:cash,gcash,paymongo'],
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
@@ -34,6 +35,9 @@ class OrderRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            if ($this->input('payment_method') === 'paymongo' && ! PayMongoCheckout::enabled()) {
+                $validator->errors()->add('payment_method', 'PayMongo checkout is not available.');
+            }
             if ($this->filled('reservation_at')
                 && ! $validator->errors()->hasAny(['reservation_at', 'table_size'])
                 && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'), 'table', (int) $this->input('table_size', 1))) {

@@ -33,6 +33,8 @@ class CashierController extends Controller
         return view('roles.cashier-orders', [
             'orders' => Order::query()
                 ->where('payment_status', 'pending')
+                ->where(fn ($query) => $query->where('payment_method', '!=', 'paymongo')
+                    ->orWhereNull('paymongo_checkout_id'))
                 ->whereNotNull('customer_id')
                 ->with(['customer', 'items.product', 'reservation'])
                 ->latest()
@@ -43,6 +45,7 @@ class CashierController extends Controller
     public function reviewCustomerOrder(Order $order): View
     {
         $this->ensurePendingCustomerOrder($order);
+        $this->ensureManuallyPayable($order);
 
         $order->load(['customer', 'items.product', 'reservation']);
 
@@ -74,6 +77,7 @@ class CashierController extends Controller
         DB::transaction(function () use ($order, $validated, $request, &$itemsChanged, &$itemsAdded): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensurePendingCustomerOrder($lockedOrder);
+            $this->ensureManuallyPayable($lockedOrder);
             $items = $lockedOrder->items()->lockForUpdate()->get();
             $requested = collect($validated['quantities'])->map(fn ($quantity) => (int) $quantity);
             $newRequested = collect($validated['new_quantities'] ?? [])
@@ -232,6 +236,7 @@ class CashierController extends Controller
             app(ReservationSchedule::class)->lock();
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensurePendingCustomerOrder($lockedOrder);
+            $this->ensureManuallyPayable($lockedOrder);
             $lockedOrder->load('reservation');
             if ($lockedOrder->reservation && ! in_array($lockedOrder->reservation->booking_status, ['pending', 'confirmed', 'completed'])) {
                 throw ValidationException::withMessages(['reservation' => 'This reservation is no longer active. Review its schedule before collecting payment.']);
@@ -363,11 +368,21 @@ class CashierController extends Controller
 
     private function ensurePendingCustomerOrder(Order $order): void
     {
+        if ($order->payment_method === 'paymongo' && $order->paymongo_checkout_id) {
+            throw ValidationException::withMessages(['order' => 'A PayMongo checkout is active for this order.']);
+        }
         if ($order->customer_id === null) {
             throw ValidationException::withMessages(['order' => 'Only customer online orders can be reviewed here.']);
         }
         if ($order->payment_status !== 'pending') {
             throw ValidationException::withMessages(['order' => 'This order is no longer waiting for payment confirmation.']);
+        }
+    }
+
+    private function ensureManuallyPayable(Order $order): void
+    {
+        if ($order->payment_method === 'paymongo') {
+            throw ValidationException::withMessages(['order' => 'PayMongo payments are confirmed automatically.']);
         }
     }
 }

@@ -22,7 +22,7 @@ class ReportController extends Controller
             'period' => ['nullable', 'in:week,month,year,custom'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
-            'payment_method' => ['nullable', 'in:cash,gcash'],
+            'payment_method' => ['nullable', 'in:cash,gcash,paymongo'],
         ]);
 
         [$period, $from, $to] = $this->resolvePeriod($filters);
@@ -106,10 +106,12 @@ class ReportController extends Controller
             'orders' => $orders,
             'salesTotal' => $salesTotal,
             'salesChange' => $salesChange,
-            'cashTotal' => $allPaymentOrders->where('payment_method', 'cash')->sum('total'),
-            'cashCount' => $allPaymentOrders->where('payment_method', 'cash')->count(),
-            'gcashTotal' => $allPaymentOrders->where('payment_method', 'gcash')->sum('total'),
-            'gcashCount' => $allPaymentOrders->where('payment_method', 'gcash')->count(),
+            'cashTotal' => $orders->where('payment_method', 'cash')->sum('total'),
+            'cashCount' => $orders->where('payment_method', 'cash')->count(),
+            'gcashTotal' => $orders->where('payment_method', 'gcash')->sum('total'),
+            'gcashCount' => $orders->where('payment_method', 'gcash')->count(),
+            'paymongoTotal' => $orders->where('payment_method', 'paymongo')->sum('total'),
+            'paymongoCount' => $orders->where('payment_method', 'paymongo')->count(),
             'topProducts' => $topProducts,
             'products' => $products,
             'lowStock' => Product::query()->available()->lowStock()->count(),
@@ -149,7 +151,7 @@ class ReportController extends Controller
     }
 
     /**
-     * @return array{labels:array<int,string>,cash:array<int,float>,gcash:array<int,float>,total:array<int,float>}
+     * @return array{labels:array<int,string>,cash:array<int,float>,gcash:array<int,float>,paymongo:array<int,float>,total:array<int,float>}
      */
     private function salesChart(Collection $orders, CarbonImmutable $from, CarbonImmutable $to, string $period): array
     {
@@ -179,12 +181,14 @@ class ReportController extends Controller
             );
             $cash = (float) $matches->where('payment_method', 'cash')->sum('total');
             $gcash = (float) $matches->where('payment_method', 'gcash')->sum('total');
+            $paymongo = (float) $matches->where('payment_method', 'paymongo')->sum('total');
 
             return [
                 'label' => $bucket['label'],
                 'cash' => $cash,
                 'gcash' => $gcash,
-                'total' => $cash + $gcash,
+                'paymongo' => $paymongo,
+                'total' => $cash + $gcash + $paymongo,
             ];
         });
 
@@ -192,6 +196,7 @@ class ReportController extends Controller
             'labels' => $values->pluck('label')->all(),
             'cash' => $values->pluck('cash')->all(),
             'gcash' => $values->pluck('gcash')->all(),
+            'paymongo' => $values->pluck('paymongo')->all(),
             'total' => $values->pluck('total')->all(),
         ];
     }

@@ -72,7 +72,7 @@
                         <div><p>PAYMENT</p><h2>Payment details</h2></div>
                     </div>
                     <dl class="clean-detail-list">
-                        <div><dt>Method</dt><dd>{{ $reservation->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
+                        <div><dt>Method</dt><dd>{{ match($reservation->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>
                         <div><dt>Status</dt><dd>{{ ucfirst($reservation->payment_status) }}</dd></div>
                         <div class="wide-detail"><dt>Reference code</dt><dd>{{ $reservation->payment_reference ?: 'Not provided' }}</dd></div>
                     </dl>

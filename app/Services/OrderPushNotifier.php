@@ -44,7 +44,9 @@ class OrderPushNotifier
         $number = str_pad((string) $order->id, 6, '0', STR_PAD_LEFT);
 
         return match ((string) $order->payment_status) {
-            'paid' => ['Order accepted', "Your order #{$number} was accepted and payment was confirmed."],
+            'paid' => $order->payment_method === 'paymongo'
+                ? ['Payment received', "PayMongo confirmed payment for order #{$number}. Your reservation is awaiting approval."]
+                : ['Order accepted', "Your order #{$number} was accepted and payment was confirmed."],
             'rejected' => ['Order rejected', "Your order #{$number} was rejected. Open the order for details."],
             default => ['Order updated', "Order #{$number} has a new status."],
         };

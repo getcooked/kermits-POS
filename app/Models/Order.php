@@ -16,6 +16,8 @@ class Order extends Model
         'payment_method',
         'payment_status',
         'payment_reference',
+        'paymongo_checkout_id',
+        'paymongo_checkout_url',
         'cash_received',
         'change_due',
     ];

@@ -21,6 +21,7 @@ class CustomerDecisionNotification extends Notification implements ShouldBeEncry
         public readonly int $subjectId,
         public readonly string $identifier,
         public readonly string $status,
+        public readonly bool $paymentOnly = false,
     ) {
         $this->afterCommit();
     }
@@ -33,6 +34,16 @@ class CustomerDecisionNotification extends Notification implements ShouldBeEncry
 
     public function toMail(object $notifiable): MailMessage
     {
+        if ($this->paymentOnly) {
+            return (new MailMessage)
+                ->subject("Payment received | Kermit's")
+                ->greeting("Hello {$notifiable->name},")
+                ->line("PayMongo confirmed payment for your order {$this->identifier}.")
+                ->line('Your reservation is awaiting approval. Open the order for its latest status.')
+                ->action('View order', route('shop.orders.show', $this->subjectId))
+                ->line('Thank you for choosing Kermit\'s.');
+        }
+
         $accepted = in_array($this->status, ['confirmed', 'paid'], true);
         $type = ucfirst($this->subjectType);
         $decision = $accepted ? 'accepted' : 'rejected';

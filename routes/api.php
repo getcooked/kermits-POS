@@ -8,8 +8,11 @@ use App\Http\Controllers\Api\MobilePasswordResetController;
 use App\Http\Controllers\Api\MobilePushInstallationController;
 use App\Http\Controllers\Api\MobileRegistrationController;
 use App\Http\Controllers\Api\MobileReservationController;
+use App\Http\Controllers\PayMongoWebhookController;
 use App\Http\Controllers\ReservationAvailabilityController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/paymongo/webhook', PayMongoWebhookController::class);
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/recaptcha/config', fn () => response()->json(['data' => [

@@ -10,6 +10,17 @@ Register the website hostname in the [reCAPTCHA console](https://www.google.com/
 
 Automated tests disable reCAPTCHA by default; `RecaptchaLoginTest` explicitly enables it and mocks Google's responses to cover successful verification, rejection, expiry, hostname mismatch, and outages. For a live check, open `/login`, complete the checkbox, and sign in; also confirm submitting without completing the checkbox shows an error.
 
+## PayMongo online checkout
+
+The customer shop can create a [PayMongo Hosted Checkout v2](https://docs.paymongo.com/docs/payment-channels-hosted-checkout) session for the food order and table fee. The app saves the PayMongo checkout ID and marks both records paid only after it receives a matching, signed `checkout_session.payment.paid` webhook. Cash and manual GCash checkout remain available.
+
+1. Run `php artisan migrate` to add the checkout fields to orders.
+2. Get a **test** secret API key from the [PayMongo dashboard](https://dashboard.paymongo.com/). In `.env`, set `PAYMONGO_SECRET_KEY=sk_test_...` and `PAYMONGO_PAYMENT_METHODS=gcash,qrph,card` to the methods enabled for your account.
+3. Register an HTTPS webhook endpoint at `https://YOUR-DOMAIN/api/paymongo/webhook` in the PayMongo dashboard. Subscribe to `checkout_session.payment.paid` and copy that endpoint's signing secret into `PAYMONGO_WEBHOOK_SECRET`. A local `127.0.0.1` URL cannot receive PayMongo webhooks; use a public test URL while developing.
+4. Set `APP_URL` to the site's public HTTPS URL, set `PAYMONGO_ENABLED=true`, and run `php artisan config:clear` (or rebuild the production config cache). Create a test customer order and complete a test payment. Confirm the order and linked reservation show **Paid** before using live credentials.
+
+Keep both secrets only on the server. Use the matching live API and webhook secrets when switching to live mode. A checkout redirect alone does not confirm payment. If a reservation is cancelled while a checkout is open and its payment later succeeds, the payment is recorded but staff must review the reservation and handle any refund in PayMongo. The Android API still uses its existing payment flow.
+
 ## Roles and access
 
 | Role | Access |
@@ -59,7 +70,7 @@ php artisan test
 composer audit --locked
 ```
 
-Current verified baseline: **100 tests, 612 assertions**, with no known Composer security advisories.
+Current verified test run: **228 tests, 1669 assertions**.
 
 ## Mobile API readiness
 
@@ -80,4 +91,4 @@ Set `APP_URL=https://kermits-pos.com` so API image and payment URLs use the publ
 
 ## Production notes
 
-Never deploy the local `.env` file. On the live server, use a new application key, `APP_ENV=production`, `APP_DEBUG=false`, HTTPS, secure cookies, real mail credentials, database backups, and private production credentials. Real GCash or Maya payments require their official merchant APIs and server-side webhook verification; displaying a QR image alone does not prove payment.
+Never deploy the local `.env` file. On the live server, use a new application key, `APP_ENV=production`, `APP_DEBUG=false`, HTTPS, secure cookies, real mail credentials, database backups, and private production credentials. The manual GCash QR flow still needs cashier verification; displaying a QR image alone does not prove payment.

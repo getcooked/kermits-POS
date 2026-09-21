@@ -42,10 +42,10 @@
                     <div><dt>Date</dt><dd>{{ $order->created_at->format('M d, Y h:i A') }}</dd></div>
                     <div><dt>Customer</dt><dd>{{ $order->customer?->name ?? ($order->user?->hasRole(\App\Models\User::ROLE_CUSTOMER) ? $order->user->name : 'Walk-in Customer') }}</dd></div>
                     <div><dt>Cashier</dt><dd>{{ $order->user?->hasRole(\App\Models\User::ROLE_CASHIER, \App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_SUPER_ADMIN) ? $order->user->name : 'Online order' }}</dd></div>
-                    <div><dt>Payment method</dt><dd>{{ $order->payment_method === 'cash' ? 'Walk In Pay' : 'GCash' }}</dd></div>
+                    <div><dt>Payment method</dt><dd>{{ match($order->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>
                     <div><dt>Payment status</dt><dd>{{ ucfirst($order->payment_status) }}</dd></div>
                     @if($order->payment_reference)
-                        <div><dt>GCash reference</dt><dd>{{ $order->payment_reference }}</dd></div>
+                        <div><dt>{{ $order->payment_method === 'paymongo' ? 'PayMongo payment ID' : 'GCash reference' }}</dt><dd>{{ $order->payment_reference }}</dd></div>
                     @endif
                     @if($reservation)
                         <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>

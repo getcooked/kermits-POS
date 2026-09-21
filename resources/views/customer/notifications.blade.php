@@ -32,10 +32,10 @@
                     </div>
                     <div class="notification-copy">
                         <div class="notification-title">
-                            <h2>Order #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }} {{ $accepted ? 'accepted' : 'rejected' }}</h2>
+                            <h2>Order #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }} {{ $accepted ? ($order->payment_method === 'paymongo' ? 'payment received' : 'accepted') : 'rejected' }}</h2>
                             <span>{{ $order->updated_at->diffForHumans() }}</span>
                         </div>
-                        <p>{{ $accepted ? 'Your order was accepted by the cashier.' : 'Your order was rejected by the cashier.' }}</p>
+                        <p>{{ $accepted ? ($order->payment_method === 'paymongo' ? 'PayMongo confirmed your payment. Your reservation is awaiting approval.' : 'Your order was accepted by the cashier.') : 'Your order was rejected by the cashier.' }}</p>
                         <div class="notification-meta">
                             <span>{{ $order->items->sum('quantity') }} {{ Str::plural('item', $order->items->sum('quantity')) }}</span>
                             <span>&#8369;{{ number_format($order->total, 2) }}</span>

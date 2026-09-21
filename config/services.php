@@ -12,6 +12,12 @@ return [
         'site_key' => env('RECAPTCHA_SITE_KEY'),
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
     ],
+    'paymongo' => [
+        'enabled' => env('PAYMONGO_ENABLED', false),
+        'secret_key' => env('PAYMONGO_SECRET_KEY'),
+        'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+        'payment_methods' => array_filter(array_map('trim', explode(',', env('PAYMONGO_PAYMENT_METHODS', 'gcash,qrph,card')))),
+    ],
 
     /*
     |--------------------------------------------------------------------------

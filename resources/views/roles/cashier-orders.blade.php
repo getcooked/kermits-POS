@@ -43,13 +43,19 @@
                         <footer>
                             <div class="payment-summary">
                                 <span class="payment-method {{ $order->payment_method }}">{{ strtoupper($order->payment_method) }}</span>
-                                @if($order->payment_reference)
+                                @if($order->payment_method === 'paymongo')
+                                    <span><b>PayMongo checkout failed</b> · No checkout session was created. Reject the order to release its stock.</span>
+                                @elseif($order->payment_reference)
                                     <span><b>GCash submitted</b> · Ref: {{ $order->payment_reference }}</span>
                                 @else
                                     <span><b>Not yet paid</b> · Cash is required at the counter.</span>
                                 @endif
                             </div>
-                            <a class="review-order" href="{{ route('cashier.orders.review', $order) }}">Review order <span>→</span></a>
+                            @if($order->payment_method === 'paymongo')
+                                <form method="POST" action="{{ route('cashier.orders.reject', $order) }}" onsubmit="return confirm('Reject this unpaid order and release its stock?')">@csrf @method('PATCH')<button type="submit">Reject unpaid order</button></form>
+                            @else
+                                <a class="review-order" href="{{ route('cashier.orders.review', $order) }}">Review order <span>→</span></a>
+                            @endif
                         </footer>
                     </article>
                 @empty

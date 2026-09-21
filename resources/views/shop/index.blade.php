@@ -142,6 +142,7 @@
                         <div class="checkout-options">
                             <label><input type="radio" name="payment_method" value="cash" @checked(old('payment_method','cash')==='cash' )><span><strong>Walk In Pay</strong><small>Pay the total at the counter when you arrive.</small></span></label>
                             <label><input type="radio" name="payment_method" value="gcash" @checked(old('payment_method')==='gcash' )><span><strong>GCash</strong><small>Scan the QR and submit your payment details.</small></span></label>
+                            @if($paymongoEnabled)<label><input type="radio" name="payment_method" value="paymongo" @checked(old('payment_method')==='paymongo')><span><strong>PayMongo online</strong><small>Pay securely on PayMongo's checkout page.</small></span></label>@endif
                         </div>
                     </fieldset>
 
@@ -2304,7 +2305,8 @@
             proof.disabled = !isPaymentStep || !isGcash;
             reference.required = isPaymentStep && isGcash;
             proof.required = isPaymentStep && isGcash;
-            note.textContent = isGcash ? 'Your GCash details will remain pending until they are verified.' : 'Bring payment to the counter when you arrive for your reservation.';
+            const isPayMongo = form.querySelector('input[name="payment_method"]:checked')?.value === 'paymongo';
+            note.textContent = isGcash ? 'Your GCash details will remain pending until they are verified.' : (isPayMongo ? 'You will be sent to PayMongo to complete payment. Your order is confirmed as paid after PayMongo notifies us.' : 'Bring payment to the counter when you arrive for your reservation.');
         }
 
         function setStep(step) {

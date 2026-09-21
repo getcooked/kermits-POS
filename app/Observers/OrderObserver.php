@@ -31,6 +31,7 @@ class OrderObserver implements ShouldHandleEventsAfterCommit
                 subjectId: (int) $order->id,
                 identifier: '#'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT),
                 status: (string) $order->payment_status,
+                paymentOnly: $order->payment_method === 'paymongo' && $order->payment_status === 'paid',
             ));
         }
     }

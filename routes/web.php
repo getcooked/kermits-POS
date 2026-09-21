@@ -15,6 +15,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PaymentSettingsController;
+use App\Http\Controllers\PayMongoController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\PublicStorageController;
@@ -81,6 +82,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/shop', [CustomerOrderController::class, 'index'])->name('shop');
         Route::post('/shop/orders', [CustomerOrderController::class, 'store'])->name('shop.orders.store');
         Route::get('/shop/orders/{order}', [CustomerOrderController::class, 'show'])->name('shop.orders.show');
+        Route::post('/shop/orders/{order}/paymongo', [PayMongoController::class, 'checkout'])
+            ->middleware('throttle:10,1')->name('shop.orders.paymongo');
         Route::get('/history', [CustomerHistoryController::class, 'index'])->name('customer.history');
         Route::get('/notifications', [CustomerNotificationController::class, 'index'])->name('customer.notifications');
         Route::get('/profile', [CustomerAccountController::class, 'editProfile'])->name('customer.profile.edit');
