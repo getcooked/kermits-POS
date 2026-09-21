@@ -603,7 +603,7 @@
                      z-index: 50;
                      height: 76px;
                      width: 100%;
-                     padding: 0 max(18px, calc((100% - 1180px)/2));
+                     padding: 0 clamp(20px, 3vw, 56px);
                      background: rgba(245, 243, 235, .92);
                      border-bottom: 1px solid rgba(216, 217, 207, .8);
                      backdrop-filter: blur(14px)
