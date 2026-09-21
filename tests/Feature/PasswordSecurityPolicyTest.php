@@ -22,6 +22,7 @@ class PasswordSecurityPolicyTest extends TestCase
             'UPPERCASE123!',
             'NoNumberHere!',
             'NoSymbol12345',
+            str_repeat('a', 21).'A1!',
         ] as $weakPassword) {
             $this->assertTrue(Validator::make(
                 ['password' => $weakPassword],
@@ -30,7 +31,7 @@ class PasswordSecurityPolicyTest extends TestCase
         }
 
         $this->assertFalse(Validator::make(
-            ['password' => 'StrongPassword123!'],
+            ['password' => 'Abcdef1!'],
             ['password' => [Password::defaults()]],
         )->fails());
     }

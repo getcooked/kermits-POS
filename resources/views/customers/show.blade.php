@@ -39,8 +39,8 @@
                 <div class="field"><label for="birthday">Birthday</label><input class="control" id="birthday" name="birthday" type="date" value="{{ old('birthday', $customer->birthday?->format('Y-m-d')) }}" min="1900-01-01" max="{{ now()->toDateString() }}" required></div>
                 <div class="field"><label for="sex">Sex</label><select class="control" id="sex" name="sex" required><option value="">Select sex</option><option value="male" @selected(old('sex', $customer->sex) === 'male')>Male</option><option value="female" @selected(old('sex', $customer->sex) === 'female')>Female</option></select></div>
                 <div class="field"><label for="address">Present address</label><textarea class="control" id="address" name="address" rows="3" maxlength="500" required>{{ old('address', $customer->address) }}</textarea></div>
-                <div class="field"><label for="password">Set new password <small>(optional; strong password required)</small></label><input class="control" id="password" name="password" type="password" minlength="12" autocomplete="new-password"></div>
-                <div class="field"><label for="password_confirmation">Confirm new password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password"></div>
+                <div class="field"><label for="password">Set new password <small>(optional; strong password required)</small></label><input class="control" id="password" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div>
+                <div class="field"><label for="password_confirmation">Confirm new password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div>
                 <button class="button" type="submit">Save customer account</button>
             </form>
         @else

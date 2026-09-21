@@ -7,8 +7,8 @@ internal class AuthRequestException(message: String, val restartVerification: Bo
 
 /** Keeps authentication response handling independent of screen state. */
 internal class MobileAuth(private val api: KermitsApi) {
-    suspend fun sendCode(email: String): SendCodeData {
-        val response = api.sendRegistrationCode(SendCodeRequest(email.trim().lowercase()))
+    suspend fun sendCode(email: String, recaptchaToken: String? = null): SendCodeData {
+        val response = api.sendRegistrationCode(SendCodeRequest(email.trim().lowercase(), recaptchaToken))
         checkResponse(response, "The verification code could not be sent. Please try again.")
         return response.body()?.data?.takeIf { it.challenge.isNotBlank() }
             ?: throw AuthRequestException("The server returned an incomplete verification response. Please request a new code.")
@@ -29,8 +29,8 @@ internal class MobileAuth(private val api: KermitsApi) {
         }
     }
 
-    suspend fun requestPasswordReset(email: String): String {
-        val response = api.forgotPassword(ForgotPasswordRequest(email.trim().lowercase()))
+    suspend fun requestPasswordReset(email: String, recaptchaToken: String? = null): String {
+        val response = api.forgotPassword(ForgotPasswordRequest(email.trim().lowercase(), recaptchaToken))
         checkResponse(response, "The reset request could not be sent. Please try again.")
         return response.body()?.message?.takeIf { it.isNotBlank() }
             ?: throw AuthRequestException("Could not confirm the reset request. Please try again.")

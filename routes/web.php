@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/download-app', [LandingController::class, 'downloadApp'])->name('app.download');
+Route::view('/mobile/recaptcha', 'auth.mobile-recaptcha')->name('mobile.recaptcha');
 Route::get('/menu-images/{product}', ProductImageController::class)->name('products.image');
 Route::get('/media/{path}', PublicStorageController::class)->where('path', '.*')->name('public.media');
 Route::get('/location/reverse', ReverseGeocodingController::class)

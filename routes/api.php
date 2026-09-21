@@ -12,6 +12,9 @@ use App\Http\Controllers\ReservationAvailabilityController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
+    Route::get('/recaptcha/config', fn () => response()->json(['data' => [
+        'enabled' => (bool) config('services.recaptcha.enabled'),
+    ]]));
     Route::post('/login', [MobileAuthController::class, 'login']);
     Route::post('/password/forgot', [MobilePasswordResetController::class, 'store'])->middleware('throttle:3,1,mobile-password-forgot');
     Route::post('/register/email', [MobileRegistrationController::class, 'sendCode'])->middleware('throttle:3,1,mobile-registration-email');

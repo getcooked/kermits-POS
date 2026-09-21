@@ -31,13 +31,13 @@
 
                     <div class="field">
                         <label for="password">New password</label>
-                        <input class="control" id="password" name="password" type="password" minlength="12" autocomplete="new-password" required>
+                        <input class="control" id="password" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required>
                         @error('password')<small class="field-error">{{ $message }}</small>@enderror
                     </div>
 
                     <div class="field">
                         <label for="password_confirmation">Confirm new password</label>
-                        <input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required>
+                        <input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required>
                     </div>
 
                     <button class="account-submit" type="submit">Update password</button>

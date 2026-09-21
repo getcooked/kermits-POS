@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Rules\MobileRecaptcha;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +18,8 @@ class MobilePasswordResetController extends Controller
     {
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160'],
-        ]);
+            'recaptcha_token' => MobileRecaptcha::rules($request),
+        ], MobileRecaptcha::messages());
 
         $user = User::query()
             ->whereRaw('LOWER(email) = ?', [Str::lower($validated['email'])])
