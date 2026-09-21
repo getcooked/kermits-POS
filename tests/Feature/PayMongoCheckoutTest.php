@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -72,6 +74,22 @@ class PayMongoCheckoutTest extends TestCase
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $this->actingAs($superAdmin)->get('/reports?payment_method=paymongo')
             ->assertOk()->assertSee('PayMongo · 1 sales');
+    }
+
+    public function test_migration_repairs_a_partially_created_paymongo_schema_and_can_be_retried(): void
+    {
+        Schema::table('orders', function (Blueprint $table): void {
+            $table->dropUnique(['paymongo_checkout_id']);
+            $table->dropColumn('paymongo_checkout_url');
+        });
+
+        $migration = require database_path('migrations/2026_09_20_000001_add_paymongo_checkout_to_orders.php');
+        $migration->up();
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('orders', 'paymongo_checkout_id'));
+        $this->assertTrue(Schema::hasColumn('orders', 'paymongo_checkout_url'));
+        $this->assertTrue(Schema::hasIndex('orders', ['paymongo_checkout_id'], 'unique'));
     }
 
     public function test_wrong_amount_cannot_mark_an_order_paid(): void
