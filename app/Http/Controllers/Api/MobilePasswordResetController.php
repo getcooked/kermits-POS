@@ -37,7 +37,7 @@ class MobilePasswordResetController extends Controller
         }
 
         try {
-            Password::sendResetLink(['email' => $user->email]);
+            $status = Password::sendResetLink(['email' => $user->email]);
         } catch (TransportExceptionInterface) {
             // The broker creates the token before sending. A failed send must
             // not throttle a retry for a link the customer never received.
@@ -45,6 +45,13 @@ class MobilePasswordResetController extends Controller
             Log::warning('Mobile password reset email delivery failed.');
 
             return response()->json(['message' => 'The password reset email could not be sent. Please try again later.'], 503);
+        }
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            return response()->json([
+                'message' => __($status),
+                'code' => 'reset_link_not_sent',
+            ], 429);
         }
 
         return response()->json([

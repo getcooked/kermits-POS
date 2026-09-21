@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
+use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 class PasswordResetTest extends TestCase
@@ -77,6 +79,31 @@ class PasswordResetTest extends TestCase
             ->assertSessionHas('status');
 
         Notification::assertSentTo($user, ResetPassword::class);
+    }
+
+    public function test_web_reset_delivery_failure_removes_the_unsent_token(): void
+    {
+        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        Notification::shouldReceive('send')->once()->andThrow(new TransportException('SMTP unavailable'));
+
+        $this->post(route('password.email'), ['email' => $user->email])
+            ->assertSessionHasErrors('email')
+            ->assertSessionMissing('status');
+
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
+    }
+
+    public function test_mobile_reset_reports_when_the_broker_throttles_delivery(): void
+    {
+        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        Password::shouldReceive('sendResetLink')
+            ->once()
+            ->with(['email' => $user->email])
+            ->andReturn(Password::RESET_THROTTLED);
+
+        $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
+            ->assertStatus(429)
+            ->assertJsonPath('code', 'reset_link_not_sent');
     }
 
     public function test_mobile_password_recovery_sends_only_to_a_customer_account(): void

@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 class AuthenticationAndAccessTest extends TestCase
@@ -53,6 +56,15 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee('minlength="3" maxlength="30"', false)
             ->assertSee('Use my current location')
             ->assertDontSee('Prefer not to say');
+    }
+
+    public function test_failed_registration_email_does_not_leave_a_usable_code(): void
+    {
+        Mail::shouldReceive('raw')->once()->andThrow(new TransportException('SMTP unavailable'));
+
+        $this->post(route('register.email'), ['email' => 'NEW.CUSTOMER@GMAIL.COM'])
+            ->assertSessionHasErrors('email')
+            ->assertSessionMissing('registration_email_verification');
     }
 
     public function test_customer_registration_enforces_name_and_username_length_limits(): void
@@ -123,6 +135,35 @@ class AuthenticationAndAccessTest extends TestCase
 
         $this->post('/login', ['email' => $customer->username, 'password' => 'password123'])
             ->assertRedirect('/shop');
+
+        $this->post('/logout');
+        $this->post('/login', ['email' => 'KIM@GMAIL.COM', 'password' => 'password123'])
+            ->assertRedirect('/shop');
+    }
+
+    public function test_verified_registration_must_be_completed_before_the_code_expires(): void
+    {
+        $this->withSession([
+            'registration_email_verification' => [
+                'email' => 'expired@gmail.com',
+                'code_hash' => Hash::make('123456'),
+                'expires_at' => now()->subMinute()->timestamp,
+                'verified' => true,
+            ],
+        ])->post('/register', [
+            'name' => 'Expired Verification',
+            'username' => 'expired.verification',
+            'email' => 'EXPIRED@GMAIL.COM',
+            'phone' => '09171234567',
+            'birthday' => '2000-09-15',
+            'sex' => 'female',
+            'address' => 'Bantayan, Cebu',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ])->assertSessionHasErrors('email')
+            ->assertSessionMissing('registration_email_verification');
+
+        $this->assertDatabaseMissing('users', ['email' => 'expired@gmail.com']);
     }
 
     public function test_new_super_admin_email_works_before_the_data_migration_runs(): void
@@ -156,6 +197,12 @@ class AuthenticationAndAccessTest extends TestCase
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ];
+        DB::table('sessions')->insert([
+            'id' => 'customer-admin-reset-session',
+            'user_id' => $customer->id,
+            'payload' => 'test',
+            'last_activity' => now()->timestamp,
+        ]);
 
         $this->actingAs($admin)->put('/customers/'.$customer->id, $update)->assertForbidden();
         $this->actingAs($superAdmin)->put('/customers/'.$customer->id, $update)->assertRedirect();
@@ -170,6 +217,7 @@ class AuthenticationAndAccessTest extends TestCase
             'address' => 'Updated present address',
             'role' => User::ROLE_CUSTOMER,
         ]);
+        $this->assertDatabaseMissing('sessions', ['user_id' => $customer->id]);
 
         $this->actingAs($superAdmin)->get(route('customers.show', $customer))
             ->assertOk()
@@ -281,10 +329,17 @@ class AuthenticationAndAccessTest extends TestCase
             'password' => 'NewPassword123!',
             'password_confirmation' => 'NewPassword123!',
         ];
+        DB::table('sessions')->insert([
+            'id' => 'cashier-admin-reset-session',
+            'user_id' => $cashier->id,
+            'payload' => 'test',
+            'last_activity' => now()->timestamp,
+        ]);
 
         $this->actingAs($admin)->put('/staff/cashiers/'.$cashier->id, $update)->assertForbidden();
         $this->actingAs($superAdmin)->put('/staff/cashiers/'.$cashier->id, $update)->assertRedirect();
         $this->assertDatabaseHas('users', ['id' => $cashier->id, 'username' => 'cashier.updated', 'role' => User::ROLE_CASHIER]);
+        $this->assertDatabaseMissing('sessions', ['user_id' => $cashier->id]);
 
         $this->actingAs($admin)->delete('/staff/cashiers/'.$cashier->id)->assertForbidden();
         $this->actingAs($superAdmin)->delete('/staff/cashiers/'.$cashier->id)->assertRedirect();
@@ -362,7 +417,7 @@ class AuthenticationAndAccessTest extends TestCase
             'role' => User::ROLE_CUSTOMER,
         ]);
         $invalidCredentials = [
-            'email' => $customer->email,
+            'email' => strtoupper($customer->email),
             'password' => 'IncorrectPassword123!',
         ];
 

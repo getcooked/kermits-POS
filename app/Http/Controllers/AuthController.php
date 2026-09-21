@@ -12,8 +12,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends Controller
 {
@@ -38,6 +41,10 @@ class AuthController extends Controller
 
     public function sendRegistrationCode(Request $request): RedirectResponse
     {
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => Str::lower(trim($request->input('email')))]);
+        }
+
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
             'g-recaptcha-response' => Recaptcha::rules($request),
@@ -57,10 +64,19 @@ class AuthController extends Controller
             ],
         ]);
 
-        Mail::raw("Your Kermit's verification code is {$code}. This code expires in 10 minutes.", function ($message) use ($validated): void {
-            $message->to($validated['email'])
-                ->subject("Kermit's account verification code");
-        });
+        try {
+            Mail::raw("Your Kermit's verification code is {$code}. This code expires in 10 minutes.", function ($message) use ($validated): void {
+                $message->to($validated['email'])
+                    ->subject("Kermit's account verification code");
+            });
+        } catch (TransportExceptionInterface) {
+            session()->forget('registration_email_verification');
+            Log::warning('Web registration email delivery failed.');
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'The verification email could not be sent. Please try again later.']);
+        }
 
         return back()->with('status', 'We sent a 6-digit verification code to your Gmail.');
     }
@@ -96,7 +112,11 @@ class AuthController extends Controller
         $verification = session('registration_email_verification');
         $email = strtolower($request->validated('email'));
 
-        if (($verification['verified'] ?? false) !== true || ($verification['email'] ?? null) !== $email) {
+        if (($verification['verified'] ?? false) !== true
+            || ($verification['email'] ?? null) !== $email
+            || (int) ($verification['expires_at'] ?? 0) < now()->timestamp) {
+            $request->session()->forget('registration_email_verification');
+
             return back()
                 ->withInput($request->except('password', 'password_confirmation'))
                 ->withErrors(['email' => 'Please verify this Gmail address before creating your account.']);
@@ -120,6 +140,9 @@ class AuthController extends Controller
     public function store(LoginRequest $request, LoginAttemptLimiter $loginAttempts): RedirectResponse
     {
         $login = $request->string('email')->trim()->toString();
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $login = Str::lower($login);
+        }
 
         if ($loginAttempts->isLocked($request, $login)) {
             return $this->lockoutResponse($request, $loginAttempts, $login);

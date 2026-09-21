@@ -17,10 +17,6 @@ use Throwable;
 
 class MobileReservationController extends Controller
 {
-    private const TABLE_FEES = [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
-
-    private const EXCLUSIVE_FEE = 5000;
-
     public function index(Request $request): JsonResponse
     {
         $items = Reservation::query()->with('items.product')->whereBelongsTo($request->user())
@@ -52,7 +48,9 @@ class MobileReservationController extends Controller
         try {
             $reservation = DB::transaction(function () use ($request, $validated, $proofPath, $schedules): Reservation {
                 $schedules->lock();
-                $fee = $validated['type'] === 'table' ? self::TABLE_FEES[(int) $validated['table_size']] : self::EXCLUSIVE_FEE;
+                $fee = $validated['type'] === 'table'
+                    ? (float) config('reservations.table_fees.'.(int) $validated['table_size'])
+                    : (float) config('reservations.exclusive_fee');
                 $reservation = $schedules->reserve([
                     ...collect($validated)->except(['menu_items', 'payment_proof'])->all(),
                     'user_id' => $request->user()->id, 'customer_name' => $request->user()->name,

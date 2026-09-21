@@ -10,6 +10,7 @@ use App\Notifications\CustomerPasswordVerification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -64,7 +65,7 @@ class MobileApiTest extends TestCase
             'role' => User::ROLE_CUSTOMER,
         ]);
         $invalidCredentials = [
-            'login' => $customer->email,
+            'login' => strtoupper($customer->email),
             'password' => 'IncorrectMobilePassword123!',
             'device_name' => 'Lockout test phone',
         ];
@@ -226,6 +227,13 @@ class MobileApiTest extends TestCase
             'code_hash' => Hash::make('123456'),
         ], now()->addMinutes(10));
 
+        DB::table('sessions')->insert([
+            'id' => 'mobile-password-web-session',
+            'user_id' => $customer->id,
+            'payload' => 'test',
+            'last_activity' => now()->timestamp,
+        ]);
+
         $this->withToken($token)->putJson('/api/v1/account/password', [
             ...$data,
             'password' => 'MobilePassword123!',
@@ -238,6 +246,7 @@ class MobileApiTest extends TestCase
 
         $this->assertTrue(Hash::check('NewMobilePassword456!', $customer->fresh()->password));
         $this->assertDatabaseMissing('mobile_api_tokens', ['user_id' => $customer->id]);
+        $this->assertDatabaseMissing('sessions', ['user_id' => $customer->id]);
         $this->assertNull(Cache::get('mobile-customer-password-verification:'.$customer->id));
         $this->withToken($token)->getJson('/api/v1/me')->assertUnauthorized();
     }

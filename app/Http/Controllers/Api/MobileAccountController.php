@@ -39,11 +39,12 @@ class MobileAccountController extends Controller
 
         $customerDetailsSchema->ensure();
         $customer->update($validated);
+        $customer = $customer->fresh();
 
         return response()->json([
             'message' => 'Your personal information was updated.',
             'data' => [
-                ...$customer->fresh()->only(['id', 'name', 'username', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
+                ...$customer->only(['id', 'name', 'username', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
                 'birthday' => $customer->birthday?->format('Y-m-d'),
                 'age' => $customer->birthday?->age,
             ],
@@ -111,6 +112,7 @@ class MobileAccountController extends Controller
 
         DB::transaction(function () use ($customer, $validated): void {
             $customer->forceFill(['password' => $validated['password']])->save();
+            DB::table(config('session.table', 'sessions'))->where('user_id', $customer->id)->delete();
             DB::table('mobile_api_tokens')->where('user_id', $customer->id)->delete();
             DB::table('password_reset_tokens')->where('email', $customer->email)->delete();
         });

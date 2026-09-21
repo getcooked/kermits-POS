@@ -47,6 +47,7 @@ class PayMongoCheckoutTest extends TestCase
         $this->assertSame(3, $product->fresh()->stock);
         Http::assertSent(fn ($request) => $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
             && $request->hasHeader('Authorization', 'Basic '.base64_encode('sk_test_example:'))
+            && $request->hasHeader('Idempotency-Key', 'kermits-order-'.$order->id.'-checkout')
             && $request['data']['attributes']['line_items'] === [
                 ['name' => 'Test meal', 'amount' => 17500, 'currency' => 'PHP', 'quantity' => 2],
                 ['name' => 'Table reservation', 'amount' => 15000, 'currency' => 'PHP', 'quantity' => 1],

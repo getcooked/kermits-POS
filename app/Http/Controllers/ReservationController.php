@@ -20,16 +20,12 @@ use Throwable;
 
 class ReservationController extends Controller
 {
-    private const TABLE_FEES = [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
-
-    private const EXCLUSIVE_FEE = 5000;
-
     public function create(Request $request): View
     {
         return view('reservations.create', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
-            'tableFees' => self::TABLE_FEES,
-            'exclusiveFee' => self::EXCLUSIVE_FEE,
+            'tableFees' => config('reservations.table_fees'),
+            'exclusiveFee' => config('reservations.exclusive_fee'),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
         ]);
     }
@@ -44,8 +40,8 @@ class ReservationController extends Controller
             $reservation = DB::transaction(function () use ($request, $proofPath, $schedules): Reservation {
                 $schedules->lock();
                 $reservationFee = $request->validated('type') === 'table'
-                    ? self::TABLE_FEES[(int) $request->validated('table_size')]
-                    : self::EXCLUSIVE_FEE;
+                    ? (float) config('reservations.table_fees.'.(int) $request->validated('table_size'))
+                    : (float) config('reservations.exclusive_fee');
                 $reservation = $schedules->reserve([
                     ...$request->safe()->except(['menu_items', 'payment_proof']),
                     'user_id' => $request->user()->id,

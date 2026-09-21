@@ -19,8 +19,6 @@ use Throwable;
 
 class CustomerOrderController extends Controller
 {
-    private const TABLE_FEES = [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
-
     public function index(): View
     {
         $qrPath = SystemSetting::get('gcash_qr_path');
@@ -34,7 +32,7 @@ class CustomerOrderController extends Controller
         return view('shop.index', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'gcashQrSrc' => $gcashQrSrc,
-            'tableFees' => self::TABLE_FEES,
+            'tableFees' => config('reservations.table_fees'),
             'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
@@ -62,7 +60,7 @@ class CustomerOrderController extends Controller
                 );
 
                 $tableSize = (int) $request->validated('table_size');
-                $reservationFee = self::TABLE_FEES[$tableSize];
+                $reservationFee = (float) config('reservations.table_fees.'.$tableSize);
                 $reservation = $schedules->reserve([
                     'user_id' => $request->user()->id,
                     'order_id' => $order->id,

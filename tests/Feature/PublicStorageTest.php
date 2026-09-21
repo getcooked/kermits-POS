@@ -15,9 +15,13 @@ class PublicStorageTest extends TestCase
         Storage::fake('public');
         Storage::disk('public')->put('payment/qr-code.jpg', 'qr-image');
 
-        $this->get(route('public.media', ['path' => 'payment/qr-code.jpg']))
+        $response = $this->get(route('public.media', ['path' => 'payment/qr-code.jpg']))
             ->assertOk()
             ->assertHeader('content-type', 'image/jpeg');
+
+        $this->assertStringContainsString('public', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('max-age=86400', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringNotContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }
 
     public function test_public_storage_path_traversal_is_rejected(): void

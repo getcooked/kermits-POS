@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Throwable;
 
 class SuperAdminSecurityController extends Controller
 {
@@ -30,7 +31,14 @@ class SuperAdminSecurityController extends Controller
             'expires_at' => now()->addMinutes(10)->timestamp,
         ]);
 
-        $user->notify(new SuperAdminPasswordVerification($code));
+        try {
+            $user->notify(new SuperAdminPasswordVerification($code));
+        } catch (Throwable $exception) {
+            $request->session()->forget('super_admin_password_verification');
+            report($exception);
+
+            return back()->withErrors(['email' => 'The verification email could not be sent. Please try again later.']);
+        }
 
         return back()->with('verification_sent', 'A 6-digit verification code was sent to '.$user->email.'.');
     }

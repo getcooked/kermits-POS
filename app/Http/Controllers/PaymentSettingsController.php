@@ -7,6 +7,7 @@ use App\Models\SystemSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Throwable;
 
 class PaymentSettingsController extends Controller
 {
@@ -20,7 +21,13 @@ class PaymentSettingsController extends Controller
         $oldPath = SystemSetting::get('gcash_qr_path');
         $newPath = $request->file('gcash_qr')->store('payment', 'public');
 
-        SystemSetting::query()->updateOrCreate(['key' => 'gcash_qr_path'], ['value' => $newPath]);
+        try {
+            SystemSetting::query()->updateOrCreate(['key' => 'gcash_qr_path'], ['value' => $newPath]);
+        } catch (Throwable $exception) {
+            Storage::disk('public')->delete($newPath);
+
+            throw $exception;
+        }
 
         if ($oldPath && $oldPath !== $newPath) {
             Storage::disk('public')->delete($oldPath);

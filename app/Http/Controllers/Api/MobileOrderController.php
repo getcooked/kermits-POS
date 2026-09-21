@@ -18,8 +18,6 @@ use Throwable;
 
 class MobileOrderController extends Controller
 {
-    private const TABLE_FEES = [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
-
     public function index(Request $request): JsonResponse
     {
         $orders = Order::query()->with(['items.product', 'reservation'])->where('customer_id', $request->user()->id)
@@ -69,6 +67,7 @@ class MobileOrderController extends Controller
 
                 if ($needsReservation) {
                     $tableSize = (int) $validated['table_size'];
+                    $reservationFee = (float) config('reservations.table_fees.'.$tableSize);
                     $reservation = $schedules->reserve([
                         'user_id' => $request->user()->id,
                         'order_id' => $order->id,
@@ -80,9 +79,9 @@ class MobileOrderController extends Controller
                         'phone' => $validated['phone'],
                         'reservation_at' => $schedules->normalize($validated['reservation_at']),
                         'guests' => $tableSize,
-                        'reservation_fee' => self::TABLE_FEES[$tableSize],
+                        'reservation_fee' => $reservationFee,
                         'food_total' => 0,
-                        'total_amount' => self::TABLE_FEES[$tableSize],
+                        'total_amount' => $reservationFee,
                         'payment_method' => $validated['payment_method'],
                         'payment_reference' => $validated['payment_reference'] ?? null,
                         'payment_status' => 'pending',

@@ -52,6 +52,7 @@ class PayMongoCheckout
             ];
 
             $response = Http::withBasicAuth(config('services.paymongo.secret_key'), '')
+                ->withHeaders(['Idempotency-Key' => 'kermits-order-'.$locked->id.'-checkout'])
                 ->acceptJson()->timeout(15)->connectTimeout(5)
                 ->post('https://api.paymongo.com/v2/checkout_sessions', [
                     'data' => ['attributes' => [

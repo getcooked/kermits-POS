@@ -9,10 +9,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\View\View;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordResetController extends Controller
 {
@@ -71,7 +73,22 @@ class PasswordResetController extends Controller
             && ! User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
             $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
         }
-        Password::sendResetLink(['email' => $user->email]);
+        try {
+            $status = Password::sendResetLink(['email' => $user->email]);
+        } catch (TransportExceptionInterface) {
+            Password::deleteToken($user);
+            Log::warning('Web password reset email delivery failed.');
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'The password reset email could not be sent. Please try again later.']);
+        }
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => __($status)]);
+        }
 
         return back()->with(
             'status',

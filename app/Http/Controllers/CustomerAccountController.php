@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Throwable;
 
 class CustomerAccountController extends Controller
 {
@@ -50,7 +51,14 @@ class CustomerAccountController extends Controller
             'expires_at' => now()->addMinutes(10)->timestamp,
         ]);
 
-        $customer->notify(new CustomerPasswordVerification($code));
+        try {
+            $customer->notify(new CustomerPasswordVerification($code));
+        } catch (Throwable $exception) {
+            $request->session()->forget('customer_password_verification');
+            report($exception);
+
+            return back()->withErrors(['email' => 'The verification email could not be sent. Please try again later.']);
+        }
 
         return back()->with('verification_sent', 'A 6-digit verification code was sent to '.$customer->email.'.');
     }

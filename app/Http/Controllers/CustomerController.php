@@ -55,12 +55,22 @@ class CustomerController extends Controller
         abort_unless($customer->hasRole(User::ROLE_CUSTOMER), 404);
 
         $data = $request->safe()->except(['password', 'password_confirmation']);
+        $oldEmail = $customer->email;
         if ($request->filled('password')) {
             $data['password'] = $request->validated('password');
         }
 
         $customerDetailsSchema->ensure();
         $customer->update($data);
+
+        if ($request->filled('password')) {
+            $customer->forceFill(['remember_token' => Str::random(60)])->save();
+            DB::table(config('session.table', 'sessions'))->where('user_id', $customer->id)->delete();
+            DB::table('mobile_api_tokens')->where('user_id', $customer->id)->delete();
+        }
+        if ($request->filled('password') || $oldEmail !== $customer->email) {
+            DB::table('password_reset_tokens')->whereIn('email', [$oldEmail, $customer->email])->delete();
+        }
 
         return back()->with('status', 'Customer account updated securely.');
     }

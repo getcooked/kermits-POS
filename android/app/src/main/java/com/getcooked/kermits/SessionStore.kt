@@ -2,7 +2,6 @@ package com.getcooked.kermits
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.os.Build
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -23,11 +22,7 @@ class SessionStore(context: Context) {
                 Log.w(TAG, "Credential-protected session storage is unavailable", error)
             }
 
-            val deviceContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                context.createDeviceProtectedStorageContext()
-            } else {
-                context
-            }
+            val deviceContext = context.createDeviceProtectedStorageContext()
 
             try {
                 return createEncryptedPreferences(deviceContext, DEVICE_ENCRYPTED_PREFS)

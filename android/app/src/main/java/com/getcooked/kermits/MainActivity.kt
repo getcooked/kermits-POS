@@ -980,6 +980,7 @@ private fun CurrentLocationAddressButton(onAddressFound: (String) -> Unit) {
 }
 
 @SuppressLint("MissingPermission")
+@Suppress("DEPRECATION")
 private suspend fun currentDeviceLocation(context: Context): Location? {
     val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)

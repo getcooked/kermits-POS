@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCashierAccountRequest;
 use App\Http\Requests\UpdateCashierAccountRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -42,6 +43,13 @@ class CashierAccountController extends Controller
             $data['password'] = $request->validated('password');
         }
         $cashier->update($data);
+
+        if ($request->filled('password')) {
+            $cashier->forceFill(['remember_token' => Str::random(60)])->save();
+            DB::table(config('session.table', 'sessions'))->where('user_id', $cashier->id)->delete();
+            DB::table('mobile_api_tokens')->where('user_id', $cashier->id)->delete();
+            DB::table('password_reset_tokens')->where('email', $cashier->email)->delete();
+        }
 
         return back()->with('status', 'Cashier account updated successfully.');
     }

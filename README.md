@@ -6,7 +6,7 @@ A Laravel capstone project for restaurant sales, inventory, customer ordering, a
 
 The website login supports Google reCAPTCHA v2 (the "I'm not a robot" checkbox). In `.env`, set `RECAPTCHA_ENABLED=true`, `RECAPTCHA_SITE_KEY`, and `RECAPTCHA_SECRET_KEY`, then run `php artisan config:clear`. Configure these values separately on the deployed server; `.env` is not committed to Git. Keep the secret key on the server only.
 
-Register the website hostname in the [reCAPTCHA console](https://www.google.com/recaptcha/admin). For local development, allow `localhost` and open the site using `localhost` rather than `127.0.0.1`. Keep Google's domain validation enabled and use checkbox v2 keys. The server verifies each token and its hostname before checking login credentials. Missing/expired tokens and verification outages reject the login with a retry message. Existing login rate limits remain in effect. Registration, password reset, and the native Android API login are unchanged.
+Register the website hostname in the [reCAPTCHA console](https://www.google.com/recaptcha/admin). For local development, allow `localhost` and open the site using `localhost` rather than `127.0.0.1`. Keep Google's domain validation enabled and use checkbox v2 keys. The server verifies each token and its hostname before processing login, registration, or password reset requests. The Android app uses the same site key through its restricted in-app verification page. Missing, expired, and invalid tokens are rejected, and verification outages return a retry message.
 
 Automated tests disable reCAPTCHA by default; `RecaptchaLoginTest` explicitly enables it and mocks Google's responses to cover successful verification, rejection, expiry, hostname mismatch, and outages. For a live check, open `/login`, complete the checkbox, and sign in; also confirm submitting without completing the checkbox shows an error.
 
@@ -70,7 +70,7 @@ php artisan test
 composer audit --locked
 ```
 
-Current verified test run: **228 tests, 1669 assertions**.
+Run the commands above to see the current test and assertion totals.
 
 ## Mobile API readiness
 

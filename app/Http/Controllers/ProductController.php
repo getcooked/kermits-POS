@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Throwable;
 
 class ProductController extends Controller
 {
@@ -46,12 +47,22 @@ class ProductController extends Controller
     {
         $data = $request->productData();
         $data['category_order'] = $this->categoryOrder($data['category']);
+        $newImage = null;
 
         if ($request->hasFile('image')) {
-            $data['image_path'] = $request->file('image')->store('products', 'public');
+            $newImage = $request->file('image')->store('products', 'public');
+            $data['image_path'] = $newImage;
         }
 
-        Product::query()->create($data);
+        try {
+            Product::query()->create($data);
+        } catch (Throwable $exception) {
+            if ($newImage) {
+                Storage::disk('public')->delete($newImage);
+            }
+
+            throw $exception;
+        }
 
         return redirect()->route('products.index')->with('status', 'Product added successfully.');
     }
@@ -61,16 +72,26 @@ class ProductController extends Controller
         $data = $request->productData();
         $data['category_order'] = $this->categoryOrder($data['category'], $product);
         $oldImage = $product->image_path;
+        $newImage = null;
 
         if ($request->boolean('remove_image')) {
             $data['image_path'] = null;
         }
 
         if ($request->hasFile('image')) {
-            $data['image_path'] = $request->file('image')->store('products', 'public');
+            $newImage = $request->file('image')->store('products', 'public');
+            $data['image_path'] = $newImage;
         }
 
-        $product->update($data);
+        try {
+            $product->update($data);
+        } catch (Throwable $exception) {
+            if ($newImage) {
+                Storage::disk('public')->delete($newImage);
+            }
+
+            throw $exception;
+        }
 
         if ($this->isStoredImage($oldImage) && $oldImage !== $product->image_path) {
             Storage::disk('public')->delete($oldImage);

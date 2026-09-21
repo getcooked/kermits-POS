@@ -1,6 +1,7 @@
 package com.getcooked.kermits
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -26,8 +27,6 @@ object PushNotifications {
     private val networkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun createChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-
         val channel = NotificationChannel(
             CHANNEL_ID,
             context.getString(R.string.reservation_updates_channel_name),
@@ -144,6 +143,7 @@ object PushNotifications {
     }
 }
 
+@SuppressLint("MissingFirebaseInstanceTokenRefresh")
 class KermitsMessagingService : FirebaseMessagingService() {
     override fun onRegistered(installationId: String) {
         super.onRegistered(installationId)

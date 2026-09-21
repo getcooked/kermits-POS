@@ -10,6 +10,7 @@ use App\Services\LoginAttemptLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class MobileAuthController extends Controller
 {
@@ -22,6 +23,9 @@ class MobileAuthController extends Controller
             'recaptcha_token' => MobileRecaptcha::rules($request),
         ], MobileRecaptcha::messages());
         $login = trim($validated['login']);
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $login = Str::lower($login);
+        }
 
         if ($loginAttempts->isLocked($request, $login)) {
             return $this->lockoutResponse($request, $loginAttempts, $login);

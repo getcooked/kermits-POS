@@ -306,7 +306,10 @@ class InventoryAndProductsTest extends TestCase
             'image_path' => 'products/menu-picture.png',
         ]);
 
-        $this->get('/menu-images/'.$product->id)->assertOk();
+        $response = $this->get('/menu-images/'.$product->id)->assertOk();
+        $this->assertStringContainsString('public', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('max-age=86400', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringNotContainsString('no-store', (string) $response->headers->get('Cache-Control'));
 
         $product->update(['image_path' => 'products/missing.png']);
         $this->get('/menu-images/'.$product->id)->assertNotFound();
