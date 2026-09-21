@@ -9,11 +9,15 @@ import retrofit2.Response
 import retrofit2.http.*
 
 @JsonClass(generateAdapter = true)
-data class LoginRequest(val login: String, val password: String, val device_name: String = "Android device")
+data class LoginRequest(val login: String, val password: String, val device_name: String = "Android device", val recaptcha_token: String? = null)
 @JsonClass(generateAdapter = true)
-data class SendCodeRequest(val email: String)
+data class SendCodeRequest(val email: String, val recaptcha_token: String? = null)
 @JsonClass(generateAdapter = true)
-data class ForgotPasswordRequest(val email: String)
+data class ForgotPasswordRequest(val email: String, val recaptcha_token: String? = null)
+@JsonClass(generateAdapter = true)
+data class RecaptchaConfig(val enabled: Boolean)
+@JsonClass(generateAdapter = true)
+data class RecaptchaConfigResponse(val data: RecaptchaConfig)
 @JsonClass(generateAdapter = true)
 data class VerifyCodeRequest(val challenge: String, val email: String, val code: String)
 @JsonClass(generateAdapter = true)
@@ -90,6 +94,7 @@ data class ReservationSlot(val start: String, val end: String, val label: String
 data class ReservationSlotsResponse(val data: List<ReservationSlot>)
 
 interface KermitsApi {
+    @GET("recaptcha/config") suspend fun recaptchaConfig(): RecaptchaConfigResponse
     @GET("reservation-availability") suspend fun reservationSlots(@Query("date") date: String, @Query("type") type: String, @Query("guests") guests: Int): ReservationSlotsResponse
     @POST("login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     @POST("password/forgot") suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ApiError>

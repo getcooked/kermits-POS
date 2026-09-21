@@ -1,6 +1,20 @@
 # Kermit's Customer Android App
 
-Native Kotlin + Jetpack Compose customer application for the Laravel `/api/v1` API. It renders entirely with Android Compose UI and does not embed the website in a WebView.
+Native Kotlin + Jetpack Compose customer application for the Laravel `/api/v1` API. App screens use Compose; the security dialog loads one hosted reCAPTCHA page in a restricted WebView.
+
+## Mobile reCAPTCHA
+
+The app uses the website's existing reCAPTCHA v2 checkbox before customer login, sending a registration code, and requesting a password reset. It loads `/mobile/recaptcha` from the same server, so Google sees the registered website hostname. After the customer completes the checkbox, the app sends the single-use token to Laravel and Laravel verifies it with the same secret and hostname check used by the web forms.
+
+No Android key, Google Cloud project ID, or additional API key is required. Use the website's existing settings in the Laravel server's `.env`:
+
+```dotenv
+RECAPTCHA_ENABLED=true
+RECAPTCHA_SITE_KEY=YOUR_EXISTING_WEB_V2_SITE_KEY
+RECAPTCHA_SECRET_KEY=YOUR_EXISTING_WEB_V2_SECRET_KEY
+```
+
+The web key must allow the hostname serving the API, currently `kermits-pos.com`. Keep the secret on the server. The public `/api/v1/recaptcha/config` response contains only the enable flag. Deploy the Laravel API and `/mobile/recaptcha` page before publishing the updated APK. Older APKs keep working because they do not request the new configuration endpoint; the server requires a token only when the shared web reCAPTCHA setting is enabled.
 
 ## Open and run
 
@@ -69,4 +83,4 @@ Android 13 and newer asks the signed-in customer for notification permission. Th
 4. Add `google-services.json`, run `assembleRelease`, install the signed artifact on a clean device, and exercise login, reservation updates, push permission, notification taps, logout, ordering, and history flows against staging.
 5. Add Crashlytics or an equivalent crash reporting service before publishing.
 
-The build requires JDK 17 or newer and an Android SDK with API 35. Android Studio's bundled runtime is suitable when `JAVA_HOME` points to a complete installation.
+The build requires JDK 17 and an Android SDK with API 35. Use JDK 17 for the full lint and packaging checks; the JDK 25 installation on this workstation crashes the Android lint worker. Android Studio's bundled runtime is suitable when `JAVA_HOME` points to a complete compatible installation.

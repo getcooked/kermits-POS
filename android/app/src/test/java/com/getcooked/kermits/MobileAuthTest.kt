@@ -18,6 +18,26 @@ class MobileAuthTest {
         assertEquals("challenge", auth.sendCode(" Customer@Gmail.com ").challenge)
     }
 
+    @Test fun recaptchaTokensAreForwardedOnProtectedEmailRequests() = runBlocking {
+        val auth = MobileAuth(api { method, request ->
+            when (method) {
+                "sendRegistrationCode" -> {
+                    assertEquals("signup-token", (request as SendCodeRequest).recaptcha_token)
+                    Response.success(SendCodeResponse(SendCodeData("challenge", "customer@gmail.com", 600)))
+                }
+                "forgotPassword" -> {
+                    assertEquals("reset-token", (request as ForgotPasswordRequest).recaptcha_token)
+                    Response.success(ApiError(message = "Sent."))
+                }
+                else -> throw AssertionError("Unexpected API call: $method")
+            }
+        })
+
+        auth.sendCode("customer@gmail.com", "signup-token")
+        auth.requestPasswordReset("customer@gmail.com", "reset-token")
+        Unit
+    }
+
     @Test fun verificationReturnsRegistrationTokenAndPreservesLeadingZeroInCode() = runBlocking {
         val auth = MobileAuth(api { _, request ->
             assertEquals(VerifyCodeRequest("challenge", "customer@gmail.com", "012345"), request)

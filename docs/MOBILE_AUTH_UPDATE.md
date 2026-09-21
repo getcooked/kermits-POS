@@ -1,6 +1,6 @@
-# Mobile authentication update - 1.0.20
+# Mobile authentication update - 1.0.21
 
-The Android download APK is `storage/app/releases/kermits.apk` (version code 21, version 1.0.20). It uses the production API at `https://kermits-pos.com/api/v1/` and the same signing certificate as the previous download, so it can update that installation. Registration and Personal Information can resolve the device's present location into a readable address.
+The Android download APK is `storage/app/releases/kermits.apk` (version code 22, version 1.0.21). It uses the production API at `https://kermits-pos.com/api/v1/` and the same signing certificate as the previous download, so it can update that installation. Registration and Personal Information can resolve the device's present location into a readable address.
 
 ## Deploy the online fixes
 
@@ -8,10 +8,14 @@ Upload these server files to the corresponding paths in the existing Laravel app
 
 - `app/Http/Controllers/Api/MobileRegistrationController.php`
 - `app/Http/Controllers/Api/MobilePasswordResetController.php`
+- `app/Http/Controllers/Api/MobileAuthController.php`
+- `app/Rules/MobileRecaptcha.php`
+- `resources/views/auth/mobile-recaptcha.blade.php`
 - `routes/api.php`
+- `routes/web.php`
 - `storage/app/releases/kermits.apk`
 
-The server-only ZIP contains the three PHP files and this guide. It does not contain `.env` or credentials. Preserve the live server's existing `.env` and database.
+Preserve the live server's existing `.env`, reCAPTCHA values, and database. The mobile flow uses the existing `RECAPTCHA_ENABLED`, `RECAPTCHA_SITE_KEY`, and `RECAPTCHA_SECRET_KEY` values.
 
 In the live application's directory, run:
 
@@ -31,6 +35,8 @@ Confirm the server uses the public HTTPS `APP_URL` and a working email provider.
 - Password recovery scrolls when the keyboard is open and explains how to complete the email link flow.
 - An SMTP failure returns an actionable error. A failed reset email removes its undelivered token, allowing a retry rather than silently throttling it.
 - Incorrect verification attempts do not extend the original code expiry.
+- Present-location addresses use named location components and exclude Plus Codes such as `8P2H+2XF`.
+- Passwords must be 8-23 characters and still require uppercase, lowercase, a number, and a symbol.
 
 ## Verification
 
@@ -40,4 +46,4 @@ Live endpoint checks used empty requests and confirmed both authentication route
 
 Use your own customer email for a final check: request a registration code, test resend, create the account, and log in. Request a reset link, open it from the email, choose a new password, and return to the app to log in. Also check the spam folder.
 
-The website's reCAPTCHA protects web login only; the native mobile registration and recovery flows do not use it.
+The native app now uses the website's existing reCAPTCHA v2 checkbox for login, registration-code requests, and password recovery when `RECAPTCHA_ENABLED=true`. The checkbox is served from `/mobile/recaptcha` so the existing `kermits-pos.com` web key and secret remain valid. See `android/README.md` for deployment details.

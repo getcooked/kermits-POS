@@ -30,7 +30,8 @@ class AppServiceProvider extends ServiceProvider
         Reservation::observe(ReservationObserver::class);
         Order::observe(OrderObserver::class);
 
-        Password::defaults(fn (): Password => Password::min(12)
+        Password::defaults(fn (): Password => Password::min(8)
+            ->max(23)
             ->mixedCase()
             ->letters()
             ->numbers()

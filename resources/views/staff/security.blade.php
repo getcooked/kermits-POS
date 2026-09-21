@@ -31,8 +31,8 @@
                 <form class="password-form" method="POST" action="{{ route('superadmin.security.password.update') }}">
                     @csrf @method('PUT')
                     <div class="field"><label for="verification_code">Email verification code</label><input class="control verification-code" id="verification_code" name="verification_code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required></div>
-                    <div class="field"><label for="password">New password</label><input class="control" id="password" name="password" type="password" minlength="12" autocomplete="new-password" required><small>12+ characters with uppercase, lowercase, a number, and a symbol.</small></div>
-                    <div class="field"><label for="password_confirmation">Confirm new password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required></div>
+                    <div class="field"><label for="password">New password</label><input class="control" id="password" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, a number, and a symbol.</small></div>
+                    <div class="field"><label for="password_confirmation">Confirm new password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>
                     <button class="button" type="submit">Verify and change password</button>
                 </form>
             </article>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\MobileApiToken;
 use App\Models\User;
+use App\Rules\MobileRecaptcha;
 use App\Services\LoginAttemptLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,8 @@ class MobileAuthController extends Controller
             'login' => ['required', 'string', 'max:160'],
             'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:100'],
-        ]);
+            'recaptcha_token' => MobileRecaptcha::rules($request),
+        ], MobileRecaptcha::messages());
         $login = trim($validated['login']);
 
         if ($loginAttempts->isLocked($request, $login)) {

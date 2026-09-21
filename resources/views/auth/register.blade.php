@@ -60,8 +60,8 @@
                         <small id="address-help">Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</small>
                         <small id="location-status" class="location-status" role="status" aria-live="polite"></small>
                     </div>
-                    <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>12+ characters with uppercase, lowercase, number, and symbol.</small></div>
-                    <div class="field"><label>Confirm password</label><input class="control" name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
+                    <div class="field"><label>Password</label><input class="control" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required @disabled(! $verifiedEmail)><small>8-23 characters with uppercase, lowercase, number, and symbol.</small></div>
+                    <div class="field"><label>Confirm password</label><input class="control" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required @disabled(! $verifiedEmail)></div>
                     @unless($verifiedEmail)<p class="locked-note">Verify your Gmail first to unlock account creation.</p>@endunless
                     <button class="register-button" @disabled(! $verifiedEmail)>Create account <span>&rarr;</span></button>
                 </form>

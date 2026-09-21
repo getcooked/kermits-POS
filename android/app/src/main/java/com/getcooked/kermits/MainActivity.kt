@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Address
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
@@ -172,6 +173,7 @@ private fun Intent?.orderUpdateId(): Int? = this
     ?.takeIf { it > 0 }
 
 private val BRAND_LOGO_URL = BuildConfig.API_BASE_URL.substringBefore("/api/").trimEnd('/') + "/kermits-logo.jpg"
+private val MOBILE_RECAPTCHA_URL = BuildConfig.API_BASE_URL.substringBefore("/api/").trimEnd('/') + "/mobile/recaptcha"
 
 data class CheckoutDetails(
     val phone: String,
@@ -196,6 +198,8 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var registrationMessage by mutableStateOf<String?>(null); private set
     var registrationNeedsVerification by mutableStateOf(false); private set
     private val mobileAuth = MobileAuth(api)
+    var recaptchaUrl by mutableStateOf<String?>(null); private set
+    private var recaptchaCompletion: ((String?) -> Unit)? = null
     var signedIn by mutableStateOf(store.token != null && store.keepsSession); private set
     var loginCooldownSeconds by mutableIntStateOf(0); private set
     var loginCooldownReason by mutableStateOf<String?>(null); private set
@@ -209,11 +213,15 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     }
     fun login(login: String, password: String, keepSignedIn: Boolean) {
         if (busy || loginCooldownIsActive() || login.isBlank() || password.isBlank()) return
+        withRecaptcha { token -> performLogin(login, password, keepSignedIn, token) }
+    }
+    private fun performLogin(login: String, password: String, keepSignedIn: Boolean, recaptchaToken: String?) {
+        if (busy) return
         busy = true
         error = null
         viewModelScope.launch {
             try {
-                val response = api.login(LoginRequest(login.trim(), password))
+                val response = api.login(LoginRequest(login.trim(), password, recaptcha_token = recaptchaToken))
                 if (!response.isSuccessful) {
                     val parsedError = parseApiError(response.errorBody()?.string())
                     when {
@@ -224,7 +232,9 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                             startLoginCooldown(retryAfter, apiErrorMessage(parsedError))
                         }
                         response.code() >= 500 -> error = "Kermit's server is temporarily unavailable. Please try again shortly."
-                        else -> error = apiErrorMessage(parsedError) ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
+                        else -> error = parsedError?.errors?.get("recaptcha_token")?.firstOrNull()
+                            ?: apiErrorMessage(parsedError)
+                            ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
                     }
                     return@launch
                 }
@@ -246,6 +256,8 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 }
             } catch (exception: CancellationException) {
                 throw exception
+            } catch (exception: AuthRequestException) {
+                error = exception.message
             } catch (_: JsonDataException) {
                 error = "Kermit's returned an invalid sign-in response. Please update the app and try again."
             } catch (_: JsonEncodingException) {
@@ -350,14 +362,51 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun sendCode(email: String, done: (String?) -> Unit) {
         if (busy) return
         registrationMessage = null
-        runAuthRequest({
-            val data = mobileAuth.sendCode(email)
-            registrationMessage = "Verification code sent to ${data.email}. Check your inbox and spam folder."
-            data.challenge
-        }, done)
+        withRecaptcha { token ->
+            runAuthRequest({
+                val data = mobileAuth.sendCode(email, token)
+                registrationMessage = "Verification code sent to ${data.email}. Check your inbox and spam folder."
+                data.challenge
+            }, done)
+        }
     }
     fun requestPasswordReset(email: String, done: (String?) -> Unit) =
-        runAuthRequest({ mobileAuth.requestPasswordReset(email) }, done)
+        withRecaptcha { token -> runAuthRequest({ mobileAuth.requestPasswordReset(email, token) }, done) }
+
+    private fun withRecaptcha(done: (String?) -> Unit) {
+        if (busy || recaptchaUrl != null) return
+        busy = true
+        error = null
+        viewModelScope.launch {
+            try {
+                val enabled = api.recaptchaConfig().data.enabled
+                busy = false
+                if (enabled) {
+                    recaptchaCompletion = done
+                    recaptchaUrl = MOBILE_RECAPTCHA_URL
+                } else {
+                    done(null)
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                error = "Could not load reCAPTCHA. Check your connection and try again."
+                busy = false
+            }
+        }
+    }
+
+    fun completeRecaptcha(token: String) {
+        val completion = recaptchaCompletion
+        recaptchaCompletion = null
+        recaptchaUrl = null
+        if (token.isNotBlank()) completion?.invoke(token)
+    }
+
+    fun cancelRecaptcha() {
+        recaptchaCompletion = null
+        recaptchaUrl = null
+    }
 
     fun verifyCode(challenge: String, email: String, code: String, done: (String?) -> Unit) =
         runAuthRequest({
@@ -648,6 +697,13 @@ fun KermitsApp(
             vm.loadOrder(orderUpdateId) { selectedOrder = it }
             onOrderUpdateConsumed()
         }
+    }
+    vm.recaptchaUrl?.let { url ->
+        MobileRecaptchaDialog(
+            url = url,
+            onVerified = vm::completeRecaptcha,
+            onDismiss = vm::cancelRecaptcha,
+        )
     }
     if (!vm.signedIn) {
         when {
@@ -974,12 +1030,37 @@ private suspend fun currentNamedAddress(context: Context): String? {
             Geocoder(context, Locale.ENGLISH)
                 .getFromLocation(location.latitude, location.longitude, 1)
                 ?.firstOrNull()
-                ?.getAddressLine(0)
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
+                ?.toNamedLocation()
         }.getOrNull()
     }
 }
+
+private fun Address.toNamedLocation(): String? {
+    fun namedPart(value: String?): String? = value
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?.takeUnless { PLUS_CODE.matches(it) }
+
+    val street = listOfNotNull(namedPart(subThoroughfare), namedPart(thoroughfare))
+        .joinToString(" ")
+        .takeIf(String::isNotEmpty)
+    val parts = listOf(
+        street,
+        namedPart(featureName),
+        namedPart(subLocality),
+        namedPart(locality),
+        namedPart(subAdminArea),
+        namedPart(adminArea),
+        namedPart(countryName),
+    ).filterNotNull().fold(mutableListOf<String>()) { unique, part ->
+        if (unique.none { it.equals(part, ignoreCase = true) }) unique += part
+        unique
+    }
+
+    return parts.joinToString(", ").takeIf(String::isNotEmpty)
+}
+
+private val PLUS_CODE = Regex("^[23456789CFGHJMPQRVWX]{4,8}\\+[23456789CFGHJMPQRVWX]{2,8}$", RegexOption.IGNORE_CASE)
 
 @Composable
 private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
@@ -1045,7 +1126,7 @@ private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var sentMessage by rememberSaveable { mutableStateOf<String?>(null) }
-    val passwordIsStrong = newPassword.length in 12..23 && newPassword.any(Char::isUpperCase) && newPassword.any(Char::isLowerCase) && newPassword.any(Char::isDigit) && Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(newPassword)
+    val passwordIsStrong = newPassword.length in 8..23 && newPassword.any(Char::isUpperCase) && newPassword.any(Char::isLowerCase) && newPassword.any(Char::isDigit) && Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(newPassword)
     val canChange = code.length == 6 && passwordIsStrong && confirmation == newPassword
 
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
@@ -1065,7 +1146,7 @@ private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
                 sentMessage?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 10.dp)) }
                 Spacer(Modifier.height(14.dp))
                 RegistrationField("Email verification code", code, "Enter the 6-digit code", keyboardType = KeyboardType.NumberPassword) { code = it.filter(Char::isDigit).take(6); vm.clearError() }
-                RegistrationField("New password", newPassword, "12-23 characters with uppercase, lowercase, number, and symbol", password = true, keyboardType = KeyboardType.Password) { newPassword = it.take(23); vm.clearError() }
+                RegistrationField("New password", newPassword, "8-23 characters with uppercase, lowercase, number, and symbol", password = true, keyboardType = KeyboardType.Password) { newPassword = it.take(23); vm.clearError() }
                 RegistrationField("Confirm new password", confirmation, "Enter the new password again", password = true, keyboardType = KeyboardType.Password, imeAction = ImeAction.Done) { confirmation = it.take(23); vm.clearError() }
                 Spacer(Modifier.height(10.dp))
                 Button(
@@ -1149,12 +1230,12 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
     }
     val passwordError = when {
         password.isBlank() -> "Enter a password."
-        password.length !in 12..23 ||
+        password.length !in 8..23 ||
             password.none(Char::isUpperCase) ||
             password.none(Char::isLowerCase) ||
             !Regex("\\p{N}").containsMatchIn(password) ||
             !Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(password) ->
-            "Password must be 12-23 characters with uppercase, lowercase, a number, and a symbol."
+            "Password must be 8-23 characters with uppercase, lowercase, a number, and a symbol."
         else -> null
     }
     val confirmationError = when {
@@ -1250,7 +1331,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
             RegistrationField(
                 label = "Password",
                 value = password,
-                helperText = "12-23 characters with uppercase, lowercase, a number, and a symbol (${password.length}/23)",
+                helperText = "8-23 characters with uppercase, lowercase, a number, and a symbol (${password.length}/23)",
                 errorText = passwordError.takeIf { showRegistrationErrors },
                 password = true,
                 keyboardType = KeyboardType.Password,
