@@ -387,13 +387,16 @@
               }
 
               .footer {
-                     background: #171817;
-                     color: white;
-                     padding: 55px 20px
+                     min-height: 92px;
+                     display: flex;
+                     align-items: center;
+                     background: #121a2b;
+                     color: #959dac;
+                     padding: 20px clamp(20px, 3vw, 56px)
               }
 
               .footer-inner {
-                     width: min(1180px, 100%);
+                     width: 100%;
                      margin: auto;
                      display: flex;
                      justify-content: space-between;
@@ -401,21 +404,40 @@
                      align-items: center
               }
 
-              .footer-brand {
+              .footer-copy {
+                     margin: 0;
+                     color: #959dac;
+                     font-size: 14px;
+                     font-weight: 600
+              }
+
+              .footer-links {
                      display: flex;
                      align-items: center;
-                     gap: 12px
+                     gap: 34px
               }
 
-              .footer-brand img {
-                     width: 58px;
-                     height: 58px;
-                     border-radius: 50%;
-                     background: white
+              .footer-links a {
+                     display: inline-flex;
+                     align-items: center;
+                     gap: 7px;
+                     color: #d8aa37;
+                     font-size: 14px;
+                     font-weight: 700;
+                     text-decoration: none;
+                     transition: color .2s ease
               }
 
-              .footer small {
-                     color: #8f928c
+              .footer-links a:hover {
+                     color: #f0ca67
+              }
+
+              .footer-links svg {
+                     width: 16px;
+                     height: 16px;
+                     fill: none;
+                     stroke: currentColor;
+                     stroke-width: 1.8
               }
 
               .menu-toggle {
@@ -566,8 +588,15 @@
 
                      .footer-inner {
                             display: grid;
+                            gap: 16px;
                             text-align: center;
                             justify-items: center
+                     }
+
+                     .footer-links {
+                            justify-content: center;
+                            gap: 18px;
+                            flex-wrap: wrap
                      }
               }
 
@@ -985,7 +1014,14 @@
        </main>
        <footer class="footer">
               <div class="footer-inner">
-                     <div class="footer-brand"><img src="{{ asset('kermits-logo.jpg') }}" alt=""><strong>KERMIT'S</strong></div><small>Time-honored recipes since 2000</small>
+                     <p class="footer-copy">&copy; {{ now()->year }} Kermit's &mdash; Bantayan &nbsp;|&nbsp; Time-honored recipes since 2000</p>
+                     <div class="footer-links">
+                            <a href="mailto:Kermitsbantayan1@gmail.com">Kermitsbantayan1@gmail.com</a>
+                            <a href="https://www.facebook.com/share/1JxJ7gTUba/" target="_blank" rel="noopener noreferrer" aria-label="Visit Kermit's on Facebook">
+                                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.7 2.5 4.1 5.5 4.1 9S14.7 18.5 12 21M12 3C9.3 5.5 7.9 8.5 7.9 12S9.3 18.5 12 21"/></svg>
+                                   <span>Facebook</span>
+                            </a>
+                     </div>
               </div>
        </footer>
 
