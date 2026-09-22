@@ -6,6 +6,7 @@ use App\Models\Reservation;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -108,11 +109,23 @@ class ReservationSchedule
 
     private function hasCapacity(string $start, string $end, int $guests, ?int $ignore = null): bool
     {
+        $bookings = $this->conflicts($start, $end, $ignore)->get($this->conflictColumns());
+
+        return $this->hasCapacityForBookings($bookings, $start, $end, $guests);
+    }
+
+    private function conflictColumns(): array
+    {
         $columns = ['id', 'type', 'guests', 'table_size', 'reservation_at'];
         if ($this->hasReservationEndAt()) {
             $columns[] = 'reservation_end_at';
         }
-        $bookings = $this->conflicts($start, $end, $ignore)->get($columns);
+
+        return $columns;
+    }
+
+    private function hasCapacityForBookings(Collection $bookings, string $start, string $end, int $guests): bool
+    {
         if ($bookings->contains(fn (Reservation $reservation): bool => $reservation->type === 'exclusive')) {
             return false;
         }
@@ -147,6 +160,49 @@ class ReservationSchedule
         }
 
         return true;
+    }
+
+    public function availabilityForDate(string|DateTimeInterface $date, string $type = 'table', int $guests = 1): array
+    {
+        $date = CarbonImmutable::parse($date, config('app.timezone'))->setTimezone(config('app.timezone'));
+        $start = $date->setTimeFromTimeString(config('reservations.opening_time'));
+        $last = $date->setTimeFromTimeString(config('reservations.last_start_time'));
+        $dayEnd = $date->setTimeFromTimeString(config('reservations.closing_time'));
+        $bookings = $this->conflicts($start->format('Y-m-d H:i:s'), $dayEnd->format('Y-m-d H:i:s'))
+            ->get($this->conflictColumns());
+        $now = now();
+        $slots = [];
+
+        for ($at = $start; $at->lte($last); $at = $at->addMinutes(30)) {
+            $slotStart = $at->format('Y-m-d H:i:s');
+            $slotEnd = $this->endAt($at);
+            $slotBookings = $bookings->filter(function (Reservation $reservation) use ($slotStart, $slotEnd): bool {
+                $reservationStart = $this->normalize($reservation->reservation_at);
+                $reservationEnd = $reservation->reservation_end_at?->format('Y-m-d H:i:s')
+                    ?? CarbonImmutable::parse($reservationStart)->addMinutes(config('reservations.duration_minutes'))->format('Y-m-d H:i:s');
+
+                return $reservationStart < $slotEnd && $reservationEnd > $slotStart;
+            });
+            $available = $at->gt($now);
+            if ($available && $type === 'table' && $this->hasLegacyUniqueSchedule()
+                && $slotBookings->contains(fn (Reservation $reservation): bool => $this->normalize($reservation->reservation_at) === $slotStart)) {
+                $available = false;
+            } elseif ($available) {
+                $available = $type === 'exclusive'
+                    ? ! $slotBookings->contains(fn (Reservation $reservation): bool => $reservation->type === 'exclusive')
+                    : $this->hasCapacityForBookings($slotBookings, $slotStart, $slotEnd, $guests);
+            }
+
+            $end = CarbonImmutable::parse($slotEnd);
+            $slots[] = [
+                'start' => $at->format('Y-m-d\\TH:i'),
+                'end' => $end->format('Y-m-d\\TH:i'),
+                'label' => $at->format('g:i A').' – '.$end->format('g:i A'),
+                'available' => $available,
+            ];
+        }
+
+        return $slots;
     }
 
     public function isAvailable(string|DateTimeInterface $at, string $type = 'table', int $guests = 1): bool
