@@ -72,6 +72,16 @@ class PaymentSettingsTest extends TestCase
             ->assertDontSee('Scan using your GCash app.');
     }
 
+    public function test_shop_uses_default_table_fees_when_configuration_is_missing(): void
+    {
+        config(['reservations.table_fees' => null]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('value="2" data-fee="150.00"', false);
+    }
+
     private function fakePng(string $name): UploadedFile
     {
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);

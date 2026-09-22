@@ -22,9 +22,11 @@ class ReservationController extends Controller
 {
     public function create(Request $request): View
     {
+        $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
+
         return view('reservations.create', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
-            'tableFees' => config('reservations.table_fees'),
+            'tableFees' => $tableFees,
             'exclusiveFee' => config('reservations.exclusive_fee'),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
         ]);
@@ -39,8 +41,9 @@ class ReservationController extends Controller
         try {
             $reservation = DB::transaction(function () use ($request, $proofPath, $schedules): Reservation {
                 $schedules->lock();
+                $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
                 $reservationFee = $request->validated('type') === 'table'
-                    ? (float) config('reservations.table_fees.'.(int) $request->validated('table_size'))
+                    ? (float) ($tableFees[(int) $request->validated('table_size')] ?? 0)
                     : (float) config('reservations.exclusive_fee');
                 $reservation = $schedules->reserve([
                     ...$request->safe()->except(['menu_items', 'payment_proof']),

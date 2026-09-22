@@ -21,6 +21,7 @@ class CustomerOrderController extends Controller
 {
     public function index(): View
     {
+        $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
         $qrPath = SystemSetting::get('gcash_qr_path');
         $disk = Storage::disk('public');
         $qrImage = $qrPath && $disk->exists($qrPath) ? $disk->get($qrPath) : null;
@@ -32,7 +33,7 @@ class CustomerOrderController extends Controller
         return view('shop.index', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'gcashQrSrc' => $gcashQrSrc,
-            'tableFees' => config('reservations.table_fees'),
+            'tableFees' => $tableFees,
             'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
@@ -60,7 +61,8 @@ class CustomerOrderController extends Controller
                 );
 
                 $tableSize = (int) $request->validated('table_size');
-                $reservationFee = (float) config('reservations.table_fees.'.$tableSize);
+                $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
+                $reservationFee = (float) ($tableFees[$tableSize] ?? 0);
                 $reservation = $schedules->reserve([
                     'user_id' => $request->user()->id,
                     'order_id' => $order->id,
