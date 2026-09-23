@@ -6,7 +6,9 @@ use App\Http\Requests\StoreReservationRequest;
 use App\Http\Requests\UpdateReservationStatusRequest;
 use App\Models\Product;
 use App\Models\Reservation;
+use App\Models\Order;
 use App\Models\SystemSetting;
+use App\Services\PayMongoCheckout;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +31,7 @@ class ReservationController extends Controller
             'tableFees' => $tableFees,
             'exclusiveFee' => config('reservations.exclusive_fee'),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
+            'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
 
@@ -90,6 +93,17 @@ class ReservationController extends Controller
                     'changed_by' => $request->user()->id,
                 ]);
 
+                if ($request->validated('payment_method') === 'paymongo') {
+                    $order = Order::query()->create([
+                        'user_id' => $request->user()->id,
+                        'customer_id' => $request->user()->id,
+                        'total' => 0,
+                        'payment_method' => 'paymongo',
+                        'payment_status' => 'pending',
+                    ]);
+                    $reservation->update(['order_id' => $order->id]);
+                }
+
                 return $reservation;
             });
         } catch (Throwable $exception) {
@@ -98,6 +112,23 @@ class ReservationController extends Controller
             }
 
             throw $exception;
+        }
+
+        if ($request->validated('payment_method') === 'paymongo') {
+            try {
+                return redirect()->away(app(PayMongoCheckout::class)->urlFor($reservation->fresh()));
+            } catch (Throwable $exception) {
+                report($exception);
+
+                $failureUrl = URL::temporarySignedRoute(
+                    'reservations.success',
+                    now()->addMinutes(30),
+                    ['reference' => $reservation->reference],
+                );
+
+                return redirect()->to($failureUrl)
+                    ->with('payment_error', 'Your reservation was saved, but PayMongo checkout is unavailable. Please try the payment link again.');
+            }
         }
 
         $url = URL::temporarySignedRoute(

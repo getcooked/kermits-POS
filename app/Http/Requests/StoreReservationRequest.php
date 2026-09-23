@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\User;
 use App\Rules\ReservationHours;
 use App\Services\ReservationSchedule;
+use App\Services\PayMongoCheckout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -29,7 +30,7 @@ class StoreReservationRequest extends FormRequest
             'menu_items' => ['nullable', 'array'],
             'menu_items.*' => ['nullable', 'integer', 'min:0', 'max:22'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'payment_method' => ['required', 'in:cash,gcash'],
+            'payment_method' => ['required', 'in:cash,gcash,paymongo'],
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
@@ -39,6 +40,10 @@ class StoreReservationRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->input('payment_method') === 'paymongo' && ! PayMongoCheckout::enabled()) {
+                    $validator->errors()->add('payment_method', 'PayMongo checkout is not available.');
+                }
+
                 if (! $validator->errors()->hasAny(['reservation_at', 'type', 'table_size', 'guests'])
                     && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'), $this->input('type', 'table'), (int) ($this->input('table_size') ?: $this->input('guests', 1)))) {
                     $validator->errors()->add('reservation_at', 'This reservation time is no longer available. Please choose another schedule.');

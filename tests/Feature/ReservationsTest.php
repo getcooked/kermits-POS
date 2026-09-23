@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\Order;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ReservationsTest extends TestCase
@@ -58,6 +60,34 @@ class ReservationsTest extends TestCase
             'email' => 'customer@gmail.com',
             'status' => 'pending',
         ]);
+    }
+
+    public function test_customer_can_submit_a_reservation_with_paymongo(): void
+    {
+        config()->set('services.paymongo.enabled', true);
+        config()->set('services.paymongo.secret_key', 'sk_test_example');
+        config()->set('services.paymongo.webhook_secret', 'whsec_example');
+        config()->set('services.paymongo.payment_methods', ['gcash', 'qrph']);
+        Http::fake(['api.paymongo.com/*' => Http::response([
+            'data' => ['id' => 'cs_reservation_123', 'attributes' => ['checkout_url' => 'https://checkout.paymongo.com/reservation-session']],
+        ])]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        $this->actingAs($customer)->post('/book', [
+            'type' => 'table',
+            'table_size' => 4,
+            'customer_name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
+            'payment_method' => 'paymongo',
+        ])->assertRedirect('https://checkout.paymongo.com/reservation-session');
+
+        $reservation = Reservation::query()->latest('id')->firstOrFail();
+        $order = Order::query()->findOrFail($reservation->order_id);
+        $this->assertSame('paymongo', $order->payment_method);
+        $this->assertSame('pending', $order->payment_status);
+        $this->assertSame(150.0, (float) $reservation->total_amount);
     }
 
     public function test_guest_cannot_open_or_submit_a_reservation(): void

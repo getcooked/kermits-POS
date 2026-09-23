@@ -973,7 +973,7 @@
                      <div class="section-head">
                             <div>
                                    <p>MOST LOVED AT KERMIT'S</p>
-                                   <h2>Best sellers</h2>
+                                   <h2>Best Sellers</h2>
                             </div><a href="{{ route('login') }}">Log in to view the full menu &rarr;</a>
                      </div>
                      <div class="product-grid">@forelse($products as $product)<article class="menu-card">@if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="menu-image">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif<div class="menu-copy"><span class="menu-category-label">{{ $product->category }}</span>
@@ -1017,7 +1017,7 @@
                      <p class="footer-copy">&copy; {{ now()->year }} Kermit's &mdash; Bantayan &nbsp;|&nbsp; Time-honored recipes since 2000</p>
                      <div class="footer-links">
                             <a href="mailto:Kermitsbantayan1@gmail.com">Kermitsbantayan1@gmail.com</a>
-                            <a href="https://www.facebook.com/share/1JxJ7gTUba/" target="_blank" rel="noopener noreferrer" aria-label="Visit Kermit's on Facebook">
+                            <a href="https://www.facebook.com/share/1Eei4X9SED/" target="_blank" rel="noopener noreferrer" aria-label="Visit Kermit's on Facebook">
                                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.7 2.5 4.1 5.5 4.1 9S14.7 18.5 12 21M12 3C9.3 5.5 7.9 8.5 7.9 12S9.3 18.5 12 21"/></svg>
                                    <span>Facebook</span>
                             </a>

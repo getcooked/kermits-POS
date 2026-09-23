@@ -10,14 +10,13 @@
             </div><small>Time-honored recipes since 2000</small>
         </div>
         <div class="login-form">
-            <div class="login-inner"><a class="global-back" href="{{ route('home') }}">&larr; Back home</a>
-                <p class="eyebrow">WELCOME BACK</p>
+            <div class="login-inner"><a class="global-back" href="{{ route('home') }}">&larr; Home</a>
                 <h2 id="login-title">Log in to your account</h2>
-                <p class="muted">Enter your details to continue to Kermit’s.</p>
+                <p class="muted">Enter your account details to continue to Kermit’s.</p>
                 @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
                 @php($loginRetryAfter = max(0, (int) session('login_retry_after', 0)))
                 <form id="login-form" method="POST" action="{{ route('login.store') }}" data-retry-after="{{ $loginRetryAfter }}">@csrf
-                    <div class="field"><label for="email">Username or email address</label><input class="control" id="email" name="email" type="text" value="{{ old('email') }}" autocomplete="username" placeholder="Username or name@gmail.com" required autofocus>@error('email')@if($loginRetryAfter > 0)<p class="error" id="login-lockout" role="status" aria-live="polite">Too many login attempts. Try again in <span id="login-retry-seconds">{{ $loginRetryAfter }}</span> <span id="login-retry-unit">{{ $loginRetryAfter === 1 ? 'second' : 'seconds' }}</span>.</p>@else<p class="error">{{ $message }}</p>@endif @enderror</div>
+                    <div class="field"><label for="email">email address</label><input class="control" id="email" name="email" type="text" value="{{ old('email') }}" autocomplete="username" placeholder="Username or name@gmail.com" required autofocus>@error('email')@if($loginRetryAfter > 0)<p class="error" id="login-lockout" role="status" aria-live="polite">Too many login attempts. Try again in <span id="login-retry-seconds">{{ $loginRetryAfter }}</span> <span id="login-retry-unit">{{ $loginRetryAfter === 1 ? 'second' : 'seconds' }}</span>.</p>@else<p class="error">{{ $message }}</p>@endif @enderror</div>
                     <div class="field"><label for="password">Password</label><input class="control" id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>@error('password')<p class="error">{{ $message }}</p>@enderror</div>
                     <div class="login-options"><label class="check" for="remember"><input id="remember" name="remember" type="checkbox" value="1" @checked(old('remember'))> Keep me signed in</label><a href="{{ route('password.request') }}">Forgot password?</a></div>
                     @if(config('services.recaptcha.enabled'))
