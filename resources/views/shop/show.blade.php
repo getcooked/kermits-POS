@@ -54,7 +54,7 @@
                 <form method="POST" action="{{ route('shop.orders.paymongo', $order) }}">@csrf<button class="button" type="submit">Continue to PayMongo</button></form>
             @endif
             <a class="button" href="{{ route('shop.orders.receipt', $order) }}" download>Download receipt</a>
-            <a class="logout" href="{{ route('shop') }}">Order more</a>
+            <a class="logout" href="{{ route('shop') }}">Back to Home</a>
         </div>
     </div>
 </main>
