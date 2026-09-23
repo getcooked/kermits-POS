@@ -146,7 +146,7 @@ class RecaptchaLoginTest extends TestCase
         $this->get('/login')->assertOk()->assertDontSee('id="login-recaptcha"', false);
     }
 
-    public function test_registration_and_password_recovery_pages_display_recaptcha_without_exposing_secret(): void
+    public function test_registration_displays_recaptcha_but_password_recovery_does_not(): void
     {
         $this->get('/register')->assertOk()
             ->assertSee('id="registration-recaptcha"', false)
@@ -155,14 +155,13 @@ class RecaptchaLoginTest extends TestCase
 
         foreach (['/forgot-password', '/admin/forgot-password'] as $path) {
             $this->get($path)->assertOk()
-                ->assertSee('id="password-reset-recaptcha"', false)
-                ->assertSee('test-site-key')
-                ->assertSee('https://www.google.com/recaptcha/api.js', false)
+                ->assertDontSee('id="password-reset-recaptcha"', false)
+                ->assertDontSee('https://www.google.com/recaptcha/api.js', false)
                 ->assertDontSee('test-secret-key');
         }
     }
 
-    public function test_missing_captcha_blocks_registration_email_and_password_reset_messages(): void
+    public function test_missing_captcha_blocks_registration_but_not_password_reset_messages(): void
     {
         Mail::fake();
         Notification::fake();
@@ -172,10 +171,11 @@ class RecaptchaLoginTest extends TestCase
         $this->post('/register/email', ['email' => 'new.customer@gmail.com'])
             ->assertSessionHasErrors('g-recaptcha-response');
         $this->post('/forgot-password', ['email' => $user->email])
-            ->assertSessionHasErrors('g-recaptcha-response');
+            ->assertSessionHas('status')
+            ->assertSessionDoesntHaveErrors();
 
         $this->assertNull(session('registration_email_verification'));
-        Notification::assertNothingSent();
+        Notification::assertSentTo($user, ResetPassword::class);
         Http::assertNothingSent();
     }
 
@@ -196,10 +196,9 @@ class RecaptchaLoginTest extends TestCase
 
         $this->post('/forgot-password', [
             'email' => $user->email,
-            'g-recaptcha-response' => 'password-reset-token',
         ])->assertSessionHas('status')->assertSessionDoesntHaveErrors();
 
         Notification::assertSentTo($user, ResetPassword::class);
-        Http::assertSentCount(2);
+        Http::assertSentCount(1);
     }
 }
