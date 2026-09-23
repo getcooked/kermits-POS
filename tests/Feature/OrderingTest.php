@@ -151,6 +151,15 @@ class OrderingTest extends TestCase
 
         $this->actingAs($owner)->get('/shop/orders/'.$order->id)->assertOk();
         $this->actingAs($otherCustomer)->get('/shop/orders/'.$order->id)->assertForbidden();
+
+        $receipt = $this->actingAs($owner)->get(route('shop.orders.receipt', $order))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertDownload('Kermits-Receipt-'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT).'.pdf');
+        $this->assertStringStartsWith('%PDF-1.4', $receipt->getContent());
+        $this->assertStringContainsString('(ORDER RECEIPT)', $receipt->getContent());
+
+        $this->actingAs($otherCustomer)->get(route('shop.orders.receipt', $order))->assertForbidden();
     }
 
     public function test_pending_customer_orders_are_not_counted_as_paid_sales(): void
@@ -190,7 +199,8 @@ class OrderingTest extends TestCase
             'reservation_at' => $reservationAt->format('Y-m-d\TH:i'),
             'notes' => 'Window table, please.',
             'payment_method' => 'cash',
-        ])->assertRedirect(route('shop.orders.show', 1));
+        ])->assertRedirect(route('shop.orders.show', 1))
+            ->assertSessionHas('clear_customer_cart', true);
 
         $order = Order::query()->with('reservation')->firstOrFail();
         $reservation = Reservation::query()->where('order_id', $order->id)->firstOrFail();
@@ -226,7 +236,11 @@ class OrderingTest extends TestCase
             ->assertOk()
             ->assertSee('Order Receipt')
             ->assertSee('Reservation Checkout Meal')
-            ->assertSee('Walk In Pay');
+            ->assertSee('Walk In Pay')
+            ->assertSee('Download receipt')
+            ->assertSee(route('shop.orders.receipt', $order), false)
+            ->assertDontSee('Print receipt')
+            ->assertSee('localStorage.removeItem("kermits-customer-cart-v1-'.$customer->id.'")', false);
     }
 
     public function test_customer_shop_uses_one_ordered_multi_step_checkout_dialog_without_food_request_fields(): void
@@ -279,6 +293,51 @@ class OrderingTest extends TestCase
                 ->assertDontSee('>Shop</a>', false)
                 ->assertDontSee('>Reserve</a>', false);
         }
+    }
+
+    public function test_customer_cart_is_persisted_in_browser_storage_for_the_signed_in_customer(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $product = Product::query()->create([
+            'name' => 'Persistent Cart Meal',
+            'category' => 'Meals',
+            'price' => 180,
+            'stock' => 5,
+            'active' => true,
+        ]);
+
+        $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('data-product-id="'.$product->id.'"', false)
+            ->assertSee("storageKey = 'kermits-customer-cart-v1-{$customer->id}'", false)
+            ->assertSee('localStorage.getItem(storageKey)', false)
+            ->assertSee('localStorage.setItem(storageKey, JSON.stringify(cart))', false)
+            ->assertSee("window.addEventListener('storage'", false);
+    }
+
+    public function test_customer_and_cashier_carts_show_remaining_stock_as_items_change(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        Product::query()->create([
+            'name' => 'Live Stock Meal',
+            'category' => 'Meals',
+            'price' => 180,
+            'stock' => 5,
+            'active' => true,
+        ]);
+
+        $this->actingAs($customer)->get('/shop')
+            ->assertOk()
+            ->assertSee('data-shop-stock', false)
+            ->assertSee('stock - quantity', false)
+            ->assertSee('`${remaining} available`', false);
+
+        $this->actingAs($cashier)->get('/cashier')
+            ->assertOk()
+            ->assertSee('data-pos-stock', false)
+            ->assertSee('product.stock-(+product.input.value||0)', false)
+            ->assertSee('`${remaining} in stock`', false);
     }
 
     public function test_customer_gcash_checkout_requires_a_thirteen_digit_reference_and_image_proof(): void

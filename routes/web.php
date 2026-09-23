@@ -82,6 +82,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/shop', [CustomerOrderController::class, 'index'])->name('shop');
         Route::post('/shop/orders', [CustomerOrderController::class, 'store'])->name('shop.orders.store');
         Route::get('/shop/orders/{order}', [CustomerOrderController::class, 'show'])->name('shop.orders.show');
+        Route::get('/shop/orders/{order}/receipt', [CustomerOrderController::class, 'receipt'])->name('shop.orders.receipt');
         Route::post('/shop/orders/{order}/paymongo', [PayMongoController::class, 'checkout'])
             ->middleware('throttle:10,1')->name('shop.orders.paymongo');
         Route::get('/history', [CustomerHistoryController::class, 'index'])->name('customer.history');

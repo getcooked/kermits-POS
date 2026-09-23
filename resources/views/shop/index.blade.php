@@ -54,12 +54,12 @@
                 <div class="shop-grid">
                     @forelse($products->groupBy('category') as $category => $items)
                     @foreach($items as $product)
-                    <article data-shop-card data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}">
+                    <article data-shop-card data-product-id="{{ $product->id }}" data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}">
                         @if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="shop-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
                         <div>
                             <h3>{{ $product->name }}</h3>
                             <p>{{ $product->description }}</p>
-                            <div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span>{{ $product->stock }} available</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}">
+                            <div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span data-shop-stock>{{ $product->stock }} available</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}">
                                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                                     <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L3.6 6H13.5a.5.5 0 0 1 .479.642l-1.5 4A.5.5 0 0 1 11.5 11H5a.5.5 0 0 1-.485-.379L3.295 3H1.5a.5.5 0 0 1-.5-.5zM4.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM7 6.5v2H5.5a.5.5 0 0 0 0 1H7v1.5a.5.5 0 0 0 1 0V9.5h1.5a.5.5 0 0 0 0-1H8V6.5a.5.5 0 0 0-1 0z" fill="currentColor"/>
                                 </svg>
@@ -1017,6 +1017,12 @@
         width: 16px;
         height: 16px;
         display: block
+    }
+
+    .shop-add:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+        box-shadow: none
     }
 
     .customer-cart {
@@ -2378,6 +2384,8 @@
                 style: 'currency',
                 currency: 'PHP'
             }).format(n),
+            storageKey = 'kermits-customer-cart-v1-{{ auth()->id() }}',
+            hasValidationErrors = @json($errors->any()),
             cards = [...document.querySelectorAll('[data-shop-card]')],
             box = document.getElementById('customer-cart-items'),
             total = document.getElementById('customer-cart-total'),
@@ -2391,7 +2399,18 @@
             return e.innerHTML
         }
 
+        function syncStock(card) {
+            const input = card.querySelector('.shop-quantity'),
+                stock = Number(input.max || 0),
+                quantity = Math.max(0, Math.min(stock, Math.trunc(Number(input.value) || 0))),
+                remaining = stock - quantity;
+            input.value = quantity;
+            card.querySelector('[data-shop-stock]').textContent = `${remaining} available`;
+            card.querySelector('.shop-add').disabled = remaining === 0
+        }
+
         function draw() {
+            cards.forEach(syncStock);
             const selected = cards.map(card => ({
                 card,
                 input: card.querySelector('.shop-quantity'),
@@ -2400,21 +2419,55 @@
                 img: card.querySelector('img')?.src || '',
                 qty: +card.querySelector('.shop-quantity').value || 0
             })).filter(item => item.qty > 0);
-            box.innerHTML = selected.length ? selected.map(item => `<div class="customer-cart-line">${item.img?`<img src="${item.img}" alt="">`:`<div class="thumb">${esc(item.name[0]||'')}</div>`}<div><h3>${esc(item.name)}</h3><div class="customer-cart-controls"><strong>${money(item.price)}</strong><button type="button" data-shop-step="-1" data-name="${esc(item.name)}">−</button><b>${item.qty}</b><button type="button" data-shop-step="1" data-name="${esc(item.name)}">+</button></div></div></div>`).join('') : '<p>No items selected.</p>';
+            box.innerHTML = selected.length ? selected.map(item => `<div class="customer-cart-line">${item.img?`<img src="${item.img}" alt="">`:`<div class="thumb">${esc(item.name[0]||'')}</div>`}<div><h3>${esc(item.name)}</h3><div class="customer-cart-controls"><strong>${money(item.price)}</strong><button type="button" data-shop-step="-1" data-product-id="${item.card.dataset.productId}">−</button><b>${item.qty}</b><button type="button" data-shop-step="1" data-product-id="${item.card.dataset.productId}">+</button></div></div></div>`).join('') : '<p>No items selected.</p>';
             total.textContent = money(selected.reduce((sum, item) => sum + item.price * item.qty, 0))
+        }
+
+        function readCart(value = null) {
+            try {
+                const cart = JSON.parse(value ?? localStorage.getItem(storageKey) ?? '{}');
+                return cart && typeof cart === 'object' && !Array.isArray(cart) ? cart : {}
+            } catch (_) {
+                return {}
+            }
+        }
+
+        function persistCart() {
+            const cart = {};
+            cards.forEach(card => {
+                const quantity = Number(card.querySelector('.shop-quantity').value) || 0;
+                if (quantity > 0) cart[card.dataset.productId] = quantity
+            });
+            try {
+                if (Object.keys(cart).length) localStorage.setItem(storageKey, JSON.stringify(cart));
+                else localStorage.removeItem(storageKey)
+            } catch (_) {}
+        }
+
+        function restoreCart(value = null) {
+            const cart = readCart(value);
+            cards.forEach(card => {
+                const input = card.querySelector('.shop-quantity'),
+                    max = Number(input.max || 99),
+                    saved = Number(cart[card.dataset.productId]) || 0;
+                input.value = Math.max(0, Math.min(max, Math.trunc(saved)))
+            });
+            persistCart();
+            draw()
         }
 
         function adjust(card, step) {
             const input = card.querySelector('.shop-quantity'),
                 max = +(input.max || 99);
             input.value = Math.max(0, Math.min(max, (+input.value || 0) + step));
+            persistCart();
             draw()
         }
         cards.forEach(card => card.querySelector('.shop-add').addEventListener('click', () => adjust(card, 1)));
         box.addEventListener('click', event => {
             const button = event.target.closest('[data-shop-step]');
             if (!button) return;
-            const card = cards.find(item => item.dataset.name === button.dataset.name);
+            const card = cards.find(item => item.dataset.productId === button.dataset.productId);
             if (card) adjust(card, +button.dataset.shopStep)
         });
 
@@ -2433,7 +2486,15 @@
             filter()
         }));
         search?.addEventListener('input', filter);
-        draw();
+        if (hasValidationErrors) {
+            draw();
+            persistCart()
+        } else {
+            restoreCart()
+        }
+        window.addEventListener('storage', event => {
+            if (event.key === storageKey) restoreCart(event.newValue ?? '{}')
+        });
         filter()
     })();
 </script>

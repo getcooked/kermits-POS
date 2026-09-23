@@ -8,9 +8,11 @@ use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
 use App\Services\OrderService;
+use App\Services\OrderReceiptPdf;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -102,6 +104,8 @@ class CustomerOrderController extends Controller
             throw $exception;
         }
 
+        session()->flash('clear_customer_cart', true);
+
         if ($paymentMethod === 'paymongo') {
             try {
                 return redirect()->away($checkout->urlFor($order));
@@ -124,6 +128,19 @@ class CustomerOrderController extends Controller
 
         return view('shop.show', [
             'order' => $order->load(['items.product', 'reservation']),
+        ]);
+    }
+
+    public function receipt(Order $order, OrderReceiptPdf $receipt): Response
+    {
+        abort_unless($order->user_id === request()->user()->id, 403);
+
+        $filename = 'Kermits-Receipt-'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT).'.pdf';
+
+        return response($receipt->render($order), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
