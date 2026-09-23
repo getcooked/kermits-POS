@@ -147,6 +147,8 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::get('/settings/payment', [PaymentSettingsController::class, 'edit'])->name('settings.payment.edit');
         Route::put('/settings/payment', [PaymentSettingsController::class, 'update'])->name('settings.payment.update');
+        Route::put('/settings/reservation-pricing', [PaymentSettingsController::class, 'updateReservationPricing'])
+            ->name('settings.reservation-pricing.update');
     });
 
     Route::middleware('role:super_admin,cashier')->group(function (): void {

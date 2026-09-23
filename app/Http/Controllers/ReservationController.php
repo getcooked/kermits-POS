@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReservationRequest;
 use App\Http\Requests\UpdateReservationStatusRequest;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
-use App\Models\Order;
 use App\Models\SystemSetting;
 use App\Services\PayMongoCheckout;
+use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,32 +23,29 @@ use Throwable;
 
 class ReservationController extends Controller
 {
-    public function create(Request $request): View
+    public function create(Request $request, ReservationPricing $pricing): View
     {
-        $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
-
         return view('reservations.create', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
-            'tableFees' => $tableFees,
-            'exclusiveFee' => config('reservations.exclusive_fee'),
+            'tableFees' => $pricing->tableFees(),
+            'exclusiveFee' => $pricing->exclusiveFee(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
             'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
 
-    public function store(StoreReservationRequest $request, ReservationSchedule $schedules): RedirectResponse
+    public function store(StoreReservationRequest $request, ReservationSchedule $schedules, ReservationPricing $pricing): RedirectResponse
     {
         $proofPath = $request->hasFile('payment_proof')
             ? $request->file('payment_proof')->store('payment-proofs', 'local')
             : null;
 
         try {
-            $reservation = DB::transaction(function () use ($request, $proofPath, $schedules): Reservation {
+            $reservation = DB::transaction(function () use ($request, $proofPath, $schedules, $pricing): Reservation {
                 $schedules->lock();
-                $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
                 $reservationFee = $request->validated('type') === 'table'
-                    ? (float) ($tableFees[(int) $request->validated('table_size')] ?? 0)
-                    : (float) config('reservations.exclusive_fee');
+                    ? $pricing->tableFee((int) $request->validated('table_size'))
+                    : $pricing->exclusiveFee();
                 $reservation = $schedules->reserve([
                     ...$request->safe()->except(['menu_items', 'payment_proof']),
                     'user_id' => $request->user()->id,
@@ -116,7 +114,7 @@ class ReservationController extends Controller
 
         if ($request->validated('payment_method') === 'paymongo') {
             try {
-                return redirect()->away(app(PayMongoCheckout::class)->urlFor($reservation->fresh()));
+                return redirect()->away(app(PayMongoCheckout::class)->urlFor($reservation->order()->firstOrFail()));
             } catch (Throwable $exception) {
                 report($exception);
 

@@ -7,9 +7,10 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SystemSetting;
-use App\Services\OrderService;
 use App\Services\OrderReceiptPdf;
+use App\Services\OrderService;
 use App\Services\PayMongoCheckout;
+use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -21,9 +22,8 @@ use Throwable;
 
 class CustomerOrderController extends Controller
 {
-    public function index(): View
+    public function index(ReservationPricing $pricing): View
     {
-        $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
         $qrPath = SystemSetting::get('gcash_qr_path');
         $disk = Storage::disk('public');
         $qrImage = $qrPath && $disk->exists($qrPath) ? $disk->get($qrPath) : null;
@@ -35,12 +35,12 @@ class CustomerOrderController extends Controller
         return view('shop.index', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'gcashQrSrc' => $gcashQrSrc,
-            'tableFees' => $tableFees,
+            'tableFees' => $pricing->tableFees(),
             'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
 
-    public function store(OrderRequest $request, OrderService $orders, ReservationSchedule $schedules, PayMongoCheckout $checkout): RedirectResponse
+    public function store(OrderRequest $request, OrderService $orders, ReservationSchedule $schedules, PayMongoCheckout $checkout, ReservationPricing $pricing): RedirectResponse
     {
         $paymentMethod = $request->validated('payment_method');
         $paymentReference = $paymentMethod === 'gcash'
@@ -51,7 +51,7 @@ class CustomerOrderController extends Controller
             : null;
 
         try {
-            $order = DB::transaction(function () use ($request, $orders, $paymentMethod, $paymentReference, $proofPath, $schedules): Order {
+            $order = DB::transaction(function () use ($request, $orders, $paymentMethod, $paymentReference, $proofPath, $schedules, $pricing): Order {
                 $schedules->lock();
                 $order = $orders->create(
                     user: $request->user(),
@@ -63,8 +63,7 @@ class CustomerOrderController extends Controller
                 );
 
                 $tableSize = (int) $request->validated('table_size');
-                $tableFees = config('reservations.table_fees') ?: [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
-                $reservationFee = (float) ($tableFees[$tableSize] ?? 0);
+                $reservationFee = $pricing->tableFee($tableSize);
                 $reservation = $schedules->reserve([
                     'user_id' => $request->user()->id,
                     'order_id' => $order->id,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Rules\ReservationHours;
+use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class MobileReservationController extends Controller
         return response()->json(['data' => $items]);
     }
 
-    public function store(Request $request, ReservationSchedule $schedules): JsonResponse
+    public function store(Request $request, ReservationSchedule $schedules, ReservationPricing $pricing): JsonResponse
     {
         $validated = $request->validate([
             'type' => ['required', 'in:table,exclusive'],
@@ -46,11 +47,11 @@ class MobileReservationController extends Controller
         $proofPath = $request->hasFile('payment_proof') ? $request->file('payment_proof')->store('payment-proofs', 'local') : null;
 
         try {
-            $reservation = DB::transaction(function () use ($request, $validated, $proofPath, $schedules): Reservation {
+            $reservation = DB::transaction(function () use ($request, $validated, $proofPath, $schedules, $pricing): Reservation {
                 $schedules->lock();
                 $fee = $validated['type'] === 'table'
-                    ? (float) config('reservations.table_fees.'.(int) $validated['table_size'])
-                    : (float) config('reservations.exclusive_fee');
+                    ? $pricing->tableFee((int) $validated['table_size'])
+                    : $pricing->exclusiveFee();
                 $reservation = $schedules->reserve([
                     ...collect($validated)->except(['menu_items', 'payment_proof'])->all(),
                     'user_id' => $request->user()->id, 'customer_name' => $request->user()->name,

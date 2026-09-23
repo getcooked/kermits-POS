@@ -87,7 +87,7 @@ class ReservationsTest extends TestCase
         $order = Order::query()->findOrFail($reservation->order_id);
         $this->assertSame('paymongo', $order->payment_method);
         $this->assertSame('pending', $order->payment_status);
-        $this->assertSame(150.0, (float) $reservation->total_amount);
+        $this->assertSame(250.0, (float) $reservation->total_amount);
     }
 
     public function test_guest_cannot_open_or_submit_a_reservation(): void

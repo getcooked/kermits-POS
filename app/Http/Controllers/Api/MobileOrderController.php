@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Reservation;
 use App\Rules\ReservationHours;
 use App\Services\OrderService;
+use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class MobileOrderController extends Controller
         return response()->json(['data' => $orders]);
     }
 
-    public function store(Request $request, OrderService $orders, ReservationSchedule $schedules): JsonResponse
+    public function store(Request $request, OrderService $orders, ReservationSchedule $schedules, ReservationPricing $pricing): JsonResponse
     {
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', 'distinct'],
@@ -57,7 +58,7 @@ class MobileOrderController extends Controller
             : null;
 
         try {
-            $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules): Order {
+            $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules, $pricing): Order {
                 $schedules->lock();
                 $order = $orders->create(
                     user: $request->user(), quantities: $quantities, paymentStatus: 'pending',
@@ -67,7 +68,7 @@ class MobileOrderController extends Controller
 
                 if ($needsReservation) {
                     $tableSize = (int) $validated['table_size'];
-                    $reservationFee = (float) config('reservations.table_fees.'.$tableSize);
+                    $reservationFee = $pricing->tableFee($tableSize);
                     $reservation = $schedules->reserve([
                         'user_id' => $request->user()->id,
                         'order_id' => $order->id,

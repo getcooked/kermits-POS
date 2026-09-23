@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\SystemSetting;
+use App\Services\ReservationPricing;
 use Illuminate\Http\JsonResponse;
 
 class MobileCatalogController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(ReservationPricing $pricing): JsonResponse
     {
         $products = Product::query()->available()->where('stock', '>', 0)->menuOrder()->get()
             ->map(fn (Product $product): array => [
@@ -23,6 +24,8 @@ class MobileCatalogController extends Controller
         return response()->json(['data' => [
             'products' => $products,
             'gcash_qr_url' => $qrPath ? route('public.media', ['path' => $qrPath]) : null,
+            'table_fees' => $pricing->tableFees(),
+            'exclusive_fee' => $pricing->exclusiveFee(),
         ]]);
     }
 }
