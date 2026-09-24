@@ -1853,18 +1853,6 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             Text("Payment:")
                             Spacer(Modifier.width(8.dp))
                             FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") })
-                            Spacer(Modifier.width(6.dp))
-                            FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") })
-                        }
-                        if (payment == "gcash") {
-                            vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
-                            OutlinedTextField(paymentReference, { paymentReference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
-                            Spacer(Modifier.height(8.dp))
-                            PaymentProofAttachment(
-                                proofUri = proofUri,
-                                onChoose = { proofPicker.launch("image/*") },
-                                onRemove = { proofUri = null },
-                            )
                         }
                         Spacer(Modifier.height(12.dp))
                         Button(
@@ -2372,17 +2360,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(reservationFee + selectedFoodTotal), fontWeight = FontWeight.Bold) }
-    Spacer(Modifier.height(8.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }) }
-    if (payment == "gcash") {
-        vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
-        OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        PaymentProofAttachment(
-            proofUri = proofUri,
-            onChoose = { proofPicker.launch("image/*") },
-            onRemove = { proofUri = null },
-        )
-    }
+    Spacer(Modifier.height(8.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }) }
     Spacer(Modifier.height(16.dp))
     Button(
         onClick = {

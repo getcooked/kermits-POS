@@ -269,8 +269,7 @@ class OrderingTest extends TestCase
             ->assertSee('data-checkout-step="payment"', false)
             ->assertSee('Walk In Pay')
             ->assertSee('value="cash"', false)
-            ->assertSee('GCash')
-            ->assertSee('value="gcash"', false)
+            ->assertDontSee('value="gcash"', false)
             ->assertDontSee('Food Request')
             ->assertDontSee('name="menu_items[', false)
             ->assertDontSee('name="food_request"', false)
@@ -279,7 +278,6 @@ class OrderingTest extends TestCase
                 'Submit reservation',
                 'data-checkout-step="payment"',
                 'Walk In Pay',
-                'GCash',
             ], false);
 
         $this->assertSame(0, substr_count($menu->getContent(), 'href="'.route('reservations.create').'"'));
@@ -343,7 +341,7 @@ class OrderingTest extends TestCase
             ->assertSee('`${remaining} in stock`', false);
     }
 
-    public function test_customer_gcash_checkout_requires_a_thirteen_digit_reference_and_image_proof(): void
+    public function test_customer_manual_gcash_checkout_is_rejected(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $product = Product::query()->create(['name' => 'Reference Product', 'price' => 100, 'stock' => 5, 'active' => true]);
@@ -355,14 +353,14 @@ class OrderingTest extends TestCase
             'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
             'payment_method' => 'gcash',
             'payment_reference' => '12345',
-        ])->assertSessionHasErrors(['payment_reference', 'payment_proof']);
+        ])->assertSessionHasErrors(['payment_method', 'payment_reference']);
 
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('reservations', 0);
         $this->assertSame(5, $product->fresh()->stock);
     }
 
-    public function test_customer_can_complete_gcash_checkout_with_proof_and_receive_the_order_receipt(): void
+    public function test_customer_manual_gcash_checkout_is_rejected_even_with_proof(): void
     {
         Storage::fake('local');
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -376,32 +374,12 @@ class OrderingTest extends TestCase
             'payment_method' => 'gcash',
             'payment_reference' => '1234567890123',
             'payment_proof' => $this->fakePng('checkout-proof.png'),
-        ])->assertRedirect(route('shop.orders.show', 1));
+        ])->assertSessionHasErrors(['payment_method', 'payment_reference', 'payment_proof']);
 
-        $order = Order::query()->firstOrFail();
-        $reservation = Reservation::query()->where('order_id', $order->id)->firstOrFail();
-
-        $this->assertDatabaseHas('orders', [
-            'id' => $order->id,
-            'payment_method' => 'gcash',
-            'payment_reference' => '1234567890123',
-            'payment_status' => 'pending',
-        ]);
-        $this->assertDatabaseHas('reservations', [
-            'id' => $reservation->id,
-            'order_id' => $order->id,
-            'payment_method' => 'gcash',
-            'payment_reference' => '1234567890123',
-            'payment_status' => 'pending',
-        ]);
-        $this->assertNotNull($reservation->payment_proof_path);
-        Storage::disk('local')->assertExists($reservation->payment_proof_path);
-
-        $this->get(route('shop.orders.show', $order))
-            ->assertOk()
-            ->assertSee('Order Receipt')
-            ->assertSee('GCash')
-            ->assertSee('1234567890123');
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('reservations', 0);
+        $this->assertSame(5, $product->fresh()->stock);
+        $this->assertSame([], Storage::disk('local')->allFiles('payment-proofs'));
     }
 
     public function test_customer_checkout_rolls_back_order_stock_and_uploaded_proof_when_reservation_creation_fails(): void
@@ -420,9 +398,7 @@ class OrderingTest extends TestCase
                 'table_size' => 2,
                 'phone' => '09171234567',
                 'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
-                'payment_method' => 'gcash',
-                'payment_reference' => '1234567890123',
-                'payment_proof' => $this->fakePng('rollback-proof.png'),
+                'payment_method' => 'cash',
             ]);
 
             $this->fail('The simulated reservation failure was not thrown.');

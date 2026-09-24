@@ -17,9 +17,7 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordResetController extends Controller
 {
-    private const LEGACY_SUPER_ADMIN_EMAIL = 'superadmin@gmail.com';
-
-    private const SUPER_ADMIN_EMAIL = 'kermitsbantayan1@gmail.com';
+    private const RESET_LINK_STATUS = 'If an eligible account exists, a password reset link has been sent.';
 
     public function request(): View
     {
@@ -48,8 +46,10 @@ class PasswordResetController extends Controller
         ]);
 
         $email = Str::lower($validated['email']);
-        $acceptedEmails = $requiredRole === User::ROLE_SUPER_ADMIN && $email === self::SUPER_ADMIN_EMAIL
-            ? [self::SUPER_ADMIN_EMAIL, self::LEGACY_SUPER_ADMIN_EMAIL]
+        $superAdminEmail = $this->superAdminEmail();
+        $legacyEmail = $this->legacySuperAdminEmail();
+        $acceptedEmails = $requiredRole === User::ROLE_SUPER_ADMIN && $superAdminEmail !== '' && $email === $superAdminEmail
+            ? array_values(array_filter([$superAdminEmail, $legacyEmail]))
             : [$email];
         $user = User::query()
             ->whereIn(DB::raw('LOWER(email)'), $acceptedEmails)
@@ -57,19 +57,14 @@ class PasswordResetController extends Controller
             ->first();
 
         if (! $user) {
-            $accountType = $requiredRole === User::ROLE_SUPER_ADMIN ? 'Super Admin account' : 'customer account';
-
-            return back()
-                ->withInput($request->only('email'))
-                ->withErrors([
-                    'email' => "No registered {$accountType} was found with that email address.",
-                ]);
+            return back()->with('status', self::RESET_LINK_STATUS);
         }
 
         if ($requiredRole === User::ROLE_SUPER_ADMIN
-            && strtolower($user->email) === self::LEGACY_SUPER_ADMIN_EMAIL
-            && ! User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
-            $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
+            && $superAdminEmail !== '' && $legacyEmail !== ''
+            && strtolower($user->email) === $legacyEmail
+            && ! User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [$superAdminEmail])->exists()) {
+            $user->forceFill(['email' => $superAdminEmail])->save();
         }
         try {
             $status = Password::sendResetLink(['email' => $user->email]);
@@ -77,21 +72,14 @@ class PasswordResetController extends Controller
             Password::deleteToken($user);
             Log::warning('Web password reset email delivery failed.');
 
-            return back()
-                ->withInput($request->only('email'))
-                ->withErrors(['email' => 'The password reset email could not be sent. Please try again later.']);
+            return back()->with('status', self::RESET_LINK_STATUS);
         }
 
         if ($status !== Password::RESET_LINK_SENT) {
-            return back()
-                ->withInput($request->only('email'))
-                ->withErrors(['email' => __($status)]);
+            Log::notice('Password reset link was not sent.', ['status' => $status, 'role' => $requiredRole]);
         }
 
-        return back()->with(
-            'status',
-            'A password reset link was sent to your registered email address.'
-        );
+        return back()->with('status', self::RESET_LINK_STATUS);
     }
 
     public function reset(Request $request, string $token): View|RedirectResponse
@@ -137,7 +125,7 @@ class PasswordResetController extends Controller
         if (! $user) {
             return back()
                 ->withInput($request->only('email'))
-                ->withErrors(['email' => 'No registered account was found with that email address.']);
+                ->withErrors(['email' => 'This password reset link is invalid or expired.']);
         }
 
         $validated['email'] = $user->email;
@@ -168,6 +156,16 @@ class PasswordResetController extends Controller
 
         return back()
             ->withInput($request->only('email'))
-            ->withErrors(['email' => __($status)]);
+            ->withErrors(['email' => 'This password reset link is invalid or expired.']);
+    }
+
+    private function superAdminEmail(): string
+    {
+        return Str::lower(trim((string) config('auth.staff.super_admin_email')));
+    }
+
+    private function legacySuperAdminEmail(): string
+    {
+        return Str::lower(trim((string) config('auth.staff.legacy_super_admin_email')));
     }
 }

@@ -60,6 +60,8 @@ class MobileAccountController extends Controller
         Cache::put($key, [
             'email' => strtolower($customer->email),
             'code_hash' => Hash::make($code),
+            'attempts' => 0,
+            'expires_at' => now()->addMinutes(10)->timestamp,
         ], now()->addMinutes(10));
 
         try {
@@ -99,8 +101,21 @@ class MobileAccountController extends Controller
             && Hash::check($validated['verification_code'], $codeHash);
 
         if (! $validCode) {
+            if (is_array($verification)) {
+                $verification['attempts'] = (int) ($verification['attempts'] ?? 0) + 1;
+                if ($verification['attempts'] >= 5) {
+                    Cache::forget($key);
+                } else {
+                    $remainingSeconds = max(1, (int) ($verification['expires_at'] ?? now()->timestamp) - now()->timestamp);
+                    Cache::put($key, $verification, $remainingSeconds);
+                }
+            }
+
+            $message = is_array($verification) && (int) ($verification['attempts'] ?? 0) >= 5
+                ? 'Too many incorrect attempts. Request a new verification code.'
+                : 'The email verification code is invalid or has expired. Request a new code.';
             throw ValidationException::withMessages([
-                'verification_code' => 'The email verification code is invalid or has expired. Request a new code.',
+                'verification_code' => $message,
             ]);
         }
 

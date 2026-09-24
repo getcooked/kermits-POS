@@ -3,5 +3,4 @@
 !public/
 !releases/
 releases/*
-!releases/kermits.apk
 !.gitignore

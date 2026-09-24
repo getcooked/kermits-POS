@@ -16,6 +16,8 @@ class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const GENERIC_RESET_MESSAGE = 'If an eligible account exists, a password reset link has been sent.';
+
     public function test_forgot_password_page_is_available_to_guests(): void
     {
         $this->get(route('password.request'))
@@ -45,10 +47,8 @@ class PasswordResetTest extends TestCase
             ->assertSessionDoesntHaveErrors();
 
         $this->post(route('superadmin.password.email'), ['email' => $admin->email])
-            ->assertSessionHasErrors([
-                'email' => 'No registered Super Admin account was found with that email address.',
-            ])
-            ->assertSessionMissing('status');
+            ->assertSessionHas('status', self::GENERIC_RESET_MESSAGE)
+            ->assertSessionDoesntHaveErrors();
 
         Notification::assertSentTo($superAdmin, ResetPassword::class);
         Notification::assertNotSentTo($admin, ResetPassword::class);
@@ -87,13 +87,13 @@ class PasswordResetTest extends TestCase
         Notification::shouldReceive('send')->once()->andThrow(new TransportException('SMTP unavailable'));
 
         $this->post(route('password.email'), ['email' => $user->email])
-            ->assertSessionHasErrors('email')
-            ->assertSessionMissing('status');
+            ->assertSessionHas('status', self::GENERIC_RESET_MESSAGE)
+            ->assertSessionDoesntHaveErrors();
 
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
     }
 
-    public function test_mobile_reset_reports_when_the_broker_throttles_delivery(): void
+    public function test_mobile_reset_does_not_reveal_when_the_broker_throttles_delivery(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         Password::shouldReceive('sendResetLink')
@@ -102,8 +102,8 @@ class PasswordResetTest extends TestCase
             ->andReturn(Password::RESET_THROTTLED);
 
         $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
-            ->assertStatus(429)
-            ->assertJsonPath('code', 'reset_link_not_sent');
+            ->assertOk()
+            ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
     }
 
     public function test_mobile_password_recovery_sends_only_to_a_customer_account(): void
@@ -114,17 +114,16 @@ class PasswordResetTest extends TestCase
 
         $this->postJson('/api/v1/password/forgot', ['email' => $customer->email])
             ->assertOk()
-            ->assertJsonPath('message', 'A password reset link was sent to your registered email address. Check your inbox and spam folder.');
+            ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
         $this->postJson('/api/v1/password/forgot', ['email' => $admin->email])
-            ->assertUnprocessable()
-            ->assertJsonPath('code', 'account_not_found')
-            ->assertJsonValidationErrors('email');
+            ->assertOk()
+            ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
 
         Notification::assertSentTo($customer, ResetPassword::class);
         Notification::assertNotSentTo($admin, ResetPassword::class);
     }
 
-    public function test_mobile_password_recovery_rejects_an_unregistered_or_deleted_customer(): void
+    public function test_mobile_password_recovery_hides_unregistered_or_deleted_customer_status(): void
     {
         Notification::fake();
         $deletedCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -132,17 +131,15 @@ class PasswordResetTest extends TestCase
 
         foreach (['not-registered@example.com', $deletedCustomer->email] as $email) {
             $this->postJson('/api/v1/password/forgot', ['email' => $email])
-                ->assertUnprocessable()
-                ->assertJsonPath('message', 'No registered customer account was found with that email address.')
-                ->assertJsonPath('code', 'account_not_found')
-                ->assertJsonValidationErrors('email');
+                ->assertOk()
+                ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
         }
 
         Notification::assertNothingSent();
         $this->assertDatabaseCount('password_reset_tokens', 0);
     }
 
-    public function test_web_password_recovery_rejects_an_unknown_deleted_or_staff_account(): void
+    public function test_web_password_recovery_hides_unknown_deleted_or_staff_account_status(): void
     {
         Notification::fake();
         $deletedUser = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -151,10 +148,8 @@ class PasswordResetTest extends TestCase
 
         foreach (['not-a-kermits-account@example.com', $deletedUser->email, $cashier->email] as $email) {
             $this->post(route('password.email'), ['email' => $email])
-                ->assertSessionHasErrors([
-                    'email' => 'No registered customer account was found with that email address.',
-                ])
-                ->assertSessionMissing('status');
+                ->assertSessionHas('status', self::GENERIC_RESET_MESSAGE)
+                ->assertSessionDoesntHaveErrors();
         }
 
         Notification::assertNothingSent();
@@ -178,7 +173,7 @@ class PasswordResetTest extends TestCase
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ])->assertSessionHasErrors([
-            'email' => 'No registered account was found with that email address.',
+            'email' => 'This password reset link is invalid or expired.',
         ]);
     }
 

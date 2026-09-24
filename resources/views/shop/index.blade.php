@@ -141,18 +141,10 @@
                         <legend>Payment method</legend>
                         <div class="checkout-options">
                             <label><input type="radio" name="payment_method" value="cash" @checked(old('payment_method','cash')==='cash' )><span><strong>Walk In Pay</strong><small>Pay the total at the counter when you arrive.</small></span></label>
-                            <label><input type="radio" name="payment_method" value="gcash" @checked(old('payment_method')==='gcash' )><span><strong>GCash</strong><small>Scan the QR and submit your payment details.</small></span></label>
                             @if($paymongoEnabled)<label><input type="radio" name="payment_method" value="paymongo" @checked(old('payment_method')==='paymongo')><span><strong>PayMongo online</strong><small>Pay securely on PayMongo's checkout page.</small></span></label>@endif
                         </div>
                     </fieldset>
 
-                    <div class="gcash-checkout" data-gcash-fields>
-                        <div class="shop-qr"><img src="{{ $gcashQrSrc ?? asset('gcash-qr-placeholder.svg') }}" alt="Kermit's GCash QR code"><small>{{ $gcashQrSrc ? 'Scan using your GCash app.' : 'The GCash QR is unavailable. Please ask the Super Admin to upload it in Payment Settings.' }}</small></div>
-                        <div class="gcash-details">
-                            <div class="field"><label for="payment_reference">GCash transaction reference</label><input class="control" id="payment_reference" name="payment_reference" value="{{ old('payment_reference') }}" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" placeholder="Enter exactly 13 digits"><small>Use the 13-digit reference shown by GCash.</small></div>
-                            <div class="field"><label for="payment_proof">Payment proof</label><input class="control" id="payment_proof" name="payment_proof" type="file" accept="image/jpeg,image/png,image/webp"><small>Upload a JPG, PNG, or WebP image up to 5 MB.</small></div>
-                        </div>
-                    </div>
                     <div class="checkout-note" data-payment-note aria-live="polite"></div>
                     <div class="checkout-actions"><button type="button" class="checkout-secondary" data-payment-back>&larr; Reservation</button><button class="checkout-primary" type="submit">Confirm payment &amp; view receipt <span>&rarr;</span></button></div>
                 </section>
@@ -2264,9 +2256,6 @@
             paymentBack = dialog.querySelector('[data-payment-back]'),
             paymentControls = [...paymentStep.querySelectorAll('input,select,textarea')],
             methods = [...paymentStep.querySelectorAll('input[name="payment_method"]')],
-            gcash = dialog.querySelector('[data-gcash-fields]'),
-            reference = document.getElementById('payment_reference'),
-            proof = document.getElementById('payment_proof'),
             note = dialog.querySelector('[data-payment-note]'),
             table = document.getElementById('checkout_table_size'),
             cartError = document.querySelector('[data-cart-error]'),
@@ -2304,15 +2293,8 @@
         }
 
         function syncPayment() {
-            const isPaymentStep = !paymentStep.hidden,
-                isGcash = form.querySelector('input[name="payment_method"]:checked')?.value === 'gcash';
-            gcash.hidden = !isGcash;
-            reference.disabled = !isPaymentStep || !isGcash;
-            proof.disabled = !isPaymentStep || !isGcash;
-            reference.required = isPaymentStep && isGcash;
-            proof.required = isPaymentStep && isGcash;
             const isPayMongo = form.querySelector('input[name="payment_method"]:checked')?.value === 'paymongo';
-            note.textContent = isGcash ? 'Your GCash details will remain pending until they are verified.' : (isPayMongo ? 'You will be sent to PayMongo to complete payment. Your order is confirmed as paid after PayMongo notifies us.' : 'Bring payment to the counter when you arrive for your reservation.');
+            note.textContent = isPayMongo ? 'You will be sent to PayMongo to complete payment. Your order is confirmed as paid after PayMongo notifies us.' : 'Bring payment to the counter when you arrive for your reservation.';
         }
 
         function setStep(step) {
@@ -2356,7 +2338,6 @@
         paymentBack.addEventListener('click', () => setStep('reservation'));
         methods.forEach(method => method.addEventListener('change', syncPayment));
         table.addEventListener('change', renderSummary);
-        reference.addEventListener('input', () => reference.value = reference.value.replace(/\D/g, '').slice(0, 13));
         document.getElementById('checkout_phone').addEventListener('input', event => event.target.value = event.target.value.replace(/\D/g, '').slice(0, 11));
         dialog.addEventListener('click', event => {
             const bounds = dialog.getBoundingClientRect();

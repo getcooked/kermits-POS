@@ -26,9 +26,9 @@ class OrderRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'food_request' => ['prohibited'],
             'menu_items' => ['prohibited'],
-            'payment_method' => ['required', 'in:cash,gcash,paymongo'],
-            'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
-            'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'payment_method' => ['required', 'in:cash,paymongo'],
+            'payment_reference' => ['prohibited'],
+            'payment_proof' => ['prohibited'],
         ];
     }
 

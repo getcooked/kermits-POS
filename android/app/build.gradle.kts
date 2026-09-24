@@ -20,6 +20,16 @@ val localProperties = Properties().apply {
 }
 val productionApiBaseUrl = "https://kermits-pos.com/api/v1/"
 val debugApiBaseUrl = localProperties.getProperty("debug.api.base.url", "https://kermits-pos.com/api/v1/")
+val releaseKeystorePath = System.getenv("KERMITS_KEYSTORE_PATH")
+val releaseKeystorePassword = System.getenv("KERMITS_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("KERMITS_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("KERMITS_KEY_PASSWORD")
+val releaseSigningConfigured = listOf(
+    releaseKeystorePath,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.getcooked.kermits"
@@ -36,6 +46,17 @@ android {
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigPresent.toString())
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
@@ -46,7 +67,9 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         create("download") {
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isDebuggable = false
             isMinifyEnabled = false
             isShrinkResources = false
@@ -98,6 +121,11 @@ tasks.register<Copy>("publishDownloadApk") {
     group = "distribution"
     description = "Builds the production-endpoint APK and publishes it for Laravel's /download-app route."
     dependsOn("assembleDownload")
+    doFirst {
+        check(releaseSigningConfigured) {
+            "Release signing is required. Set KERMITS_KEYSTORE_PATH, KERMITS_KEYSTORE_PASSWORD, KERMITS_KEY_ALIAS, and KERMITS_KEY_PASSWORD."
+        }
+    }
     from(layout.buildDirectory.file("outputs/apk/download/app-download.apk"))
     into(rootProject.layout.projectDirectory.dir("../storage/app/releases"))
     rename { "kermits.apk" }

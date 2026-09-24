@@ -4,6 +4,11 @@ use App\Models\User;
 
 return [
 
+    'staff' => [
+        'super_admin_email' => env('SUPER_ADMIN_EMAIL'),
+        'legacy_super_admin_email' => env('LEGACY_SUPER_ADMIN_EMAIL'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Defaults

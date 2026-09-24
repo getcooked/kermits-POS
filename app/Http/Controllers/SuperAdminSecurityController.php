@@ -28,6 +28,7 @@ class SuperAdminSecurityController extends Controller
             'user_id' => $user->getKey(),
             'email' => strtolower($user->email),
             'code_hash' => Hash::make($code),
+            'attempts' => 0,
             'expires_at' => now()->addMinutes(10)->timestamp,
         ]);
 

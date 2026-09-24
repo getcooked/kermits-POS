@@ -71,7 +71,7 @@ class MobileAuthFlowTest extends TestCase
         $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         Notification::shouldReceive('send')->once()->andThrow(new TransportException('SMTP unavailable'));
         $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
-            ->assertStatus(503)->assertJsonPath('message', 'The password reset email could not be sent. Please try again later.');
+            ->assertOk()->assertJsonPath('message', 'If an eligible account exists, a password reset link has been sent.');
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
 
         Notification::fake();

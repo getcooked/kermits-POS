@@ -14,6 +14,8 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class MobilePasswordResetController extends Controller
 {
+    private const RESET_LINK_MESSAGE = 'If an eligible account exists, a password reset link has been sent.';
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -27,13 +29,7 @@ class MobilePasswordResetController extends Controller
             ->first();
 
         if (! $user) {
-            return response()->json([
-                'message' => 'No registered customer account was found with that email address.',
-                'code' => 'account_not_found',
-                'errors' => [
-                    'email' => ['No registered customer account was found with that email address.'],
-                ],
-            ], 422);
+            return response()->json(['message' => self::RESET_LINK_MESSAGE]);
         }
 
         try {
@@ -44,18 +40,13 @@ class MobilePasswordResetController extends Controller
             Password::deleteToken($user);
             Log::warning('Mobile password reset email delivery failed.');
 
-            return response()->json(['message' => 'The password reset email could not be sent. Please try again later.'], 503);
+            return response()->json(['message' => self::RESET_LINK_MESSAGE]);
         }
 
         if ($status !== Password::RESET_LINK_SENT) {
-            return response()->json([
-                'message' => __($status),
-                'code' => 'reset_link_not_sent',
-            ], 429);
+            Log::notice('Mobile password reset link was not sent.', ['status' => $status]);
         }
 
-        return response()->json([
-            'message' => 'A password reset link was sent to your registered email address. Check your inbox and spam folder.',
-        ]);
+        return response()->json(['message' => self::RESET_LINK_MESSAGE]);
     }
 }

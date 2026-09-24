@@ -48,6 +48,7 @@ class CustomerAccountController extends Controller
             'user_id' => $customer->getKey(),
             'email' => strtolower($customer->email),
             'code_hash' => Hash::make($code),
+            'attempts' => 0,
             'expires_at' => now()->addMinutes(10)->timestamp,
         ]);
 

@@ -74,8 +74,13 @@ class WebSeederController extends Controller
 
     private function accounts(): array
     {
+        $superAdminEmail = strtolower(trim((string) config('auth.staff.super_admin_email')));
+        if (! filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('SUPER_ADMIN_EMAIL must be configured before running the web seeder.');
+        }
+
         return [
-            ['name' => 'Super Administrator', 'username' => 'superadmin', 'email' => 'kermitsbantayan1@gmail.com', 'phone' => '09170000001', 'role' => User::ROLE_SUPER_ADMIN],
+            ['name' => 'Super Administrator', 'username' => 'superadmin', 'email' => $superAdminEmail, 'phone' => '09170000001', 'role' => User::ROLE_SUPER_ADMIN],
             ['name' => 'Administrator', 'username' => 'admin', 'email' => 'admin@gmail.com', 'phone' => '09170000002', 'role' => User::ROLE_ADMIN],
             ['name' => 'Cashier', 'username' => 'cashier', 'email' => 'kermitscashier@gmail.com', 'phone' => '09170000003', 'role' => User::ROLE_CASHIER],
             ['name' => 'Customer', 'username' => 'customer', 'email' => 'customer@gmail.com', 'phone' => '09170000004', 'role' => User::ROLE_CUSTOMER],

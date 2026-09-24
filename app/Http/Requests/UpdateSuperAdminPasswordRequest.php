@@ -41,7 +41,19 @@ class UpdateSuperAdminPasswordRequest extends FormRequest
                 && Hash::check($this->string('verification_code')->toString(), $codeHash);
 
             if (! $valid) {
-                $validator->errors()->add('verification_code', 'The email verification code is invalid or has expired. Request a new code.');
+                if (is_array($verification)) {
+                    $verification['attempts'] = (int) ($verification['attempts'] ?? 0) + 1;
+                    if ($verification['attempts'] >= 5) {
+                        $this->session()->forget('super_admin_password_verification');
+                    } else {
+                        $this->session()->put('super_admin_password_verification', $verification);
+                    }
+                }
+
+                $message = is_array($verification) && (int) ($verification['attempts'] ?? 0) >= 5
+                    ? 'Too many incorrect attempts. Request a new verification code.'
+                    : 'The email verification code is invalid or has expired. Request a new code.';
+                $validator->errors()->add('verification_code', $message);
             }
         }];
     }

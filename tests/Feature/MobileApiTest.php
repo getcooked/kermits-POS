@@ -335,7 +335,7 @@ class MobileApiTest extends TestCase
             ->assertOk()->assertJsonPath('data.0.id', $reservationId);
     }
 
-    public function test_customer_can_submit_full_mobile_gcash_checkout_with_linked_reservation(): void
+    public function test_customer_cannot_submit_manual_gcash_checkout_from_mobile(): void
     {
         Storage::fake('local');
         $customer = User::factory()->create([
@@ -347,7 +347,7 @@ class MobileApiTest extends TestCase
             'price' => 300, 'stock' => 4, 'active' => true,
         ]);
 
-        $order = $this->withToken($this->login($customer))->post('/api/v1/orders', [
+        $this->withToken($this->login($customer))->post('/api/v1/orders', [
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
             'payment_method' => 'gcash',
             'payment_reference' => '1234567890123',
@@ -357,32 +357,13 @@ class MobileApiTest extends TestCase
             'reservation_at' => now()->addDays(2)->setTime(12, 0)->toIso8601String(),
             'notes' => 'Birthday lunch',
         ], ['Accept' => 'application/json'])
-            ->assertCreated()
-            ->assertJsonPath('data.total', 600)
-            ->assertJsonPath('data.total_due', 850)
-            ->assertJsonPath('data.cash_received', null)
-            ->assertJsonPath('data.change_due', null)
-            ->assertJsonPath('data.payment_reference', '1234567890123')
-            ->assertJsonPath('data.reservation.table_size', 4)
-            ->assertJsonPath('data.reservation.status', 'pending')
-            ->assertJsonMissingPath('data.reservation.table_number')
-            ->json('data');
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['payment_method', 'payment_reference', 'payment_proof']);
 
-        $this->assertDatabaseHas('orders', [
-            'id' => $order['id'],
-            'customer_id' => $customer->id,
-            'payment_method' => 'gcash',
-            'payment_reference' => '1234567890123',
-        ]);
-        $this->assertDatabaseHas('reservations', [
-            'order_id' => $order['id'],
-            'user_id' => $customer->id,
-            'table_size' => 4,
-            'payment_reference' => '1234567890123',
-            'notes' => 'Birthday lunch',
-        ]);
-        $reservation = Reservation::query()->where('order_id', $order['id'])->firstOrFail();
-        Storage::disk('local')->assertExists($reservation->payment_proof_path);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('reservations', 0);
+        $this->assertSame(4, $product->fresh()->stock);
+        $this->assertSame([], Storage::disk('local')->allFiles('payment-proofs'));
     }
 
     private function login(User $user): string

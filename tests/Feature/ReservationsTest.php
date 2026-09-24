@@ -213,13 +213,11 @@ class ReservationsTest extends TestCase
             'phone' => '09171234567',
             'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
             'menu_items' => [$meal->id => 2],
-            'payment_method' => 'gcash',
-            'payment_reference' => '1234567890123',
-            'payment_proof' => $this->fakePng('proof.png'),
+            'payment_method' => 'cash',
             'total_amount' => 1,
         ])->assertRedirect();
 
-        $this->assertDatabaseHas('reservations', ['user_id' => $customer->id, 'reservation_fee' => 250, 'food_total' => 400, 'total_amount' => 650, 'payment_method' => 'gcash', 'payment_status' => 'pending']);
+        $this->assertDatabaseHas('reservations', ['user_id' => $customer->id, 'reservation_fee' => 250, 'food_total' => 400, 'total_amount' => 650, 'payment_method' => 'cash', 'payment_status' => 'pending']);
     }
 
     public function test_gcash_proof_is_private_and_visible_only_to_owner_and_super_admin(): void
@@ -230,14 +228,27 @@ class ReservationsTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
-        $this->actingAs($customer)->post('/book', [
-            'type' => 'table', 'table_size' => 2, 'customer_name' => $customer->name,
-            'email' => $customer->email, 'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
-            'payment_method' => 'gcash', 'payment_reference' => '1234567890123', 'payment_proof' => $this->fakePng('payment.png'),
-        ])->assertRedirect();
-
-        $reservation = Reservation::query()->whereBelongsTo($customer)->firstOrFail();
+        $proofPath = 'payment-proofs/private-proof.png';
+        Storage::disk('local')->put($proofPath, 'private proof');
+        $reservation = Reservation::query()->create([
+            'user_id' => $customer->id,
+            'reference' => 'KRM-PRIVATE-PROOF',
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->setTime(12, 0),
+            'guests' => 2,
+            'reservation_fee' => 250,
+            'food_total' => 0,
+            'total_amount' => 250,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_status' => 'pending',
+            'payment_proof_path' => $proofPath,
+            'status' => 'pending',
+        ]);
         Storage::disk('local')->assertExists($reservation->payment_proof_path);
         $this->actingAs($customer)->get('/reservations/'.$reservation->id.'/payment-proof')->assertOk();
         $this->actingAs($superAdmin)->get('/reservations/'.$reservation->id.'/payment-proof')->assertOk();

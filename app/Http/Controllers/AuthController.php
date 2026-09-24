@@ -20,10 +20,6 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends Controller
 {
-    private const LEGACY_SUPER_ADMIN_EMAIL = 'superadmin@gmail.com';
-
-    private const SUPER_ADMIN_EMAIL = 'kermitsbantayan1@gmail.com';
-
     public function create(): View
     {
         return view('auth.login');
@@ -59,6 +55,7 @@ class AuthController extends Controller
             'registration_email_verification' => [
                 'email' => strtolower($validated['email']),
                 'code_hash' => Hash::make($code),
+                'attempts' => 0,
                 'expires_at' => now()->addMinutes(10)->timestamp,
                 'verified' => false,
             ],
@@ -95,7 +92,21 @@ class AuthController extends Controller
             return back()->withErrors(['code' => 'The verification code expired. Please request a new code.']);
         }
 
+        if ((int) ($verification['attempts'] ?? 0) >= 5) {
+            session()->forget('registration_email_verification');
+
+            return back()->withErrors(['code' => 'Too many incorrect attempts. Please request a new code.']);
+        }
+
         if (! Hash::check($validated['code'], $verification['code_hash'] ?? '')) {
+            $verification['attempts'] = (int) ($verification['attempts'] ?? 0) + 1;
+            if ($verification['attempts'] >= 5) {
+                session()->forget('registration_email_verification');
+
+                return back()->withErrors(['code' => 'Too many incorrect attempts. Please request a new code.']);
+            }
+            session(['registration_email_verification' => $verification]);
+
             return back()->withErrors(['code' => 'The verification code is incorrect.']);
         }
 
@@ -171,25 +182,40 @@ class AuthController extends Controller
 
     private function resolveSuperAdminEmail(string $login): string
     {
-        if (strtolower($login) !== self::SUPER_ADMIN_EMAIL
-            || User::query()->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
+        $superAdminEmail = $this->superAdminEmail();
+        $legacyEmail = $this->legacySuperAdminEmail();
+        if ($superAdminEmail === '' || $legacyEmail === '' || strtolower($login) !== $superAdminEmail
+            || User::query()->whereRaw('LOWER(email) = ?', [$superAdminEmail])->exists()) {
             return $login;
         }
 
         return User::query()
             ->where('role', User::ROLE_SUPER_ADMIN)
-            ->whereRaw('LOWER(email) = ?', [self::LEGACY_SUPER_ADMIN_EMAIL])
-            ->exists() ? self::LEGACY_SUPER_ADMIN_EMAIL : $login;
+            ->whereRaw('LOWER(email) = ?', [$legacyEmail])
+            ->exists() ? $legacyEmail : $login;
     }
 
     private function updateLegacySuperAdminEmail(User $user): void
     {
-        if ($user->role !== User::ROLE_SUPER_ADMIN || strtolower($user->email) !== self::LEGACY_SUPER_ADMIN_EMAIL
-            || User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [self::SUPER_ADMIN_EMAIL])->exists()) {
+        $superAdminEmail = $this->superAdminEmail();
+        $legacyEmail = $this->legacySuperAdminEmail();
+        if ($superAdminEmail === '' || $legacyEmail === '' || $user->role !== User::ROLE_SUPER_ADMIN
+            || strtolower($user->email) !== $legacyEmail
+            || User::query()->whereKeyNot($user->id)->whereRaw('LOWER(email) = ?', [$superAdminEmail])->exists()) {
             return;
         }
 
-        $user->forceFill(['email' => self::SUPER_ADMIN_EMAIL])->save();
+        $user->forceFill(['email' => $superAdminEmail])->save();
+    }
+
+    private function superAdminEmail(): string
+    {
+        return Str::lower(trim((string) config('auth.staff.super_admin_email')));
+    }
+
+    private function legacySuperAdminEmail(): string
+    {
+        return Str::lower(trim((string) config('auth.staff.legacy_super_admin_email')));
     }
 
     public function destroy(Request $request): RedirectResponse

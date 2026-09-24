@@ -35,9 +35,9 @@ class MobileReservationController extends Controller
             'guests' => ['nullable', 'required_if:type,exclusive', 'integer', 'min:1', 'max:300'],
             'food_request' => ['nullable', 'string', 'max:2000'], 'menu_items' => ['nullable', 'array'],
             'menu_items.*' => ['nullable', 'integer', 'min:0', 'max:22'], 'notes' => ['nullable', 'string', 'max:2000'],
-            'payment_method' => ['required', 'in:cash,gcash'],
-            'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
-            'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'payment_method' => ['required', 'in:cash'],
+            'payment_reference' => ['prohibited'],
+            'payment_proof' => ['prohibited'],
         ]);
         if (! $schedules->isAvailable($validated['reservation_at'], $validated['type'], (int) ($validated['table_size'] ?? $validated['guests'] ?? 1))) {
             throw ValidationException::withMessages([
