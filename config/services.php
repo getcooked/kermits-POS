@@ -12,6 +12,12 @@ return [
         'site_key' => env('RECAPTCHA_SITE_KEY'),
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
     ],
+    'google' => [
+        'enabled' => env('GOOGLE_LOGIN_ENABLED', false),
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+    ],
     'paymongo' => [
         'enabled' => env('PAYMONGO_ENABLED', true),
         'secret_key' => env('PAYMONGO_SECRET_KEY'),

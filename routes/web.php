@@ -11,6 +11,7 @@ use App\Http\Controllers\CustomerHistoryController;
 use App\Http\Controllers\CustomerNotificationController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
@@ -48,6 +49,11 @@ Route::middleware('guest')->controller(AuthController::class)->group(function ()
     Route::post('/register/email', 'sendRegistrationCode')->middleware('throttle:3,1')->name('register.email');
     Route::post('/register/email/verify', 'verifyRegistrationCode')->middleware('throttle:6,1')->name('register.email.verify');
     Route::post('/register', 'storeRegistration')->middleware('throttle:3,1')->name('register.store');
+});
+
+Route::middleware(['guest', 'throttle:10,1'])->controller(GoogleAuthController::class)->group(function (): void {
+    Route::get('/auth/google', 'redirect')->name('auth.google');
+    Route::get('/auth/google/callback', 'callback')->name('auth.google.callback');
 });
 
 Route::middleware('guest')->controller(PasswordResetController::class)->group(function (): void {
