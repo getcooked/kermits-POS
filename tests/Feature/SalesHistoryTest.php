@@ -11,6 +11,17 @@ class SalesHistoryTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_cashier_sidebar_contains_sales_history_link(): void
+    {
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+
+        $this->actingAs($cashier)
+            ->get(route('cashier'))
+            ->assertOk()
+            ->assertSee(route('sales-history.index'), false)
+            ->assertSee('Sales History');
+    }
+
     public function test_cashier_sees_only_sales_they_processed(): void
     {
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER, 'name' => 'Primary Cashier']);

@@ -4,7 +4,7 @@
         @if(auth()->user()->hasRole('cashier'))
             <a class="{{ request()->routeIs('cashier') || request()->routeIs('cashier.checkout') ? 'active' : '' }}" href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>
             <a class="{{ request()->routeIs('cashier.orders.*') ? 'active' : '' }}" href="{{ route('cashier.orders.index') }}">@include('partials.nav-icon',['name'=>'orders']) Customer Orders <b id="cashier-order-badge" class="cashier-order-badge" hidden>0</b></a>
-            <a class="{{ request()->routeIs('sales-history.*') ? 'active' : '' }}" href="{{ route('sales-history.index') }}">@include('partials.nav-icon',['name'=>'reports']) My Sales</a>
+            <a class="{{ request()->routeIs('sales-history.*') ? 'active' : '' }}" href="{{ route('sales-history.index') }}">@include('partials.nav-icon',['name'=>'reports']) Sales History</a>
         @elseif(auth()->user()->hasRole('super_admin'))
             <a class="{{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">@include('partials.nav-icon',['name'=>'home']) Dashboard</a>
             <a class="{{ request()->routeIs('cashier') || request()->routeIs('cashier.checkout') ? 'active' : '' }}" href="{{ route('cashier') }}">@include('partials.nav-icon',['name'=>'pos']) POS</a>
