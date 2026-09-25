@@ -18,7 +18,7 @@
             <div class="review-grid">
                 <section class="review-card">
                     <div class="card-title"><div><p>ORDER ITEMS</p><h2>Edit what the customer really wants</h2></div><span>Use 0 to remove an item</span></div>
-                    <form method="POST" action="{{ route('cashier.orders.update', $order) }}">
+                    <form method="POST" action="{{ route('cashier.orders.update', $order) }}" data-ajax-form data-ajax-target=".review-page" data-ajax-loading="Saving...">
                         @csrf @method('PUT')
                         <div class="editable-items">
                             @foreach($order->items as $item)
@@ -142,7 +142,11 @@
 </style>
 @endpush
 <script>
-(() => {
+const initializeCashierOrderReview = () => {
+    const reviewPage = document.querySelector('.review-page');
+    if (!reviewPage || reviewPage.dataset.cashierReviewBound === 'true') return;
+    reviewPage.dataset.cashierReviewBound = 'true';
+
     const quantities=[...document.querySelectorAll('.review-quantity')],newQuantities=[...document.querySelectorAll('.new-item-quantity')],total=document.getElementById('review-total');
     const money=value=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(value);
     const reviewedTotal=()=>quantities.reduce((sum,input)=>sum+(+input.value||0)*(+input.closest('label').dataset.price),0)+newQuantities.reduce((sum,input)=>sum+(+input.value||0)*(+input.closest('[data-add-product]').dataset.price),0);
@@ -179,6 +183,8 @@
 
     const cash=document.getElementById('cash_received'),change=document.getElementById('cash-change');
     if(cash){const due={{ $order->totalDue() }};const updateCash=()=>change.textContent=money(Math.max(0,(+cash.value||0)-due));cash.addEventListener('input',updateCash);updateCash()}
-})();
+};
+document.addEventListener('ajax:content-updated', initializeCashierOrderReview);
+initializeCashierOrderReview();
 </script>
 @endsection

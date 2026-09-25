@@ -3,7 +3,7 @@
 @section('content')
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard">
     <header class="topbar product-management-header">
-        <div class="product-page-heading"><h1>Product management</h1></div>
+        <div class="product-page-heading"><h1>Product Management</h1></div>
         <div class="product-header-actions">
         <form method="GET" action="{{ route('products.index') }}" class="product-search-form" aria-label="Search products">
             <div class="product-search-control">
@@ -29,7 +29,7 @@
     @if($errors->any())<div class="error" style="background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px">{{ $errors->first() }}</div>@endif
     @if(auth()->user()->hasRole('super_admin', 'admin'))<section id="product-create-panel" class="welcome product-create-panel" {{ old('form_context') === 'create' ? '' : 'hidden' }}>
         <h2>New product</h2>
-        <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data">@csrf
+        <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data" class="product-ajax-form" data-action-label="Adding product...">@csrf
             <input type="hidden" name="form_context" value="create">
             <div class="product-create-grid">
                 <div class="field"><label for="name">Product name</label><input class="control" id="name" name="name" value="{{ old('name') }}" required></div>
@@ -47,8 +47,8 @@
         @forelse($products->groupBy('category') as $category => $items)
         <h2 style="margin:20px 0 0;border-bottom:2px solid #171817;padding-bottom:8px">{{ $category }}</h2>
         @foreach($items as $product)
-        <article class="welcome" style="padding:22px">
-            <form method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data">@csrf @method('PUT')
+        <article class="welcome" style="padding:22px" data-product-id="{{ $product->getKey() }}">
+            <form method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data" class="product-ajax-form" data-action-label="Saving...">@csrf @method('PUT')
                 @if($imageUrl = $product->imageUrl())
                     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><img src="{{ $imageUrl }}" alt="{{ $product->name }}" style="width:86px;height:86px;object-fit:cover;border-radius:12px"><label class="check" style="margin:0"><input name="remove_image" type="checkbox" value="1"> Remove current picture</label></div>
                 @endif
@@ -62,7 +62,7 @@
                 <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px"><div><label>Description</label><input class="control" name="description" value="{{ $product->description }}"></div><label class="check" style="margin:0 0 11px"><input name="active" type="checkbox" value="1" {{ $product->active ? 'checked' : '' }}> Visible</label></div>
                 <div style="margin-top:12px"><label>Replace picture</label><input class="control" name="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
             </form>
-            @if(auth()->user()->hasRole('super_admin'))<form method="POST" action="{{ route('products.destroy', $product) }}" style="margin-top:12px" onsubmit="return confirm('Permanently delete this product?')">@csrf @method('DELETE')<button class="logout" style="color:#b42318" type="submit">Delete</button></form>@endif
+            @if(auth()->user()->hasRole('super_admin'))<form method="POST" action="{{ route('products.destroy', $product) }}" class="product-ajax-form" data-action-label="Deleting..." style="margin-top:12px" onsubmit="return confirm('Permanently delete this product?')">@csrf @method('DELETE')<button class="logout" style="color:#b42318" type="submit">Delete</button></form>@endif
         </article>
         @endforeach
         @empty <div class="welcome">{{ $search !== '' ? 'No products match your search.' : 'No products yet. Add your first product above.' }}</div> @endforelse
@@ -103,21 +103,28 @@
 .product-create-panel{margin:0 0 22px;padding:26px}
 .product-create-panel h2{margin:0 0 20px;font-size:20px}
 .product-create-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px}
+.product-ajax-form[aria-busy="true"]{opacity:.72;pointer-events:none}
+.product-ajax-inline-error{margin:0 0 14px;padding:11px 13px;border:1px solid #efc8c5;border-radius:9px;background:#fff0f0;color:#a51d16;font-size:13px}
+.product-ajax-toast{position:fixed;z-index:1000;top:20px;right:20px;max-width:min(380px,calc(100vw - 32px));padding:13px 16px;border:1px solid #b8dbc4;border-radius:11px;background:#edf8f0;color:#267444;font-size:14px;font-weight:650;box-shadow:0 14px 34px rgba(23,24,23,.18);transition:opacity .2s,transform .2s}
+.product-ajax-toast.is-error{border-color:#efc8c5;background:#fff0f0;color:#a51d16}
+.product-ajax-toast.is-hiding{opacity:0;transform:translateY(-8px)}
 @media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
 @media(max-width:820px){.product-create-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}#product-search{font-size:16px}.product-search-button{padding-inline:14px}.product-create-toggle{width:100%;justify-content:center}}
 @media(max-width:520px){.product-create-grid{grid-template-columns:1fr}}
 </style>
 @endpush
+@push('scripts')
 <script>
-(() => {
+const initializeProductSearch = () => {
     const input = document.getElementById('product-search');
     const dropdown = document.querySelector('.product-search-dropdown');
     const panel = document.getElementById('product-search-options');
     const empty = panel?.querySelector('.product-search-empty');
     const options = [...(panel?.querySelectorAll('.product-search-option') ?? [])];
     let activeIndex = -1;
-    if (!input || !dropdown || !panel) return;
+    if (!input || !dropdown || !panel || input.dataset.productSearchBound === 'true') return;
+    input.dataset.productSearchBound = 'true';
 
     const visibleOptions = () => options.filter(option => !option.hidden);
     const setOpen = open => {
@@ -173,16 +180,13 @@
             setOpen(false);
         }
     });
-    document.addEventListener('click', event => {
-        if (!event.target.closest('.product-search-control')) setOpen(false);
-    });
-})();
-</script>
-@if(auth()->user()->hasRole('super_admin', 'admin'))<script>
-(() => {
+};
+
+const initializeProductCreateToggle = () => {
     const toggle = document.getElementById('product-create-toggle');
     const panel = document.getElementById('product-create-panel');
-    if (!toggle || !panel) return;
+    if (!toggle || !panel || toggle.dataset.productToggleBound === 'true') return;
+    toggle.dataset.productToggleBound = 'true';
 
     toggle.addEventListener('click', () => {
         const opening = panel.hidden;
@@ -191,6 +195,125 @@
         toggle.querySelector('span').textContent = opening ? 'Close form' : 'Add product';
         if (opening) panel.querySelector('input:not([type="hidden"])')?.focus();
     });
-})();
-</script>@endif
+};
+
+const initializeProductPage = () => {
+    initializeProductSearch();
+    initializeProductCreateToggle();
+};
+
+const showProductToast = (message, isError = false) => {
+    document.querySelector('.product-ajax-toast')?.remove();
+    const toast = document.createElement('div');
+    toast.className = `product-ajax-toast${isError ? ' is-error' : ''}`;
+    toast.setAttribute('role', isError ? 'alert' : 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.textContent = message;
+    document.body.append(toast);
+    window.setTimeout(() => toast.classList.add('is-hiding'), 3600);
+    window.setTimeout(() => toast.remove(), 3900);
+};
+
+const showProductFormError = (form, message, field = '') => {
+    document.querySelectorAll('.product-ajax-inline-error').forEach(error => error.remove());
+    const error = document.createElement('div');
+    error.className = 'product-ajax-inline-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = message;
+    form.prepend(error);
+    if (field) form.elements.namedItem(field)?.focus();
+    showProductToast(message, true);
+};
+
+document.addEventListener('click', event => {
+    if (event.target.closest('.product-search-control')) return;
+    const panel = document.getElementById('product-search-options');
+    const input = document.getElementById('product-search');
+    const dropdown = document.querySelector('.product-search-dropdown');
+    if (!panel || panel.hidden) return;
+    panel.hidden = true;
+    input?.setAttribute('aria-expanded', 'false');
+    dropdown?.setAttribute('aria-expanded', 'false');
+});
+
+document.addEventListener('submit', async event => {
+    const form = event.target.closest('.product-ajax-form');
+    if (!form || event.defaultPrevented) return;
+    event.preventDefault();
+
+    const submitButton = event.submitter ?? form.querySelector('[type="submit"]');
+    const originalLabel = submitButton?.textContent;
+    form.setAttribute('aria-busy', 'true');
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = form.dataset.actionLabel || 'Saving...';
+    }
+
+    try {
+        const response = await fetch(form.action, {
+            method: (form.method || 'POST').toUpperCase(),
+            body: new FormData(form),
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (response.status === 422) {
+            const payload = await response.json();
+            const firstField = Object.keys(payload.errors ?? {})[0] ?? '';
+            const message = payload.errors?.[firstField]?.[0] ?? payload.message ?? 'Please check the form and try again.';
+            showProductFormError(form, message, firstField);
+            return;
+        }
+
+        if (!response.ok) {
+            let message = 'The product could not be saved. Please try again.';
+            if (response.headers.get('content-type')?.includes('application/json')) {
+                const payload = await response.json();
+                message = payload.message || message;
+            }
+            showProductFormError(form, message);
+            return;
+        }
+
+        const documentFromResponse = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const nextDashboard = documentFromResponse.querySelector('.admin-workspace .dashboard');
+        const currentDashboard = document.querySelector('.admin-workspace .dashboard');
+        if (!nextDashboard || !currentDashboard) {
+            showProductFormError(form, 'Your session may have expired. Refresh the page and try again.');
+            return;
+        }
+
+        const serverError = nextDashboard.querySelector('.error')?.textContent.trim();
+        const status = nextDashboard.querySelector('.notice')?.textContent.trim();
+        const workspace = document.querySelector('.admin-workspace');
+        const workspaceScroll = workspace?.scrollTop ?? 0;
+        const windowScroll = window.scrollY;
+        currentDashboard.replaceWith(document.importNode(nextDashboard, true));
+        document.body.dataset.feedback = serverError ? 'error' : 'success';
+        if (response.url && response.url !== window.location.href) {
+            window.history.replaceState({}, '', response.url);
+        }
+        initializeProductPage();
+        window.requestAnimationFrame(() => {
+            if (workspace) workspace.scrollTop = workspaceScroll;
+            window.scrollTo({ top: windowScroll, behavior: 'instant' });
+        });
+        showProductToast(serverError || status || 'Product changes saved successfully.', Boolean(serverError));
+    } catch (error) {
+        showProductFormError(form, 'A network error occurred. Check your connection and try again.');
+    } finally {
+        form.removeAttribute('aria-busy');
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+        }
+    }
+});
+
+initializeProductPage();
+</script>
+@endpush
 @endsection

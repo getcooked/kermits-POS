@@ -19,7 +19,7 @@
                 <h2>Change password</h2>
                 <p>Enter your email verification code before choosing a new password.</p>
 
-                <form class="account-form" method="POST" action="{{ route('customer.settings.password.update') }}">
+                <form class="account-form" method="POST" action="{{ route('customer.settings.password.update') }}" data-ajax-form data-ajax-loading="Updating..." data-ajax-reset="true">
                     @csrf
                     @method('PUT')
 

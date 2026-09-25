@@ -24,7 +24,7 @@
                     </div>
                 </div>
 
-                <form class="account-form" method="POST" action="{{ route('customer.profile.update') }}">
+                <form class="account-form" method="POST" action="{{ route('customer.profile.update') }}" data-ajax-form data-ajax-loading="Saving...">
                     @csrf
                     @method('PUT')
 
@@ -107,13 +107,13 @@
                         <strong>Email verification</strong>
                         <small>Send a one-time code to {{ $customer->email }}. The code expires after 10 minutes.</small>
                     </div>
-                    <form method="POST" action="{{ route('customer.settings.password.email-code') }}">
+                    <form method="POST" action="{{ route('customer.settings.password.email-code') }}" data-ajax-form data-ajax-loading="Sending..." data-ajax-success="A verification code was sent to your email.">
                         @csrf
                         <button type="submit">Send verification code</button>
                     </form>
                 </div>
 
-                <form class="account-form" method="POST" action="{{ route('customer.settings.password.update') }}">
+                <form class="account-form" method="POST" action="{{ route('customer.settings.password.update') }}" data-ajax-form data-ajax-loading="Updating..." data-ajax-reset="true">
                     @csrf
                     @method('PUT')
 

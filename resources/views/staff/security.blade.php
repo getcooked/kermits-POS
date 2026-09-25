@@ -22,13 +22,13 @@
 
                 <div class="verification-step">
                     <div><span><strong>Email verification</strong><small>Send a one-time code to {{ auth()->user()->email }}. The code expires after 10 minutes.</small></span></div>
-                    <form method="POST" action="{{ route('superadmin.security.email-code') }}">
+                    <form method="POST" action="{{ route('superadmin.security.email-code') }}" data-ajax-form data-ajax-loading="Sending..." data-ajax-success="A verification code was sent to your email.">
                         @csrf
                         <button class="verification-send" type="submit">Send verification code</button>
                     </form>
                 </div>
 
-                <form class="password-form" method="POST" action="{{ route('superadmin.security.password.update') }}">
+                <form class="password-form" method="POST" action="{{ route('superadmin.security.password.update') }}" data-ajax-form data-ajax-loading="Updating..." data-ajax-reset="true">
                     @csrf @method('PUT')
                     <div class="field"><label for="verification_code">Email verification code</label><input class="control verification-code" id="verification_code" name="verification_code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required></div>
                     <div class="field"><label for="password">New password</label><input class="control" id="password" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, a number, and a symbol.</small></div>

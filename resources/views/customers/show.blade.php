@@ -28,7 +28,7 @@
         </div>
 
         @if(auth()->user()->hasRole('super_admin'))
-            <form method="POST" action="{{ route('customers.update', $customer) }}">
+            <form method="POST" action="{{ route('customers.update', $customer) }}" data-ajax-form data-ajax-target=".customer-record" data-ajax-loading="Saving...">
                 @csrf
                 @method('PUT')
                 <h3>Edit customer account</h3>

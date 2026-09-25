@@ -52,7 +52,7 @@
                                 @endif
                             </div>
                             @if($order->payment_method === 'paymongo')
-                                <form method="POST" action="{{ route('cashier.orders.reject', $order) }}" onsubmit="return confirm('Reject this unpaid order and release its stock?')">@csrf @method('PATCH')<button type="submit">Reject unpaid order</button></form>
+                                <form method="POST" action="{{ route('cashier.orders.reject', $order) }}" data-ajax-form data-ajax-target=".customer-orders" data-ajax-loading="Rejecting..." onsubmit="return confirm('Reject this unpaid order and release its stock?')">@csrf @method('PATCH')<button type="submit">Reject unpaid order</button></form>
                             @else
                                 <a class="review-order" href="{{ route('cashier.orders.review', $order) }}">Review order <span>→</span></a>
                             @endif

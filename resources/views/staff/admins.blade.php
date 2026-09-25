@@ -13,7 +13,7 @@
                 @forelse($admins as $admin)
                 <article>
                     <header><span>{{ strtoupper(substr($admin->name,0,1)) }}</span><div><h2>{{ $admin->name }}</h2><p>{{ $admin->username ?: 'No username' }} · {{ $admin->email }}</p></div><b>Admin</b></header>
-                    <form method="POST" action="{{ route('admins.password.update',$admin) }}">
+                    <form method="POST" action="{{ route('admins.password.update',$admin) }}" data-ajax-form data-ajax-loading="Updating..." data-ajax-reset="true">
                         @csrf @method('PUT')
                         <div class="field"><label for="password-{{ $admin->id }}">New password</label><input class="control" id="password-{{ $admin->id }}" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, number, and symbol.</small></div>
                         <div class="field"><label for="password-confirmation-{{ $admin->id }}">Confirm new password</label><input class="control" id="password-confirmation-{{ $admin->id }}" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>

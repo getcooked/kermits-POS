@@ -11,7 +11,7 @@
             <a class="{{ request()->routeIs('reports') ? 'active' : '' }}" href="{{ route('reports') }}">@include('partials.nav-icon',['name'=>'reports']) Reporting</a>
             <a class="{{ request()->routeIs('inventory.*') ? 'active' : '' }}" href="{{ route('inventory.index') }}">@include('partials.nav-icon',['name'=>'inventory']) Inventory</a>
             <a class="{{ request()->routeIs('reservations.index') ? 'active' : '' }}" href="{{ route('reservations.index') }}">@include('partials.nav-icon',['name'=>'reservations']) Reservations</a>
-            <a class="{{ request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Menu Pictures</a>
+            <a class="{{ request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Products</a>
             <a class="{{ request()->routeIs('cashiers.*') ? 'active' : '' }}" href="{{ route('cashiers.index') }}">@include('partials.nav-icon',['name'=>'cashier']) Cashier Accounts</a>
             <a class="{{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}">@include('partials.nav-icon',['name'=>'users']) Customers</a>
             <a class="{{ request()->routeIs('activity-logs.*') ? 'active' : '' }}" href="{{ route('activity-logs.index') }}">@include('partials.nav-icon',['name'=>'activity']) Activity Logs</a>
