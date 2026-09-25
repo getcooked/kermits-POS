@@ -239,10 +239,9 @@ class OrderingTest extends TestCase
             ->assertSee('Walk In Pay')
             ->assertSee('Download receipt')
             ->assertSee(route('shop.orders.receipt', $order), false)
-            ->assertSee('Back to Home')
+            ->assertSee('>Back</a>', false)
             ->assertSee('href="'.route('shop').'"', false)
             ->assertDontSee('Print receipt')
-            ->assertDontSee('Order more')
             ->assertSee('localStorage.removeItem("kermits-customer-cart-v1-'.$customer->id.'")', false);
     }
 

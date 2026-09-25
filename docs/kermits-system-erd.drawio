@@ -1,0 +1,121 @@
+<mxfile host="app.diagrams.net" agent="Codex" version="24.7.17" pages="1">
+  <diagram id="kermits-erd" name="Kermit's System ERD">
+    <mxGraphModel dx="1900" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1700" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Kermit's Ordering and Reservation System — Entity Relationship Diagram" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=24;fontStyle=1;fontColor=#1F2937;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="1400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="PK = Primary Key&amp;nbsp;&amp;nbsp;&amp;nbsp; FK = Foreign Key&amp;nbsp;&amp;nbsp;&amp;nbsp; UK = Unique Key&amp;nbsp;&amp;nbsp;&amp;nbsp; 0..1 = Optional one&amp;nbsp;&amp;nbsp;&amp;nbsp; 0..* = Optional many" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=12;fontColor=#4B5563;" vertex="1" parent="1">
+          <mxGeometry x="300" y="62" width="1400" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="users" value="&lt;div style=&quot;background-color:#1F4E78;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;USERS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;name : varchar&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; username : varchar, nullable&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; email : varchar&lt;br&gt;phone : varchar, nullable&lt;br&gt;birthday : date, nullable&lt;br&gt;sex : varchar, nullable&lt;br&gt;address : text, nullable&lt;br&gt;role : varchar&lt;br&gt;email_verified_at : datetime, nullable&lt;br&gt;password : varchar&lt;br&gt;remember_token : varchar, nullable&lt;br&gt;deleted_at : datetime, nullable&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F4F8FC;strokeColor=#1F4E78;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="330" width="300" height="435" as="geometry" />
+        </mxCell>
+
+        <mxCell id="orders" value="&lt;div style=&quot;background-color:#2E7D32;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;ORDERS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; customer_id : bigint, nullable&lt;br&gt;total : decimal(10,2)&lt;br&gt;payment_method : varchar&lt;br&gt;payment_status : varchar&lt;br&gt;payment_reference : varchar, nullable&lt;br&gt;cash_received : decimal, nullable&lt;br&gt;change_due : decimal, nullable&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; paymongo_checkout_id : varchar, nullable&lt;br&gt;paymongo_checkout_url : text, nullable&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F3FAF4;strokeColor=#2E7D32;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="440" y="120" width="330" height="385" as="geometry" />
+        </mxCell>
+
+        <mxCell id="order_items" value="&lt;div style=&quot;background-color:#2E7D32;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;ORDER_ITEMS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; order_id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; product_id : bigint&lt;br&gt;quantity : int&lt;br&gt;unit_price : decimal(10,2)&lt;br&gt;subtotal : decimal(10,2)&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F3FAF4;strokeColor=#2E7D32;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="900" y="130" width="280" height="270" as="geometry" />
+        </mxCell>
+
+        <mxCell id="products" value="&lt;div style=&quot;background-color:#C26401;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;PRODUCTS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;name : varchar&lt;br&gt;category : varchar&lt;br&gt;category_order : int&lt;br&gt;description : text, nullable&lt;br&gt;image_path : varchar, nullable&lt;br&gt;price : decimal(10,2)&lt;br&gt;stock : int&lt;br&gt;active : boolean&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#FFF8F0;strokeColor=#C26401;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="390" width="290" height="330" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stock_movements" value="&lt;div style=&quot;background-color:#C26401;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;STOCK_MOVEMENTS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; product_id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id : bigint&lt;br&gt;type : varchar&lt;br&gt;quantity : int&lt;br&gt;stock_before : int&lt;br&gt;stock_after : int&lt;br&gt;note : varchar, nullable&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#FFF8F0;strokeColor=#C26401;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="110" width="290" height="300" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reservations" value="&lt;div style=&quot;background-color:#7B1FA2;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;RESERVATIONS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.48;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id : bigint, nullable&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; handled_by : bigint, nullable&lt;br&gt;&lt;b&gt;FK, UK&lt;/b&gt; order_id : bigint, nullable&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; reference : varchar&lt;br&gt;type : varchar&lt;br&gt;table_size : int, nullable&lt;br&gt;customer_name : varchar&lt;br&gt;email : varchar&lt;br&gt;phone : varchar&lt;br&gt;reservation_at : datetime&lt;br&gt;reservation_end_at : datetime, nullable&lt;br&gt;hold_expires_at : datetime, nullable&lt;br&gt;guests : int&lt;br&gt;reservation_fee : decimal&lt;br&gt;food_total : decimal&lt;br&gt;total_amount : decimal&lt;br&gt;payment_method : varchar&lt;br&gt;payment_reference : varchar, nullable&lt;br&gt;payment_status : varchar&lt;br&gt;payment_proof_path : varchar, nullable&lt;br&gt;food_request : text, nullable&lt;br&gt;notes : text, nullable&lt;br&gt;status : varchar&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#FBF4FE;strokeColor=#7B1FA2;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="430" y="650" width="350" height="650" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reservation_items" value="&lt;div style=&quot;background-color:#7B1FA2;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;RESERVATION_ITEMS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; reservation_id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; product_id : bigint&lt;br&gt;quantity : int&lt;br&gt;unit_price : decimal(10,2)&lt;br&gt;subtotal : decimal(10,2)&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#FBF4FE;strokeColor=#7B1FA2;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="900" y="670" width="300" height="270" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reservation_history" value="&lt;div style=&quot;background-color:#7B1FA2;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;RESERVATION_STATUS_HISTORIES&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; reservation_id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; changed_by : bigint, nullable&lt;br&gt;from_status : varchar, nullable&lt;br&gt;to_status : varchar&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#FBF4FE;strokeColor=#7B1FA2;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="900" y="1020" width="330" height="250" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mobile_tokens" value="&lt;div style=&quot;background-color:#00695C;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;MOBILE_API_TOKENS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id : bigint&lt;br&gt;name : varchar&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; token_hash : varchar&lt;br&gt;last_used_at : datetime, nullable&lt;br&gt;expires_at : datetime&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F0FAF8;strokeColor=#00695C;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="880" width="300" height="270" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mobile_push" value="&lt;div style=&quot;background-color:#00695C;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;MOBILE_PUSH_INSTALLATIONS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.5;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id : bigint&lt;br&gt;&lt;b&gt;FK, UK&lt;/b&gt; mobile_api_token_id : bigint&lt;br&gt;provider : varchar&lt;br&gt;identifier_kind : varchar&lt;br&gt;identifier : text&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; identifier_hash : varchar&lt;br&gt;platform : varchar&lt;br&gt;app_version : varchar, nullable&lt;br&gt;last_seen_at : datetime, nullable&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F0FAF8;strokeColor=#00695C;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1240" width="320" height="345" as="geometry" />
+        </mxCell>
+
+        <mxCell id="activity_logs" value="&lt;div style=&quot;background-color:#455A64;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;ACTIVITY_LOGS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.5;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id : bigint, nullable&lt;br&gt;actor_name : varchar&lt;br&gt;actor_role : varchar&lt;br&gt;action : varchar&lt;br&gt;description : varchar&lt;br&gt;route_name : varchar, nullable&lt;br&gt;method : varchar&lt;br&gt;path : varchar&lt;br&gt;status_code : int&lt;br&gt;ip_address : varchar, nullable&lt;br&gt;user_agent : text, nullable&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F5F7F8;strokeColor=#455A64;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="830" width="320" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="system_settings" value="&lt;div style=&quot;background-color:#455A64;color:#ffffff;padding:8px;font-size:16px;&quot;&gt;&lt;b&gt;SYSTEM_SETTINGS&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;padding:8px;line-height:1.55;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id : bigint&lt;br&gt;&lt;b&gt;UK&lt;/b&gt; key : varchar&lt;br&gt;value : text, nullable&lt;br&gt;created_at : datetime&lt;br&gt;updated_at : datetime&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=0;fillColor=#F5F7F8;strokeColor=#455A64;strokeWidth=2;fontFamily=Arial;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="1390" y="1350" width="280" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-user-order-operator" value="1 processes 0..*" edge="1" parent="1" source="users" target="orders" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.22;entryX=0;entryY=0.55;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-order-customer" value="0..1 customer / 0..* orders" edge="1" parent="1" source="users" target="orders" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;dashed=1;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.34;entryX=0;entryY=0.75;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-order-items" value="1 contains 1..*" edge="1" parent="1" source="orders" target="order_items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-product-order-items" value="1 product / 0..* line items" edge="1" parent="1" source="products" target="order_items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.25;entryX=1;entryY=0.7;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-res-owner" value="0..1 owner / 0..* reservations" edge="1" parent="1" source="users" target="reservations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.6;entryX=0;entryY=0.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-res-handler" value="0..1 handler / 0..* handled" edge="1" parent="1" source="users" target="reservations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;dashed=1;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.72;entryX=0;entryY=0.35;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-order-reservation" value="0..1 linked order / 0..1 reservation" edge="1" parent="1" source="orders" target="reservations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.55;exitY=1;entryX=0.55;entryY=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-res-items" value="1 contains 0..*" edge="1" parent="1" source="reservations" target="reservation_items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;entryX=0;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-product-res-items" value="1 product / 0..* requested items" edge="1" parent="1" source="products" target="reservation_items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.82;entryX=1;entryY=0.45;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-res-history" value="1 has 0..* status changes" edge="1" parent="1" source="reservations" target="reservation_history" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.78;entryX=0;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-history" value="0..1 changer / 0..* changes" edge="1" parent="1" source="users" target="reservation_history" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;dashed=1;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.7;exitY=1;entryX=0;entryY=0.8;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-product-stock" value="1 product / 0..* movements" edge="1" parent="1" source="products" target="stock_movements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.75;exitY=0;entryX=0.75;entryY=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-stock" value="1 recorder / 0..* movements" edge="1" parent="1" source="users" target="stock_movements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.75;exitY=0;entryX=0;entryY=0.3;">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="260" y="170" /><mxPoint x="1300" y="170" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-token" value="1 user / 0..* tokens" edge="1" parent="1" source="users" target="mobile_tokens" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;entryX=0.35;entryY=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-push" value="1 user / 0..* installations" edge="1" parent="1" source="users" target="mobile_push" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;dashed=1;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.85;entryX=0;entryY=0.25;">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="20" y="700" /><mxPoint x="20" y="1330" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-token-push" value="1 token / 0..1 installation" edge="1" parent="1" source="mobile_tokens" target="mobile_push" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERone;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.65;exitY=1;entryX=0.65;entryY=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-activity" value="0..1 actor / 0..* log entries" edge="1" parent="1" source="users" target="activity_logs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#374151;strokeWidth=1.5;fontFamily=Arial;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.9;entryX=0;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="390" y="720" /><mxPoint x="1300" y="720" /><mxPoint x="1300" y="1030" /></Array></mxGeometry>
+        </mxCell>
+
+        <mxCell id="note" value="Framework infrastructure tables (migrations, sessions, password_reset_tokens, cache, cache_locks, jobs, job_batches, and failed_jobs) are intentionally omitted from the business ERD." style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;fillColor=#FFFDE7;strokeColor=#C9A227;dashed=1;fontFamily=Arial;fontSize=11;fontColor=#374151;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1480" width="560" height="70" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
