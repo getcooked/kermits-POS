@@ -21,8 +21,6 @@ class SuperAdminNavigationTest extends TestCase
         'inventory.index',
         'reservations.index',
         'products.index',
-        'cashiers.index',
-        'customers.index',
         'activity-logs.index',
         'settings.payment.edit',
     ];

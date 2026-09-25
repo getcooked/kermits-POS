@@ -3,6 +3,7 @@
 @section('content')
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard customer-record">
     <header class="record-head"><div><p>CUSTOMER RECORD</p><h1>{{ $customer->name }}</h1><span>{{ $customer->email }} · Joined {{ $customer->created_at->format('M d, Y') }}</span></div><a class="logout" href="{{ route('customers.index') }}">Back to customers</a></header>
+    @include('partials.account-tabs')
     <div class="summary-cards"><div><span>Orders</span><strong>{{ $customer->orders->count() }}</strong></div><div><span>Reservations</span><strong>{{ $customer->reservations->count() }}</strong></div><div><span>Order value</span><strong>&#8369;{{ number_format($customer->orders->sum('total'),2) }}</strong></div></div>
     @if(session('status'))<div class="notice customer-notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error customer-notice">{{ $errors->first() }}</div>@endif

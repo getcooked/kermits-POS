@@ -392,10 +392,11 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee(route('reservations.index'), false)
             ->assertSee(route('products.index'), false)
             ->assertDontSee(route('admins.index'), false)
-            ->assertSee(route('cashiers.index'), false)
+            ->assertSee('Account')
+            ->assertDontSee(route('cashiers.index'), false)
             ->assertSee(route('activity-logs.index'), false)
             ->assertSee(route('settings.payment.edit'), false)
-            ->assertSee(route('customers.index'), false);
+            ->assertDontSee(route('customers.index'), false);
     }
 
     public function test_invalid_credentials_are_rejected(): void

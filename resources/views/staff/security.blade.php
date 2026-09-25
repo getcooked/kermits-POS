@@ -1,11 +1,12 @@
 @extends('layouts.app')
-@section('title', 'Security · Kermit’s')
+@section('title', 'Admin Account · Kermit’s')
 @section('content')
 <div class="admin-shell security-shell">
     @include('partials.admin-sidebar')
     <main class="admin-workspace">
         <div class="security-page">
-            <header><p>SUPER ADMIN</p><h1>Security</h1><span>Verify your email before setting a new password.</span></header>
+            <header><p>ACCOUNT MANAGEMENT</p><h1>Admin Account</h1><span>Manage the Super Admin account and password security.</span></header>
+            @include('partials.account-tabs')
 
             @if(session('status'))<div class="security-message success">{{ session('status') }}</div>@endif
             @if($errors->any())<div class="security-message error">{{ $errors->first() }}</div>@endif

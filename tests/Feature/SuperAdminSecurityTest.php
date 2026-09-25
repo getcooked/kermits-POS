@@ -21,6 +21,7 @@ class SuperAdminSecurityTest extends TestCase
 
         $this->actingAs($superAdmin)->get(route('superadmin.security.edit'))
             ->assertOk()
+            ->assertSee('Admin Account')
             ->assertSee('Change my password')
             ->assertSee('Send verification code')
             ->assertDontSee('Current password')
