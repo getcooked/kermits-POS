@@ -211,7 +211,7 @@
 
 
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const tabs = [...document.querySelectorAll('[data-history-tab]')];
     const panels = [...document.querySelectorAll('[data-history-panel]')];

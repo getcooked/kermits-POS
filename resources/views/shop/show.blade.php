@@ -60,7 +60,7 @@
         </div>
     </div>
 </main>
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 @if(session('clear_customer_cart'))
 try { localStorage.removeItem(@json('kermits-customer-cart-v1-'.auth()->id())); } catch (_) {}
 @endif

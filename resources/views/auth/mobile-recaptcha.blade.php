@@ -17,7 +17,7 @@
         <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
 </main>
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     window.mobileRecaptchaReady = function () {
         grecaptcha.render('mobile-recaptcha', {
             sitekey: @json(config('services.recaptcha.site_key')),
@@ -36,6 +36,6 @@
         });
     };
 </script>
-<script src="https://www.google.com/recaptcha/api.js?onload=mobileRecaptchaReady&render=explicit" async defer></script>
+<script nonce="{{ Vite::cspNonce() }}" src="https://www.google.com/recaptcha/api.js?onload=mobileRecaptchaReady&render=explicit" async defer></script>
 </body>
 </html>

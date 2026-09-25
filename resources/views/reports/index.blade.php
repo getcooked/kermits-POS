@@ -103,7 +103,7 @@
 @media(max-width:480px){.metric-grid{grid-template-columns:1fr}.metric-card{min-height:125px}.stacked-metrics,.reservation-metrics{grid-template-columns:1fr}.dashboard-card{padding:16px}.report-topbar h1{font-size:26px}}
 </style>
 @endpush
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const toggle=document.querySelector('[data-filter-toggle]'),form=document.querySelector('[data-filter-form]');
     toggle?.addEventListener('click',()=>form?.classList.toggle('open'));

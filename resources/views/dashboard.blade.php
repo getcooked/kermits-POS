@@ -530,7 +530,7 @@
 </style>
 @endpush
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     (() => {
         const date = document.getElementById('dashboard-date');
         if (!date) return;

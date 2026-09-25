@@ -144,7 +144,7 @@
 @media(max-width:520px){.history-metrics,.history-filters{grid-template-columns:1fr}.history-search{grid-column:auto}.history-card{padding:15px}.history-head h1{font-size:27px}.history-periods a{padding:0 8px;font-size:10px}}
 </style>
 @endpush
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const period = document.getElementById('history-period');
     const from = document.getElementById('history-from');

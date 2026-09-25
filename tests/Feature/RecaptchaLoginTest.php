@@ -39,7 +39,7 @@ class RecaptchaLoginTest extends TestCase
             ->assertDontSee('test-secret-key');
 
         $policy = $response->headers->get('Content-Security-Policy');
-        $this->assertStringContainsString("script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/", $policy);
+        $this->assertMatchesRegularExpression("#script-src 'self' 'nonce-[A-Za-z0-9]+' https://www\.google\.com/recaptcha/ https://www\.gstatic\.com/recaptcha/;#", $policy);
         $this->assertStringContainsString("frame-src 'self' https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/", $policy);
         $this->assertStringContainsString("connect-src 'self' https://www.google.com/recaptcha/", $policy);
     }

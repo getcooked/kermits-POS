@@ -1,9 +1,38 @@
-<IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
+Options -Indexes
+ServerSignature Off
 
+<IfModule mod_negotiation.c>
+    Options -MultiViews
+</IfModule>
+
+# Block hidden files (.env, .git, .htaccess) except the ACME /.well-known path,
+# plus backups, logs, and config files that should never be served directly.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+<FilesMatch "\.(env|ini|log|sh|sql|bak|backup|old|orig|swp|dist|lock|yml|yaml|config|conf|md|json|xml|phar)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^(robots\.txt|manifest\.json|site\.webmanifest)$">
+    Require all granted
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    # Static files are served by Apache without passing through Laravel.
+    Header unset X-Powered-By
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_rewrite.c>
     RewriteEngine On
+
+    RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)$ [NC]
+    RewriteRule ^ - [F]
+
+    RewriteCond %{REQUEST_URI} !/\.well-known/ [NC]
+    RewriteRule (^|/)\. - [F]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

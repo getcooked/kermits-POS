@@ -141,7 +141,7 @@
 @media(prefers-reduced-motion:reduce){.reject-dialog[open],.reject-dialog[open]::backdrop{animation:none}}
 </style>
 @endpush
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 const initializeCashierOrderReview = () => {
     const reviewPage = document.querySelector('.review-page');
     if (!reviewPage || reviewPage.dataset.cashierReviewBound === 'true') return;

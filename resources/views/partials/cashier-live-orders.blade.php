@@ -30,7 +30,7 @@
 @media(max-width:780px){.admin-sidebar nav a .cashier-order-badge{display:inline-flex!important}.admin-sidebar nav a .cashier-order-badge[hidden]{display:none!important}.cashier-order-toast{top:12px;right:14px;grid-template-columns:36px minmax(0,1fr);padding:13px 42px 13px 13px}.cashier-order-toast-icon{width:36px;height:36px}.cashier-order-toast>a{grid-column:2;width:max-content}.cashier-order-toast>div span{font-size:11px}.cashier-alert-setup{right:14px;bottom:14px}.cashier-alert-setup button{max-width:260px}}
 </style>
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const endpoint = @json(route('cashier.orders.notifications'));
     const ordersUrl = @json(route('cashier.orders.index'));

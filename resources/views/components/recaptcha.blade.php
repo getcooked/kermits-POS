@@ -15,7 +15,7 @@
             </style>
         @endpush
         @push('scripts')
-            <script>
+            <script nonce="{{ Vite::cspNonce() }}">
                 window.kermitsRecaptchaError = function () {
                     document.querySelectorAll('.recaptcha-status').forEach(function (status) {
                         status.textContent = 'Unable to load reCAPTCHA. Check your connection and reload this page.';
@@ -32,8 +32,14 @@
                         });
                     });
                 };
+                (function () {
+                    const script = document.createElement('script');
+                    script.src = 'https://www.google.com/recaptcha/api.js?onload=kermitsRecaptchaReady&render=explicit';
+                    script.async = true;
+                    script.addEventListener('error', window.kermitsRecaptchaError);
+                    document.head.appendChild(script);
+                })();
             </script>
-            <script src="https://www.google.com/recaptcha/api.js?onload=kermitsRecaptchaReady&render=explicit" async defer onerror="kermitsRecaptchaError()"></script>
         @endpush
     @endonce
 @endif

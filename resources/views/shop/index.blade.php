@@ -40,7 +40,7 @@
                         </a>
                     </div>
                 </div>
-                <script id="customer-order-notification-keys" type="application/json">@json($customerOrderDecisionKeys)</script>
+                <script nonce="{{ Vite::cspNonce() }}" id="customer-order-notification-keys" type="application/json">@json($customerOrderDecisionKeys)</script>
             </div>
         </div>
         <div class="shop-category-row"><button class="category-arrow" type="button" data-shop-scroll="-1" aria-label="Scroll categories left">‹</button>
@@ -2183,7 +2183,7 @@
 </style>
 @endpush
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const button = document.querySelector('[data-order-notification-button]');
     const badge = document.querySelector('[data-order-notification-count]');
@@ -2216,7 +2216,7 @@
 })();
 </script>
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const menu = document.querySelector('[data-profile-menu]');
     const trigger = menu?.querySelector('[data-profile-trigger]');
@@ -2246,7 +2246,7 @@
 })();
 </script>
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     (() => {
         const form = document.querySelector('[data-shop-order-form]'),
             dialog = document.querySelector('[data-checkout-modal]');
@@ -2364,7 +2364,7 @@
 
 
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     (() => {
         const money = n => new Intl.NumberFormat('en-PH', {
                 style: 'currency',
@@ -2486,7 +2486,7 @@
         filter()
     })();
 </script>
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     (() => {
         const tabs = document.querySelector('.shop-category-tabs');
         document.querySelectorAll('[data-shop-scroll]').forEach(button => button.addEventListener('click', () => tabs?.scrollBy({

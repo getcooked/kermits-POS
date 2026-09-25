@@ -152,7 +152,7 @@
 @endpush
 
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (()=>{
     const rows=[...document.querySelectorAll('[data-product]')],box=document.getElementById('cart-items'),count=document.getElementById('cart-count'),totalEl=document.getElementById('cart-total'),money=n=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(n),products=new Map(rows.map(row=>[row.dataset.product,{id:row.dataset.product,name:row.dataset.name,price:+row.dataset.price,stock:+row.dataset.stock,input:row.querySelector('.cart-quantity'),stockEl:row.querySelector('[data-pos-stock]'),add:row.querySelector('.add-cart')} ]));
     function esc(value){const element=document.createElement('div');element.textContent=value;return element.innerHTML}
@@ -161,7 +161,7 @@
     rows.forEach(row=>row.querySelector('.add-cart').addEventListener('click',()=>adjust(row.dataset.product,1)));box.addEventListener('click',event=>{const button=event.target.closest('[data-step]');if(button)adjust(button.dataset.id,+button.dataset.step)});draw();
 })();
 </script>
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (()=>{
     const methods=[...document.querySelectorAll('input[name="payment_method"]')],cashFields=document.getElementById('cash-fields'),gcashFields=document.getElementById('gcash-fields'),cash=document.getElementById('cash_received'),reference=document.getElementById('payment_reference'),submit=document.getElementById('checkout-button'),note=document.getElementById('payment-note'),change=document.getElementById('change-due'),money=n=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(n);
     function updatePayment(){
@@ -185,7 +185,7 @@
 
 
 
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (()=>{
     const search=document.getElementById('pos-search'),buttons=[...document.querySelectorAll('[data-category-filter]')],rows=[...document.querySelectorAll('[data-product]')],summary=document.getElementById('pos-filter-summary');
     let category='all';
@@ -207,7 +207,7 @@
     apply();
 })();
 </script>
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (()=>{const tabs=document.querySelector('.pos-category-tabs');document.querySelectorAll('[data-pos-scroll]').forEach(button=>button.addEventListener('click',()=>tabs?.scrollBy({left:Number(button.dataset.posScroll)*260,behavior:'smooth'})));document.querySelectorAll('[data-category-filter]').forEach(button=>button.addEventListener('click',()=>button.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'})))})();
 </script>
 @endsection

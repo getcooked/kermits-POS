@@ -58,8 +58,8 @@
     </section>
 </main>
 
-<script id="customer-order-notification-keys" type="application/json">@json($orderNotifications->map(fn ($order) => $order->id.':'.$order->payment_status)->values())</script>
-<script>
+<script nonce="{{ Vite::cspNonce() }}" id="customer-order-notification-keys" type="application/json">@json($orderNotifications->map(fn ($order) => $order->id.':'.$order->payment_status)->values())</script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const keysElement = document.getElementById('customer-order-notification-keys');
     if (!keysElement) return;

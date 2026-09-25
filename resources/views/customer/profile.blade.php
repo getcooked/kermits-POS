@@ -151,7 +151,7 @@
 @endpush
 
 @push('scripts')
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const birthday = document.getElementById('birthday');
     const age = document.getElementById('age');

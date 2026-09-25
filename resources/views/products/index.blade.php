@@ -112,7 +112,7 @@
 </style>
 @endpush
 @push('scripts')
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 const initializeProductSearch = () => {
     const input = document.getElementById('product-search');
     const dropdown = document.querySelector('.product-search-dropdown');

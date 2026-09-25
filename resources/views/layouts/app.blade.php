@@ -291,8 +291,8 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
 
 
-<script src="{{ asset('js/kermits-motion.js') }}" defer></script>
-<script src="{{ asset('js/ajax-forms.js') }}" defer></script>
+<script nonce="{{ Vite::cspNonce() }}" src="{{ asset('js/kermits-motion.js') }}" defer></script>
+<script nonce="{{ Vite::cspNonce() }}" src="{{ asset('js/ajax-forms.js') }}" defer></script>
 @stack('scripts')
 </body>
 </html>

@@ -1,3 +1,15 @@
+Options -Indexes
+
+# Everything outside public/ (.env, storage/, vendor/, composer.json) must stay
+# unreachable, so refuse all requests if the rewrite into public/ is unavailable.
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^(.*)$ public/$1 [L]

@@ -434,7 +434,7 @@
 
 @if(config('services.recaptcha.enabled'))
 @push('scripts')
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     window.loginRecaptchaError = function () {
         document.getElementById('recaptcha-status').textContent = 'Unable to load reCAPTCHA. Check your connection and reload this page.';
     };
@@ -449,13 +449,19 @@
             'error-callback': window.loginRecaptchaError
         });
     };
+    (function () {
+        const script = document.createElement('script');
+        script.src = 'https://www.google.com/recaptcha/api.js?onload=loginRecaptchaReady&render=explicit';
+        script.async = true;
+        script.addEventListener('error', window.loginRecaptchaError);
+        document.head.appendChild(script);
+    })();
 </script>
-<script src="https://www.google.com/recaptcha/api.js?onload=loginRecaptchaReady&render=explicit" async defer onerror="loginRecaptchaError()"></script>
 @endpush
 @endif
 
 @if($loginRetryAfter > 0)
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     (() => {
         const form = document.getElementById('login-form');
         const button = document.getElementById('login-submit');

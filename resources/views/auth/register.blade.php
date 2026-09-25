@@ -80,7 +80,7 @@ body{background:#f5f5ef}.register-page{display:block;min-height:100dvh;padding:0
 @endpush
 
 @push('scripts')
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (() => {
     const birthday = document.getElementById('birthday');
     const age = document.getElementById('age');

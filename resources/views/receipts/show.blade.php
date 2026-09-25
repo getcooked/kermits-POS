@@ -90,7 +90,7 @@
         </div>
     </main>
 </div>
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 document.getElementById('print-receipt')?.addEventListener('click', () => {
     document.getElementById('print-help')?.removeAttribute('hidden');
     window.focus();
