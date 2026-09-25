@@ -27,7 +27,6 @@
                     <p>{{ $isPaid ? 'TRANSACTION COMPLETE' : 'PAYMENT PENDING' }}</p>
                     <h1>{{ $isPaid ? 'Official Receipt' : 'Order Receipt' }} #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</h1>
                 </div>
-                <a class="logout" href="{{ $backRoute }}">Back</a>
             </header>
 
             @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
