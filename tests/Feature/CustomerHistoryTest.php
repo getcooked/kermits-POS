@@ -39,6 +39,50 @@ class CustomerHistoryTest extends TestCase
         $this->actingAs($admin)->get('/history')->assertForbidden();
     }
 
+    public function test_customer_sees_their_own_orders_and_paid_total_for_today(): void
+    {
+        $this->travelTo(now()->setTime(15, 30));
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $other = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        Order::query()->create([
+            'user_id' => $customer->id,
+            'total' => 320,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+        ]);
+        Order::query()->create([
+            'user_id' => $customer->id,
+            'total' => 125,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+        ]);
+        $yesterday = Order::query()->create([
+            'user_id' => $customer->id,
+            'total' => 900,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+        ]);
+        $yesterday->forceFill([
+            'created_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
+        ])->saveQuietly();
+        Order::query()->create([
+            'user_id' => $other->id,
+            'total' => 999,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+        ]);
+
+        $this->actingAs($customer)->get(route('customer.history'))
+            ->assertOk()
+            ->assertSee('<dt>Orders today</dt><dd>2</dd>', false)
+            ->assertSee('<dt>Paid today</dt><dd>&#8369;320.00</dd>', false)
+            ->assertSee("Today's purchases", false)
+            ->assertSee('Yesterday')
+            ->assertDontSee('999.00');
+    }
+
     public function test_customer_sees_a_rejected_order_without_a_payment_receipt_action(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);

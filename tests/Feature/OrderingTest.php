@@ -320,24 +320,37 @@ class OrderingTest extends TestCase
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
         Product::query()->create([
-            'name' => 'Live Stock Meal',
+            'name' => 'Low Stock Meal',
             'category' => 'Meals',
             'price' => 180,
-            'stock' => 5,
+            'stock' => 9,
+            'active' => true,
+        ]);
+        Product::query()->create([
+            'name' => 'Normal Stock Meal',
+            'category' => 'Meals',
+            'price' => 190,
+            'stock' => 10,
             'active' => true,
         ]);
 
         $this->actingAs($customer)->get('/shop')
             ->assertOk()
             ->assertSee('data-shop-stock', false)
+            ->assertSee('data-shop-stock class="low-stock">Low stock · 9 available', false)
+            ->assertSee('data-shop-stock class="">10 available', false)
             ->assertSee('stock - quantity', false)
-            ->assertSee('`${remaining} available`', false);
+            ->assertSee("classList.toggle('low-stock', remaining < 10)", false)
+            ->assertSee('color: #c62828', false);
 
         $this->actingAs($cashier)->get('/cashier')
             ->assertOk()
             ->assertSee('data-pos-stock', false)
+            ->assertSee('data-pos-stock class="low-stock">Low stock · 9 in stock', false)
+            ->assertSee('data-pos-stock class="">10 in stock', false)
             ->assertSee('product.stock-(+product.input.value||0)', false)
-            ->assertSee('`${remaining} in stock`', false);
+            ->assertSee("classList.toggle('low-stock',remaining<10)", false)
+            ->assertSee('color:#c62828!important', false);
     }
 
     public function test_customer_manual_gcash_checkout_is_rejected(): void

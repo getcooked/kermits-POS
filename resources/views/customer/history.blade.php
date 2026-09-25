@@ -24,6 +24,18 @@
         <div><span>Paid orders</span><strong>{{ $paidOrders }}</strong></div>
     </section>
 
+    <section class="today-summary" aria-label="Today's purchase summary">
+        <div>
+            <p>TODAY</p>
+            <h2>Your purchase activity</h2>
+            <span>{{ now()->format('l, F j, Y') }}</span>
+        </div>
+        <dl>
+            <div><dt>Orders today</dt><dd>{{ $todayOrderCount }}</dd></div>
+            <div><dt>Paid today</dt><dd>&#8369;{{ number_format($todayPaidTotal, 2) }}</dd></div>
+        </dl>
+    </section>
+
     <section class="history-content">
         <div class="history-tabs" role="tablist" aria-label="Activity type">
             <button class="history-tab active" id="reservations-tab" type="button" role="tab" aria-selected="true" aria-controls="reservations-panel" data-history-tab="reservations">
@@ -114,7 +126,19 @@
             </div>
 
             <div class="activity-list">
-                @forelse($orders as $order)
+                @forelse($orders->groupBy(fn ($order) => $order->created_at->toDateString()) as $date => $dateOrders)
+                    <section class="purchase-date-group">
+                        <h3 class="purchase-date-heading">
+                            @if($dateOrders->first()->created_at->isToday())
+                                Today's purchases
+                            @elseif($dateOrders->first()->created_at->isYesterday())
+                                Yesterday
+                            @else
+                                {{ $dateOrders->first()->created_at->format('l, F j, Y') }}
+                            @endif
+                        </h3>
+                        <div class="purchase-date-list">
+                @foreach($dateOrders as $order)
                     @php
                         $orderStatusLabel = match ($order->payment_status) {
                             'paid' => 'Paid',
@@ -153,6 +177,9 @@
                             </div>
                         </div>
                     </article>
+                @endforeach
+                        </div>
+                    </section>
                 @empty
                     <div class="history-empty">
                         <h3>No purchases yet</h3>
@@ -176,6 +203,9 @@
 @media(max-width:900px){.history-actions>span{display:none}}
 .history-app-link b{display:none}.history-app-link.disabled{opacity:.55;cursor:default;pointer-events:none}@media(max-width:900px){.history-app-link span{display:none}.history-app-link b{display:inline;font:inherit}}
 .activity-list{gap:18px}.reservation-date-group{display:grid;gap:9px}.reservation-date-heading{margin:0;padding:9px 12px;border-radius:7px;background:#e8eadf;color:#34382d;font-size:14px}.reservation-date-list{display:grid;gap:10px}
+.today-summary{width:min(980px,calc(100% - 30px));margin:20px auto 0;padding:20px 22px;border:1px solid #d7dacf;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:24px}.today-summary p{margin:0;color:#777f00;font-size:11px;font-weight:850;letter-spacing:.12em}.today-summary h2{margin:5px 0 3px;font-size:20px}.today-summary>div>span{color:#73796f;font-size:12px}.today-summary dl{display:grid;grid-template-columns:repeat(2,minmax(130px,1fr));margin:0}.today-summary dl div{padding:4px 22px}.today-summary dl div+div{border-left:1px solid #e1e4da}.today-summary dt{color:#73796f;font-size:12px}.today-summary dd{margin:5px 0 0;font-size:22px;font-weight:800}.purchase-date-group{display:grid;gap:9px}.purchase-date-heading{margin:0;padding:9px 12px;border-radius:7px;background:#e8eadf;color:#34382d;font-size:14px}.purchase-date-list{display:grid;gap:10px}
+@media(min-width:901px){.history-page>.today-summary{grid-column:2}}
+@media(max-width:600px){.today-summary{align-items:stretch;flex-direction:column}.today-summary dl{grid-template-columns:1fr 1fr}.today-summary dl div{padding:4px 12px 4px 0}.today-summary dl div+div{padding-left:12px}.today-summary dd{font-size:19px}}
 </style>
 @endpush
 

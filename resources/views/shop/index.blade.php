@@ -59,7 +59,7 @@
                         <div>
                             <h3>{{ $product->name }}</h3>
                             <p>{{ $product->description }}</p>
-                            <div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span data-shop-stock>{{ $product->stock }} available</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}">
+                            <div class="shop-price"><strong>&#8369;{{ number_format($product->price,2) }}</strong><span data-shop-stock @class(['low-stock' => $product->stock < 10])>{{ $product->stock < 10 ? 'Low stock · '.$product->stock.' available' : $product->stock.' available' }}</span></div><input class="shop-quantity" name="quantities[{{ $product->id }}]" type="hidden" min="0" max="{{ $product->stock }}" value="{{ old('quantities.'.$product->id,0) }}"><button class="shop-add" type="button" aria-label="Add {{ $product->name }}">
                                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                                     <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L3.6 6H13.5a.5.5 0 0 1 .479.642l-1.5 4A.5.5 0 0 1 11.5 11H5a.5.5 0 0 1-.485-.379L3.295 3H1.5a.5.5 0 0 1-.5-.5zM4.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM7 6.5v2H5.5a.5.5 0 0 0 0 1H7v1.5a.5.5 0 0 0 1 0V9.5h1.5a.5.5 0 0 0 0-1H8V6.5a.5.5 0 0 0-1 0z" fill="currentColor"/>
                                 </svg>
@@ -2175,6 +2175,11 @@
             color: #fff
         }
     }
+
+    .shop-price span.low-stock {
+        color: #c62828 !important;
+        font-weight: 850 !important
+    }
 </style>
 @endpush
 
@@ -2386,7 +2391,9 @@
                 quantity = Math.max(0, Math.min(stock, Math.trunc(Number(input.value) || 0))),
                 remaining = stock - quantity;
             input.value = quantity;
-            card.querySelector('[data-shop-stock]').textContent = `${remaining} available`;
+            const stockElement = card.querySelector('[data-shop-stock]');
+            stockElement.textContent = remaining < 10 ? `Low stock · ${remaining} available` : `${remaining} available`;
+            stockElement.classList.toggle('low-stock', remaining < 10);
             card.querySelector('.shop-add').disabled = remaining === 0
         }
 
