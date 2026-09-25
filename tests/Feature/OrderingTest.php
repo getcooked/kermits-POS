@@ -528,7 +528,10 @@ class OrderingTest extends TestCase
             ->get(route('cashier'))
             ->assertOk()
             ->assertSee('cashier-order-toast', false)
-            ->assertSee('cashier-order-badge', false);
+            ->assertSee('cashier-order-badge', false)
+            ->assertSee('cashier-alert-control', false)
+            ->assertSee('Enable sound &amp; desktop alerts', false)
+            ->assertSee('Pending orders need attention');
 
         $this->actingAs($customer)
             ->getJson(route('cashier.orders.notifications'))
