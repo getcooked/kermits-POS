@@ -17,8 +17,8 @@ class CashierAccountController extends Controller
         return view('staff.cashiers', [
             'cashiers' => User::query()
                 ->where('role', User::ROLE_CASHIER)
-                ->withCount(['orders as paid_sales_count' => fn ($query) => $query->where('payment_status', 'paid')])
-                ->withSum(['orders as paid_sales_total' => fn ($query) => $query->where('payment_status', 'paid')], 'total')
+                ->withCount(['processedSales as paid_sales_count' => fn ($query) => $query->where('payment_status', 'paid')])
+                ->withSum(['processedSales as paid_sales_total' => fn ($query) => $query->where('payment_status', 'paid')], 'total')
                 ->latest()
                 ->get(),
         ]);

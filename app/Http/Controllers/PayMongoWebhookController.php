@@ -68,7 +68,12 @@ class PayMongoWebhookController extends Controller
                 return response()->json(['error' => 'Payment amount mismatch'], 422);
             }
 
-            $order->update(['payment_status' => 'paid', 'payment_reference' => data_get($paid, 'id')]);
+            $order->update([
+                'payment_status' => 'paid',
+                'paid_at' => now(),
+                'processed_by' => null,
+                'payment_reference' => data_get($paid, 'id'),
+            ]);
             $updates = ['payment_status' => 'paid'];
             if (Schema::hasColumn('reservations', 'hold_expires_at')) {
                 $updates['hold_expires_at'] = null;

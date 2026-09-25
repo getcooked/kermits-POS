@@ -10,6 +10,7 @@
     $totalDue = $order->totalDue();
     $backRoute = match (true) {
         $isCustomerReceipt => route('customer.history'),
+        request('return') === 'sales-history' && $viewer?->hasRole(\App\Models\User::ROLE_CASHIER, \App\Models\User::ROLE_SUPER_ADMIN) => route('sales-history.index'),
         $viewer?->hasRole(\App\Models\User::ROLE_SUPER_ADMIN) => route('reports'),
         default => route('cashier'),
     };
@@ -39,9 +40,9 @@
 
                 <dl class="receipt-meta">
                     <div><dt>{{ $isPaid ? 'Receipt' : 'Order' }}</dt><dd>#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</dd></div>
-                    <div><dt>Date</dt><dd>{{ $order->created_at->format('M d, Y h:i A') }}</dd></div>
+                    <div><dt>{{ $isPaid ? 'Paid at' : 'Created at' }}</dt><dd>{{ ($isPaid ? $order->paid_at : $order->created_at)?->format('M d, Y h:i A') }}</dd></div>
                     <div><dt>Customer</dt><dd>{{ $order->customer?->name ?? ($order->user?->hasRole(\App\Models\User::ROLE_CUSTOMER) ? $order->user->name : 'Walk-in Customer') }}</dd></div>
-                    <div><dt>Cashier</dt><dd>{{ $order->user?->hasRole(\App\Models\User::ROLE_CASHIER, \App\Models\User::ROLE_ADMIN, \App\Models\User::ROLE_SUPER_ADMIN) ? $order->user->name : 'Online order' }}</dd></div>
+                    <div><dt>Processed by</dt><dd>{{ $order->processor?->name ?? 'Online / System' }}</dd></div>
                     <div><dt>Payment method</dt><dd>{{ match($order->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>
                     <div><dt>Payment status</dt><dd>{{ ucfirst($order->payment_status) }}</dd></div>
                     @if($order->payment_reference)

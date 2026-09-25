@@ -12,8 +12,8 @@ use App\Services\OrderService;
 use App\Services\ReservationPushNotifier;
 use App\Services\ReservationSchedule;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -281,7 +281,13 @@ class CashierController extends Controller
                 if (! preg_match('/^\d{13}$/', (string) $lockedOrder->payment_reference)) {
                     throw ValidationException::withMessages(['payment_reference' => 'A valid 13-digit GCash reference is required.']);
                 }
-                $lockedOrder->update(['payment_status' => 'paid', 'cash_received' => null, 'change_due' => null]);
+                $lockedOrder->update([
+                    'payment_status' => 'paid',
+                    'processed_by' => $request->user()->id,
+                    'paid_at' => now(),
+                    'cash_received' => null,
+                    'change_due' => null,
+                ]);
                 $this->markReservationPaid($lockedOrder->reservation);
 
                 return;
@@ -297,6 +303,8 @@ class CashierController extends Controller
 
             $lockedOrder->update([
                 'payment_status' => 'paid',
+                'processed_by' => $request->user()->id,
+                'paid_at' => now(),
                 'cash_received' => $cash,
                 'change_due' => $cash - $amountDue,
             ]);

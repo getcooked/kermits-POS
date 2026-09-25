@@ -215,7 +215,7 @@ class ReportController extends Controller
         );
 
         return view('receipts.show', [
-            'order' => $order->load(['user', 'customer', 'items.product', 'reservation']),
+            'order' => $order->load(['user', 'customer', 'processor', 'items.product', 'reservation']),
         ]);
     }
 }

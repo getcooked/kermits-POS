@@ -79,9 +79,13 @@ class OrderService
             $order = Order::query()->create([
                 'user_id' => $user->id,
                 'customer_id' => $customer?->id,
+                'processed_by' => $paymentStatus === 'paid' && $user->hasRole(User::ROLE_CASHIER, User::ROLE_SUPER_ADMIN)
+                    ? $user->id
+                    : null,
                 'total' => $totalCents / 100,
                 'payment_method' => $paymentMethod,
                 'payment_status' => $paymentStatus,
+                'paid_at' => $paymentStatus === 'paid' ? now() : null,
                 'payment_reference' => $paymentReference,
                 'cash_received' => $cashReceivedCents === null ? null : $cashReceivedCents / 100,
                 'change_due' => $paymentMethod === 'cash' && $cashReceivedCents !== null ? ($cashReceivedCents - $totalCents) / 100 : null,

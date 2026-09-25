@@ -23,6 +23,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationAvailabilityController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\ReverseGeocodingController;
+use App\Http\Controllers\SalesHistoryController;
 use App\Http\Controllers\SuperAdminSecurityController;
 use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
@@ -154,6 +155,8 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('role:super_admin,cashier')->group(function (): void {
         Route::get('/cashier', [CashierController::class, 'index'])->name('cashier');
         Route::post('/cashier/checkout', [CashierController::class, 'checkout'])->name('cashier.checkout');
+        Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
+        Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
         Route::get('/cashier/customer-orders', [CashierController::class, 'customerOrders'])
             ->middleware('role:cashier')
             ->name('cashier.orders.index');

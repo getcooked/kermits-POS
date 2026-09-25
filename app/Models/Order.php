@@ -12,9 +12,11 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'customer_id',
+        'processed_by',
         'total',
         'payment_method',
         'payment_status',
+        'paid_at',
         'payment_reference',
         'paymongo_checkout_id',
         'paymongo_checkout_url',
@@ -28,6 +30,7 @@ class Order extends Model
             'total' => 'decimal:2',
             'cash_received' => 'decimal:2',
             'change_due' => 'decimal:2',
+            'paid_at' => 'datetime',
         ];
     }
 
@@ -40,6 +43,23 @@ class Order extends Model
                     $order->customer_id = $creator->id;
                 }
             }
+
+            if ($order->payment_status === 'paid') {
+                $order->paid_at ??= now();
+
+                if ($order->processed_by === null && $order->user_id) {
+                    $creator ??= User::query()->find($order->user_id);
+                    if ($creator?->hasRole(User::ROLE_CASHIER, User::ROLE_SUPER_ADMIN)) {
+                        $order->processed_by = $creator->id;
+                    }
+                }
+            }
+        });
+
+        static::updating(function (Order $order): void {
+            if ($order->isDirty('payment_status') && $order->payment_status === 'paid' && $order->paid_at === null) {
+                $order->paid_at = now();
+            }
         });
     }
 
@@ -51,6 +71,11 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'customer_id')->withTrashed();
+    }
+
+    public function processor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'processed_by')->withTrashed();
     }
 
     public function items(): HasMany
