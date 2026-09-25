@@ -11,7 +11,9 @@ use App\Models\SystemSetting;
 use App\Services\OrderService;
 use App\Services\ReservationPushNotifier;
 use App\Services\ReservationSchedule;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -31,15 +33,47 @@ class CashierController extends Controller
     public function customerOrders(): View
     {
         return view('roles.cashier-orders', [
-            'orders' => Order::query()
-                ->where('payment_status', 'pending')
-                ->where(fn ($query) => $query->where('payment_method', '!=', 'paymongo')
-                    ->orWhereNull('paymongo_checkout_id'))
-                ->whereNotNull('customer_id')
+            'orders' => $this->pendingCustomerOrdersQuery()
                 ->with(['customer', 'items.product', 'reservation'])
                 ->latest()
                 ->get(),
         ]);
+    }
+
+    public function orderNotifications(Request $request): JsonResponse
+    {
+        $after = max(0, $request->integer('after'));
+        $pendingOrders = $this->pendingCustomerOrdersQuery();
+        $newOrders = collect();
+
+        if ($request->has('after')) {
+            $newOrders = (clone $pendingOrders)
+                ->where('id', '>', $after)
+                ->with(['customer', 'reservation'])
+                ->latest('id')
+                ->limit(10)
+                ->get()
+                ->sortBy('id')
+                ->values()
+                ->map(fn (Order $order): array => [
+                    'id' => $order->id,
+                    'number' => str_pad((string) $order->id, 6, '0', STR_PAD_LEFT),
+                    'customer' => $order->customer?->name ?? 'Customer',
+                    'total' => number_format($order->totalDue(), 2, '.', ','),
+                    'payment_method' => match ($order->payment_method) {
+                        'gcash' => 'GCash',
+                        'paymongo' => 'PayMongo',
+                        default => 'Cash',
+                    },
+                    'review_url' => route('cashier.orders.review', $order),
+                ]);
+        }
+
+        return response()->json([
+            'pending_count' => (clone $pendingOrders)->count(),
+            'latest_order_id' => (int) ((clone $pendingOrders)->max('id') ?? 0),
+            'orders' => $newOrders,
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function reviewCustomerOrder(Order $order): View
@@ -384,5 +418,14 @@ class CashierController extends Controller
         if ($order->payment_method === 'paymongo') {
             throw ValidationException::withMessages(['order' => 'PayMongo payments are confirmed automatically.']);
         }
+    }
+
+    private function pendingCustomerOrdersQuery(): Builder
+    {
+        return Order::query()
+            ->where('payment_status', 'pending')
+            ->where(fn ($query) => $query->where('payment_method', '!=', 'paymongo')
+                ->orWhereNull('paymongo_checkout_id'))
+            ->whereNotNull('customer_id');
     }
 }

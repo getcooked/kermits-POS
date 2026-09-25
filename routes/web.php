@@ -157,6 +157,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/cashier/customer-orders', [CashierController::class, 'customerOrders'])
             ->middleware('role:cashier')
             ->name('cashier.orders.index');
+        Route::get('/cashier/order-notifications', [CashierController::class, 'orderNotifications'])
+            ->middleware(['role:cashier', 'throttle:120,1'])
+            ->name('cashier.orders.notifications');
         Route::get('/cashier/customer-orders/{order}/review', [CashierController::class, 'reviewCustomerOrder'])
             ->middleware('role:cashier')
             ->name('cashier.orders.review');

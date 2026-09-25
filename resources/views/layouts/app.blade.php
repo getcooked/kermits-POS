@@ -276,6 +276,12 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 <body data-feedback="{{ $errors->any() ? 'error' : (session('status') ? 'success' : '') }}">
 @yield('content')
 
+@auth
+    @if(auth()->user()->hasRole('cashier'))
+        @include('partials.cashier-live-orders')
+    @endif
+@endauth
+
 
 
 

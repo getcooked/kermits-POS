@@ -482,6 +482,55 @@ class OrderingTest extends TestCase
             ->assertSee('GCash · 1 sales');
     }
 
+    public function test_cashier_can_poll_for_new_pending_customer_orders(): void
+    {
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER, 'name' => 'Live Order Customer']);
+
+        $oldOrder = Order::query()->create([
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 125,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+        ]);
+        $newOrder = Order::query()->create([
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 275,
+            'payment_method' => 'gcash',
+            'payment_status' => 'pending',
+        ]);
+        Order::query()->create([
+            'user_id' => $customer->id,
+            'customer_id' => $customer->id,
+            'total' => 500,
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+        ]);
+
+        $this->actingAs($cashier)
+            ->getJson(route('cashier.orders.notifications', ['after' => $oldOrder->id]))
+            ->assertOk()
+            ->assertJsonPath('pending_count', 2)
+            ->assertJsonPath('latest_order_id', $newOrder->id)
+            ->assertJsonCount(1, 'orders')
+            ->assertJsonPath('orders.0.id', $newOrder->id)
+            ->assertJsonPath('orders.0.customer', 'Live Order Customer')
+            ->assertJsonPath('orders.0.total', '275.00')
+            ->assertJsonPath('orders.0.payment_method', 'GCash');
+
+        $this->actingAs($cashier)
+            ->get(route('cashier'))
+            ->assertOk()
+            ->assertSee('cashier-order-toast', false)
+            ->assertSee('cashier-order-badge', false);
+
+        $this->actingAs($customer)
+            ->getJson(route('cashier.orders.notifications'))
+            ->assertForbidden();
+    }
+
     public function test_cashier_can_add_a_new_product_while_reviewing_a_customer_order(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
