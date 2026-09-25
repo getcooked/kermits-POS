@@ -17,7 +17,6 @@ class SuperAdminNavigationTest extends TestCase
         'superadmin.security.edit',
         'cashier',
         'reports',
-        'sales-history.index',
         'inventory.index',
         'reservations.index',
         'tables.index',

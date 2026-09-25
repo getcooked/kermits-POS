@@ -11,15 +11,22 @@ class SalesHistoryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_cashier_sidebar_contains_sales_history_link(): void
+    public function test_cashier_sales_link_is_in_the_cashier_sidebar_only(): void
     {
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
         $this->actingAs($cashier)
             ->get(route('cashier'))
             ->assertOk()
             ->assertSee(route('sales-history.index'), false)
-            ->assertSee('Sales History');
+            ->assertSee('Cashier Sales');
+
+        $this->actingAs($superAdmin)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Cashier Sales')
+            ->assertDontSee('href="'.route('sales-history.index').'"', false);
     }
 
     public function test_cashier_sees_only_sales_they_processed(): void
