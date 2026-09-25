@@ -97,7 +97,7 @@
                     @endif
 
                     <div class="confirm-total"><span>Amount due</span><strong>&#8369;{{ number_format($order->totalDue(), 2) }}</strong></div>
-                    <form id="confirm-payment-form" method="POST" action="{{ route('cashier.orders.confirm-payment', $order) }}" onsubmit="return confirm('Confirm that the payment for this complete order has been received?')">
+                    <form id="confirm-payment-form" method="POST" action="{{ route('cashier.orders.confirm-payment', $order) }}" data-confirm="Confirm that the payment for this complete order has been received?" data-confirm-title="Confirm payment?">
                         @csrf @method('PATCH')
                         @if($order->payment_method === 'cash')
                             <label for="cash_received">Customer cash</label>

@@ -25,26 +25,35 @@
 
     const messageFrom = (root, selector) => root.querySelector(selector)?.textContent.replace(/\s+/g, ' ').trim() || '';
 
-    const showToast = (message, isError = false, title = '') => {
-        document.querySelector('.ajax-form-toast')?.remove();
+    let closeActiveAlert = null;
+
+    const showAlert = ({ message, isError = false, title = '', confirm = false }) => new Promise(resolve => {
+        closeActiveAlert?.(false, true);
+
+        const previousFocus = document.activeElement;
+        const layer = document.createElement('div');
+        layer.className = 'app-alert-layer';
+
         const toast = document.createElement('div');
-        toast.className = `ajax-form-toast${isError ? ' is-error' : ''}`;
-        toast.setAttribute('role', isError ? 'alert' : 'status');
-        toast.setAttribute('aria-live', 'polite');
+        toast.className = `ajax-form-toast${isError ? ' is-error' : ''}${confirm ? ' is-confirm' : ''}`;
+        toast.setAttribute('role', isError || confirm ? 'alertdialog' : 'dialog');
+        toast.setAttribute('aria-modal', 'true');
+        toast.setAttribute('aria-labelledby', 'app-alert-title');
+        toast.setAttribute('aria-describedby', 'app-alert-message');
 
         const icon = document.createElement('span');
         icon.className = 'ajax-form-toast-icon';
         icon.setAttribute('aria-hidden', 'true');
-        icon.textContent = isError ? '!' : '\u2713';
+        icon.textContent = confirm ? '?' : (isError ? '!' : '\u2713');
 
         const copy = document.createElement('span');
         copy.className = 'ajax-form-toast-copy';
-        if (title) {
-            const heading = document.createElement('strong');
-            heading.textContent = title;
-            copy.append(heading);
-        }
+        const heading = document.createElement('strong');
+        heading.id = 'app-alert-title';
+        heading.textContent = title || (confirm ? 'Please confirm' : (isError ? 'Something went wrong' : 'Success'));
+        copy.append(heading);
         const description = document.createElement('span');
+        description.id = 'app-alert-message';
         description.textContent = message;
         copy.append(description);
 
@@ -54,24 +63,110 @@
         close.setAttribute('aria-label', 'Dismiss notification');
         close.textContent = '\u00d7';
 
-        const progress = document.createElement('span');
-        progress.className = 'ajax-form-toast-progress';
-        progress.setAttribute('aria-hidden', 'true');
+        const actions = document.createElement('div');
+        actions.className = 'app-alert-actions';
 
-        toast.append(icon, copy, close, progress);
-        document.body.append(toast);
+        const primary = document.createElement('button');
+        primary.className = 'app-alert-button is-primary';
+        primary.type = 'button';
+        primary.textContent = confirm ? 'Confirm' : 'OK';
+
+        let cancel = null;
+        if (confirm) {
+            cancel = document.createElement('button');
+            cancel.className = 'app-alert-button';
+            cancel.type = 'button';
+            cancel.textContent = 'Cancel';
+            actions.append(cancel);
+        }
+        actions.append(primary);
+
+        toast.append(icon, copy, close, actions);
+        if (!confirm) {
+            const progress = document.createElement('span');
+            progress.className = 'ajax-form-toast-progress';
+            progress.setAttribute('aria-hidden', 'true');
+            toast.append(progress);
+        }
+        layer.append(toast);
+        document.body.append(layer);
 
         let hideTimer;
         let removeTimer;
-        const dismiss = () => {
+        let settled = false;
+        const dismiss = (result = false, immediately = false) => {
+            if (settled) return;
+            settled = true;
             window.clearTimeout(hideTimer);
             window.clearTimeout(removeTimer);
-            toast.classList.add('is-hiding');
-            removeTimer = window.setTimeout(() => toast.remove(), 240);
+            document.removeEventListener('keydown', onKeydown);
+            if (closeActiveAlert === dismiss) closeActiveAlert = null;
+            const remove = () => {
+                layer.remove();
+                if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+                resolve(result);
+            };
+            if (immediately) {
+                remove();
+                return;
+            }
+            layer.classList.add('is-hiding');
+            removeTimer = window.setTimeout(remove, 200);
         };
-        close.addEventListener('click', dismiss);
-        hideTimer = window.setTimeout(dismiss, 5000);
-    };
+        const onKeydown = event => {
+            if (event.key === 'Escape') dismiss(false);
+            if (event.key === 'Tab') {
+                const focusable = [...toast.querySelectorAll('button:not([disabled])')];
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+        closeActiveAlert = dismiss;
+        close.addEventListener('click', () => dismiss(false));
+        primary.addEventListener('click', () => dismiss(true));
+        cancel?.addEventListener('click', () => dismiss(false));
+        layer.addEventListener('click', event => {
+            if (event.target === layer) dismiss(false);
+        });
+        document.addEventListener('keydown', onKeydown);
+        window.requestAnimationFrame(() => primary.focus());
+        if (!confirm) hideTimer = window.setTimeout(() => dismiss(true), 5000);
+    });
+
+    const showToast = (message, isError = false, title = '') => showAlert({ message, isError, title });
+
+    window.KermitsAlert = Object.freeze({
+        show: (message, title = 'Notice') => showAlert({ message: String(message), title }),
+        success: (message, title = 'Success') => showAlert({ message: String(message), title }),
+        error: (message, title = 'Something went wrong') => showAlert({ message: String(message), title, isError: true }),
+        confirm: (message, title = 'Please confirm') => showAlert({ message: String(message), title, confirm: true }),
+    });
+    window.alert = message => { window.KermitsAlert.show(message); };
+
+    const confirmedForms = new WeakSet();
+    document.addEventListener('submit', event => {
+        const form = event.target.closest('form[data-confirm]');
+        if (!form || confirmedForms.has(form)) {
+            if (form) confirmedForms.delete(form);
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const submitter = event.submitter;
+        window.KermitsAlert.confirm(form.dataset.confirm, form.dataset.confirmTitle || 'Please confirm').then(confirmed => {
+            if (!confirmed) return;
+            confirmedForms.add(form);
+            form.requestSubmit(submitter || undefined);
+        });
+    }, true);
 
     const showFormError = (form, message, field = '') => {
         form.querySelector('.ajax-form-inline-error')?.remove();
@@ -217,6 +312,14 @@
             pageToast.dataset.toastTitle || '',
         );
         pageToast.remove();
+    } else if (document.body.dataset.feedback) {
+        const isError = document.body.dataset.feedback === 'error';
+        const source = document.querySelector(isError ? errorSelector : successSelector);
+        const message = source?.textContent.replace(/\s+/g, ' ').trim();
+        if (message) {
+            if (!isError) source.hidden = true;
+            showToast(message, isError);
+        }
     }
 
     bindPhoneInputs();

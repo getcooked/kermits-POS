@@ -62,7 +62,7 @@
                 <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px"><div><label>Description</label><input class="control" name="description" value="{{ $product->description }}"></div><label class="check" style="margin:0 0 11px"><input name="active" type="checkbox" value="1" {{ $product->active ? 'checked' : '' }}> Visible</label></div>
                 <div style="margin-top:12px"><label>Replace picture</label><input class="control" name="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
             </form>
-            @if(auth()->user()->hasRole('super_admin'))<form method="POST" action="{{ route('products.destroy', $product) }}" class="product-ajax-form" data-action-label="Deleting..." style="margin-top:12px" onsubmit="return confirm('Permanently delete this product?')">@csrf @method('DELETE')<button class="logout" style="color:#b42318" type="submit">Delete</button></form>@endif
+            @if(auth()->user()->hasRole('super_admin'))<form method="POST" action="{{ route('products.destroy', $product) }}" class="product-ajax-form" data-action-label="Deleting..." data-confirm="Permanently delete this product?" data-confirm-title="Delete product?" style="margin-top:12px">@csrf @method('DELETE')<button class="logout" style="color:#b42318" type="submit">Delete</button></form>@endif
         </article>
         @endforeach
         @empty <div class="welcome">{{ $search !== '' ? 'No products match your search.' : 'No products yet. Add your first product above.' }}</div> @endforelse
@@ -105,9 +105,6 @@
 .product-create-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px}
 .product-ajax-form[aria-busy="true"]{opacity:.72;pointer-events:none}
 .product-ajax-inline-error{margin:0 0 14px;padding:11px 13px;border:1px solid #efc8c5;border-radius:9px;background:#fff0f0;color:#a51d16;font-size:13px}
-.product-ajax-toast{position:fixed;z-index:1000;top:20px;right:20px;max-width:min(380px,calc(100vw - 32px));padding:13px 16px;border:1px solid #b8dbc4;border-radius:11px;background:#edf8f0;color:#267444;font-size:14px;font-weight:650;box-shadow:0 14px 34px rgba(23,24,23,.18);transition:opacity .2s,transform .2s}
-.product-ajax-toast.is-error{border-color:#efc8c5;background:#fff0f0;color:#a51d16}
-.product-ajax-toast.is-hiding{opacity:0;transform:translateY(-8px)}
 @media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
 @media(max-width:820px){.product-create-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}#product-search{font-size:16px}.product-search-button{padding-inline:14px}.product-create-toggle{width:100%;justify-content:center}}
@@ -203,15 +200,8 @@ const initializeProductPage = () => {
 };
 
 const showProductToast = (message, isError = false) => {
-    document.querySelector('.product-ajax-toast')?.remove();
-    const toast = document.createElement('div');
-    toast.className = `product-ajax-toast${isError ? ' is-error' : ''}`;
-    toast.setAttribute('role', isError ? 'alert' : 'status');
-    toast.setAttribute('aria-live', 'polite');
-    toast.textContent = message;
-    document.body.append(toast);
-    window.setTimeout(() => toast.classList.add('is-hiding'), 3600);
-    window.setTimeout(() => toast.remove(), 3900);
+    const method = isError ? 'error' : 'success';
+    window.KermitsAlert[method](message);
 };
 
 const showProductFormError = (form, message, field = '') => {
