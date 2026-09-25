@@ -25,16 +25,52 @@
 
     const messageFrom = (root, selector) => root.querySelector(selector)?.textContent.replace(/\s+/g, ' ').trim() || '';
 
-    const showToast = (message, isError = false) => {
+    const showToast = (message, isError = false, title = '') => {
         document.querySelector('.ajax-form-toast')?.remove();
         const toast = document.createElement('div');
         toast.className = `ajax-form-toast${isError ? ' is-error' : ''}`;
         toast.setAttribute('role', isError ? 'alert' : 'status');
         toast.setAttribute('aria-live', 'polite');
-        toast.textContent = message;
+
+        const icon = document.createElement('span');
+        icon.className = 'ajax-form-toast-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = isError ? '!' : '\u2713';
+
+        const copy = document.createElement('span');
+        copy.className = 'ajax-form-toast-copy';
+        if (title) {
+            const heading = document.createElement('strong');
+            heading.textContent = title;
+            copy.append(heading);
+        }
+        const description = document.createElement('span');
+        description.textContent = message;
+        copy.append(description);
+
+        const close = document.createElement('button');
+        close.className = 'ajax-form-toast-close';
+        close.type = 'button';
+        close.setAttribute('aria-label', 'Dismiss notification');
+        close.textContent = '\u00d7';
+
+        const progress = document.createElement('span');
+        progress.className = 'ajax-form-toast-progress';
+        progress.setAttribute('aria-hidden', 'true');
+
+        toast.append(icon, copy, close, progress);
         document.body.append(toast);
-        window.setTimeout(() => toast.classList.add('is-hiding'), 3600);
-        window.setTimeout(() => toast.remove(), 3900);
+
+        let hideTimer;
+        let removeTimer;
+        const dismiss = () => {
+            window.clearTimeout(hideTimer);
+            window.clearTimeout(removeTimer);
+            toast.classList.add('is-hiding');
+            removeTimer = window.setTimeout(() => toast.remove(), 240);
+        };
+        close.addEventListener('click', dismiss);
+        hideTimer = window.setTimeout(dismiss, 5000);
     };
 
     const showFormError = (form, message, field = '') => {
@@ -172,6 +208,16 @@
             }
         }
     });
+
+    const pageToast = document.querySelector('[data-page-toast]');
+    if (pageToast) {
+        showToast(
+            pageToast.textContent.replace(/\s+/g, ' ').trim(),
+            pageToast.dataset.toastType === 'error',
+            pageToast.dataset.toastTitle || '',
+        );
+        pageToast.remove();
+    }
 
     bindPhoneInputs();
 })();

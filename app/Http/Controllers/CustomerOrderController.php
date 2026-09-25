@@ -116,9 +116,15 @@ class CustomerOrderController extends Controller
             }
         }
 
+        $status = match ($paymentMethod) {
+            'cash' => 'Pay at the counter when you arrive. Your order receipt is ready.',
+            'gcash' => 'Your payment details are awaiting verification. Your order receipt is ready.',
+            default => 'Your reservation was submitted. Your order receipt is ready.',
+        };
+
         return redirect()
             ->route('shop.orders.show', $order)
-            ->with('status', 'Reservation submitted and payment method selected. Your receipt is ready.');
+            ->with('status', $status);
     }
 
     public function show(Order $order): View

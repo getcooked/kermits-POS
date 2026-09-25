@@ -200,7 +200,8 @@ class OrderingTest extends TestCase
             'notes' => 'Window table, please.',
             'payment_method' => 'cash',
         ])->assertRedirect(route('shop.orders.show', 1))
-            ->assertSessionHas('clear_customer_cart', true);
+            ->assertSessionHas('clear_customer_cart', true)
+            ->assertSessionHas('status', 'Pay at the counter when you arrive. Your order receipt is ready.');
 
         $order = Order::query()->with('reservation')->firstOrFail();
         $reservation = Reservation::query()->where('order_id', $order->id)->firstOrFail();
@@ -235,6 +236,9 @@ class OrderingTest extends TestCase
         $this->get(route('shop.orders.show', $order))
             ->assertOk()
             ->assertSee('Order Receipt')
+            ->assertSee('data-page-toast', false)
+            ->assertSee('data-toast-title="Reservation submitted"', false)
+            ->assertSee('Pay at the counter when you arrive. Your order receipt is ready.')
             ->assertSee('Reservation Checkout Meal')
             ->assertSee('Walk In Pay')
             ->assertSee('Download receipt')

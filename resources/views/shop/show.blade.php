@@ -12,7 +12,9 @@
             <div><p>{{ $isRejected ? 'ORDER NOT APPROVED' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'PAYMENT CONFIRMED' : 'ORDER ACCEPTED') : 'ORDER & RESERVATION RECEIVED') }}</p><h1>{{ $isRejected ? 'Your order was rejected.' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'Your payment was received.' : 'Your order was accepted.') : 'Thank you, '.auth()->user()->name.'.') }}</h1></div>
         </header>
 
-        @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
+        @if(session('status'))
+            <div data-page-toast data-toast-title="Reservation submitted" hidden>{{ session('status') }}</div>
+        @endif
         @if(session('payment_error'))<div class="notice" role="alert">{{ session('payment_error') }}</div>@endif
 
         <article class="online-receipt">
