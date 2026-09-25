@@ -10,7 +10,7 @@
             </div><small>Time-honored recipes since 2000</small>
         </div>
         <div class="login-form">
-            <div class="login-inner"><a class="global-back" href="{{ route('home') }}">&larr; Home</a>
+            <div class="login-inner"><a class="global-back" href="{{ route('home') }}"><span class="login-back-arrow" aria-hidden="true">&larr;</span><span>Back</span></a>
                 <h2 id="login-title">Log in to your account</h2>
                 <p class="muted">Enter your account details to continue to Kermit’s.</p>
                 @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
@@ -286,6 +286,11 @@
 
     .login-inner>.global-back:hover {
         background: #f2f4e7
+    }
+
+    .login-back-arrow {
+        font-size: 22px;
+        line-height: 1
     }
 
     .login-inner h2 {
