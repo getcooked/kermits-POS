@@ -22,7 +22,8 @@ class PasswordResetTest extends TestCase
     {
         $this->get(route('password.request'))
             ->assertOk()
-            ->assertSee('Reset your password');
+            ->assertSee('Reset your password')
+            ->assertSee('Your Kermit’s account will receive a reset link from this page. Thank You!');
     }
 
     public function test_super_admin_recovery_page_remains_available_without_a_login_page_link(): void
@@ -87,8 +88,10 @@ class PasswordResetTest extends TestCase
         Notification::shouldReceive('send')->once()->andThrow(new TransportException('SMTP unavailable'));
 
         $this->post(route('password.email'), ['email' => $user->email])
-            ->assertSessionHas('status', self::GENERIC_RESET_MESSAGE)
-            ->assertSessionDoesntHaveErrors();
+            ->assertSessionHasErrors([
+                'email' => 'We could not send the reset email right now. Please try again in a few minutes.',
+            ])
+            ->assertSessionMissing('status');
 
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
     }

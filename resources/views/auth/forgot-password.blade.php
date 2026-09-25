@@ -10,7 +10,7 @@
     <section class="reset-form"><div class="reset-inner">
         <p class="reset-eyebrow">{{ $superAdminRecovery ? 'SUPER ADMIN RECOVERY' : 'FORGOT PASSWORD' }}</p>
         <h2>{{ $superAdminRecovery ? 'Recover Super Admin access' : 'Reset your password' }}</h2>
-        <p class="muted">Only an active {{ $superAdminRecovery ? 'Super Admin' : 'Kermit’s' }} account can receive a reset link from this page. We’ll send instructions to the registered email address.</p>
+        <p class="muted">{{ $superAdminRecovery ? 'Only an active Super Admin account can receive a reset link from this page. We’ll send instructions to the registered email address.' : 'Your Kermit’s account will receive a reset link from this page. Thank You!' }}</p>
         @if(session('status'))<div class="reset-success">{{ session('status') }}</div>@endif
         <form method="POST" action="{{ route($superAdminRecovery ? 'superadmin.password.email' : 'password.email') }}">
             @csrf

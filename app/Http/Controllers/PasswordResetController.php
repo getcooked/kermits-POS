@@ -19,6 +19,8 @@ class PasswordResetController extends Controller
 {
     private const RESET_LINK_STATUS = 'If an eligible account exists, a password reset link has been sent.';
 
+    private const RESET_DELIVERY_ERROR = 'We could not send the reset email right now. Please try again in a few minutes.';
+
     public function request(): View
     {
         return view('auth.forgot-password', ['superAdminRecovery' => false]);
@@ -68,11 +70,16 @@ class PasswordResetController extends Controller
         }
         try {
             $status = Password::sendResetLink(['email' => $user->email]);
-        } catch (TransportExceptionInterface) {
+        } catch (TransportExceptionInterface $exception) {
             Password::deleteToken($user);
-            Log::warning('Web password reset email delivery failed.');
+            Log::warning('Web password reset email delivery failed.', [
+                'exception' => $exception::class,
+                'error' => $exception->getMessage(),
+            ]);
 
-            return back()->with('status', self::RESET_LINK_STATUS);
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => self::RESET_DELIVERY_ERROR]);
         }
 
         if ($status !== Password::RESET_LINK_SENT) {
