@@ -12,6 +12,7 @@
             <a class="{{ request()->routeIs('sales-history.*') ? 'active' : '' }}" href="{{ route('sales-history.index') }}">@include('partials.nav-icon',['name'=>'reports']) Cashier Sales</a>
             <a class="{{ request()->routeIs('inventory.*') ? 'active' : '' }}" href="{{ route('inventory.index') }}">@include('partials.nav-icon',['name'=>'inventory']) Inventory</a>
             <a class="{{ request()->routeIs('reservations.index') ? 'active' : '' }}" href="{{ route('reservations.index') }}">@include('partials.nav-icon',['name'=>'reservations']) Reservations</a>
+            <a class="{{ request()->routeIs('tables.*') ? 'active' : '' }}" href="{{ route('tables.index') }}">@include('partials.nav-icon',['name'=>'tables']) Table Management</a>
             <a class="{{ request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('products.index') }}">@include('partials.nav-icon',['name'=>'products']) Products</a>
             <a class="{{ request()->routeIs('superadmin.security.*', 'cashiers.*', 'customers.*') ? 'active' : '' }}" href="{{ route('superadmin.security.edit') }}">@include('partials.nav-icon',['name'=>'users']) Account</a>
             <a class="{{ request()->routeIs('activity-logs.*') ? 'active' : '' }}" href="{{ route('activity-logs.index') }}">@include('partials.nav-icon',['name'=>'activity']) Activity Logs</a>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DiningTable;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\User;
@@ -22,21 +23,25 @@ class TableSchedulingTest extends TestCase
         $this->travelTo(now()->setDate(2030, 1, 1)->setTime(9, 0));
     }
 
-    private function book(string $at = '2030-01-02 18:00:00', int $guests = 2, string $type = 'table'): Reservation
+    private function book(string $at = '2030-01-02 18:00:00', int $guests = 2, string $type = 'table', ?int $tableId = null, ?int $userId = null): Reservation
     {
         return app(ReservationSchedule::class)->reserve([
             'reference' => 'TEST-'.bin2hex(random_bytes(6)), 'type' => $type,
             'customer_name' => 'Guest', 'email' => 'guest@example.com', 'phone' => '09171234567',
             'reservation_at' => $at, 'guests' => $guests, 'table_size' => $guests,
             'payment_method' => 'cash', 'payment_status' => 'pending',
+            'dining_table_id' => $tableId, 'user_id' => $userId,
         ]);
     }
 
-    public function test_configured_capacity_matches_the_restaurant(): void
+    public function test_numbered_tables_start_from_the_restaurant_capacity(): void
     {
         $this->assertSame([2, 2, 2, 4, 4, 4, 4, 12], config('reservations.table_capacities'));
-        $this->assertFalse(Schema::hasColumn('reservations', 'dining_table_id'));
-        $this->assertFalse(Schema::hasTable('dining_tables'));
+        $this->assertSame(
+            [1 => 2, 2 => 2, 3 => 2, 4 => 4, 5 => 4, 6 => 4, 7 => 4, 8 => 12],
+            DiningTable::query()->orderBy('number')->pluck('seats', 'number')->all(),
+        );
+        $this->assertTrue(Schema::hasColumn('reservations', 'dining_table_id'));
     }
 
     public function test_simultaneous_and_overlapping_bookings_use_separate_capacity(): void
@@ -51,7 +56,8 @@ class TableSchedulingTest extends TestCase
 
     public function test_back_to_back_bookings_reuse_capacity(): void
     {
-        config(['reservations.table_capacities' => [2]]);
+        $this->useTables([2]);
+        config(['reservations.turnover_minutes' => 0]);
         $this->book();
         $this->book('2030-01-02 20:00:00');
         $this->assertDatabaseCount('reservations', 2);
@@ -77,7 +83,7 @@ class TableSchedulingTest extends TestCase
 
     public function test_small_bookings_preserve_capacity_for_a_large_party(): void
     {
-        config(['reservations.table_capacities' => [2, 12]]);
+        $this->useTables([2, 12]);
         $this->book(guests: 2);
         $this->book(guests: 12);
 
@@ -91,7 +97,8 @@ class TableSchedulingTest extends TestCase
         $service = app(ReservationSchedule::class);
         $this->assertFalse($service->isAvailable('2030-01-02 19:00:00', 'table', 2));
         $this->assertFalse($service->isAvailable('2030-01-02 19:00:00', 'exclusive', 20));
-        $this->assertTrue($service->isAvailable('2030-01-02 20:00:00', 'exclusive', 20));
+        $this->assertFalse($service->isAvailable('2030-01-02 20:00:00', 'exclusive', 20), 'Cleanup time follows every booking.');
+        $this->assertTrue($service->isAvailable('2030-01-02 20:30:00', 'exclusive', 20));
         $this->expectException(ValidationException::class);
         $this->book();
     }
@@ -141,7 +148,7 @@ class TableSchedulingTest extends TestCase
 
     public function test_confirmation_preserves_capacity_after_the_hold_deadline(): void
     {
-        config(['reservations.table_capacities' => [2, 2]]);
+        $this->useTables([2, 2]);
         $first = $this->book();
         $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         app(ReservationSchedule::class)->changeStatus($first, 'confirmed', $admin->id);
@@ -162,14 +169,18 @@ class TableSchedulingTest extends TestCase
         app(ReservationSchedule::class)->changeStatus($first, 'confirmed', $admin->id);
     }
 
-    public function test_table_management_is_not_exposed_in_super_admin(): void
+    public function test_staff_see_the_requested_table_and_cannot_reassign_it_by_url(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $this->actingAs($admin)->get('/dashboard')->assertOk()->assertDontSee('>Tables</a>', false);
-        $reservation = $this->book();
-        $this->get('/reservations')->assertOk()->assertDontSee('Table number');
-        $this->get(route('reservations.show', $reservation))->assertOk()->assertDontSee('Table number');
-        $this->get('/tables')->assertNotFound();
+        $tableFive = DiningTable::query()->where('number', 5)->firstOrFail();
+        $requested = $this->book(guests: 4, tableId: $tableFive->id);
+        $any = $this->book();
+
+        $this->actingAs($admin)->get('/reservations')->assertOk()
+            ->assertSee('Table 5')
+            ->assertSee('Any available table');
+        $this->get(route('reservations.show', $requested))->assertOk()->assertSee('Table 5');
+        $this->get(route('reservations.show', $any))->assertOk()->assertSee('Any available table');
         $this->patch('/reservations/1/table', ['dining_table_id' => 1])->assertNotFound();
     }
 
@@ -212,10 +223,10 @@ class TableSchedulingTest extends TestCase
 
     public function test_verified_payment_preserves_pending_hold_but_expired_payment_is_rejected(): void
     {
-        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
         $product = Product::query()->create(['name' => 'Meal', 'price' => 100, 'stock' => 10, 'active' => true]);
         foreach ([false, true] as $expire) {
+            $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
             $this->actingAs($customer)->post('/shop/orders', [
                 'quantities' => [$product->id => 1], 'table_size' => 2, 'phone' => '09171234567',
                 'reservation_at' => '2030-01-02 18:00:00', 'payment_method' => 'cash',

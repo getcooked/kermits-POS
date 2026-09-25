@@ -8,11 +8,13 @@ use App\Models\Reservation;
 use App\Rules\ReservationHours;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
+use App\Services\TableLayout;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -26,11 +28,12 @@ class MobileReservationController extends Controller
         return response()->json(['data' => $items]);
     }
 
-    public function store(Request $request, ReservationSchedule $schedules, ReservationPricing $pricing): JsonResponse
+    public function store(Request $request, ReservationSchedule $schedules, ReservationPricing $pricing, TableLayout $tables): JsonResponse
     {
         $validated = $request->validate([
             'type' => ['required', 'in:table,exclusive'],
-            'table_size' => ['nullable', 'required_if:type,table', 'integer', 'in:1,2,4,8,12'],
+            'table_size' => ['nullable', 'required_if:type,table', 'integer', Rule::in($pricing->tableSizes())],
+            'dining_table_id' => ['exclude_unless:type,table', ...$tables->requestRules()],
             'phone' => ['required', 'regex:/^09\d{9}$/'], 'reservation_at' => ['required', 'bail', 'date', 'after:now', new ReservationHours],
             'guests' => ['nullable', 'required_if:type,exclusive', 'integer', 'min:1', 'max:300'],
             'food_request' => ['nullable', 'string', 'max:2000'], 'menu_items' => ['nullable', 'array'],
@@ -39,10 +42,11 @@ class MobileReservationController extends Controller
             'payment_reference' => ['prohibited'],
             'payment_proof' => ['prohibited'],
         ]);
-        if (! $schedules->isAvailable($validated['reservation_at'], $validated['type'], (int) ($validated['table_size'] ?? $validated['guests'] ?? 1))) {
-            throw ValidationException::withMessages([
-                'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
-            ]);
+        $tableId = isset($validated['dining_table_id']) ? (int) $validated['dining_table_id'] : null;
+        if (! $schedules->isAvailable($validated['reservation_at'], $validated['type'], (int) ($validated['table_size'] ?? $validated['guests'] ?? 1), $tableId)) {
+            throw ValidationException::withMessages($tableId !== null
+                ? ['dining_table_id' => 'The table you chose is not free at this time. Choose another time, another table, or any available table.']
+                : ['reservation_at' => 'This reservation time is no longer available. Please choose another schedule.']);
         }
         $proofPath = $request->hasFile('payment_proof') ? $request->file('payment_proof')->store('payment-proofs', 'local') : null;
 
@@ -100,6 +104,7 @@ class MobileReservationController extends Controller
         return [
             'id' => $reservation->id, 'reference' => $reservation->reference, 'type' => $reservation->type,
             'table_size' => $reservation->table_size, 'guests' => $reservation->guests,
+            'dining_table_id' => $reservation->dining_table_id, 'table_label' => $reservation->table_label,
             'reservation_at' => $reservation->reservation_at?->toIso8601String(),
             'reservation_end_at' => $reservation->reservation_end_at?->toIso8601String(),
             'hold_expires_at' => $reservation->hold_expires_at?->toIso8601String(), 'phone' => $reservation->phone,

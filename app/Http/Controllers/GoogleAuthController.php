@@ -7,7 +7,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use Laravel\Socialite\Contracts\User as GoogleUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
@@ -57,11 +56,7 @@ class GoogleAuthController extends Controller
                 return $this->failed('This account has been disabled. Please contact Kermit’s for help.');
             }
 
-            if (! str_ends_with($email, '@gmail.com')) {
-                return $this->failed('Please continue with a Gmail account.');
-            }
-
-            $user = $this->createCustomer($googleUser, $googleId, $email);
+            return $this->failed('No customer account uses this Google email. Please create an account first.');
         }
 
         if (! $user->hasRole(User::ROLE_CUSTOMER)) {
@@ -84,22 +79,6 @@ class GoogleAuthController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended($user->homeRoute());
-    }
-
-    private function createCustomer(GoogleUser $googleUser, string $googleId, string $email): User
-    {
-        $name = Str::limit(trim((string) $googleUser->getName()), 100, '') ?: Str::before($email, '@');
-
-        $user = User::query()->create([
-            'name' => $name,
-            'email' => $email,
-            'role' => User::ROLE_CUSTOMER,
-            'password' => Str::password(40),
-            'email_verified_at' => now(),
-        ]);
-        $user->forceFill(['google_id' => $googleId])->save();
-
-        return $user;
     }
 
     private function matchesDisabledAccount(string $googleId, string $email): bool

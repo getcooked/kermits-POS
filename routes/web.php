@@ -26,6 +26,7 @@ use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\ReverseGeocodingController;
 use App\Http\Controllers\SalesHistoryController;
 use App\Http\Controllers\SuperAdminSecurityController;
+use App\Http\Controllers\TableManagementController;
 use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
 
@@ -156,8 +157,9 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::get('/settings/payment', [PaymentSettingsController::class, 'edit'])->name('settings.payment.edit');
         Route::put('/settings/payment', [PaymentSettingsController::class, 'update'])->name('settings.payment.update');
-        Route::put('/settings/reservation-pricing', [PaymentSettingsController::class, 'updateReservationPricing'])
-            ->name('settings.reservation-pricing.update');
+        Route::get('/tables', [TableManagementController::class, 'index'])->name('tables.index');
+        Route::put('/tables', [TableManagementController::class, 'update'])->name('tables.update');
+        Route::put('/tables/layout', [TableManagementController::class, 'updateLayout'])->name('tables.layout.update');
     });
 
     Route::middleware('role:super_admin,cashier')->group(function (): void {

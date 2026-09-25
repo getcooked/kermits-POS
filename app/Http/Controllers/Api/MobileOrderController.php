@@ -9,11 +9,13 @@ use App\Rules\ReservationHours;
 use App\Services\OrderService;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
+use App\Services\TableLayout;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -27,7 +29,7 @@ class MobileOrderController extends Controller
         return response()->json(['data' => $orders]);
     }
 
-    public function store(Request $request, OrderService $orders, ReservationSchedule $schedules, ReservationPricing $pricing): JsonResponse
+    public function store(Request $request, OrderService $orders, ReservationSchedule $schedules, ReservationPricing $pricing, TableLayout $tables): JsonResponse
     {
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', 'distinct'],
@@ -35,14 +37,16 @@ class MobileOrderController extends Controller
             'payment_method' => ['required', 'in:cash'],
             'payment_reference' => ['prohibited'],
             'payment_proof' => ['prohibited'],
-            'table_size' => ['nullable', 'required_with:phone,reservation_at', 'integer', 'in:1,2,4,8,12'],
+            'table_size' => ['nullable', 'required_with:phone,reservation_at', 'integer', Rule::in($pricing->tableSizes())],
+            'dining_table_id' => $tables->requestRules(),
             'phone' => ['nullable', 'required_with:table_size,reservation_at', 'regex:/^09\d{9}$/'],
             'reservation_at' => ['nullable', 'required_with:table_size,phone', 'bail', 'date', 'after:now', new ReservationHours],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
         $quantities = collect($validated['items'])->mapWithKeys(fn (array $item): array => [(int) $item['product_id'] => (int) $item['quantity']])->all();
         $needsReservation = isset($validated['table_size'], $validated['phone'], $validated['reservation_at']);
-        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'])) {
+        $tableId = isset($validated['dining_table_id']) ? (int) $validated['dining_table_id'] : null;
+        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'], $tableId)) {
             throw ValidationException::withMessages([
                 'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
             ]);
@@ -51,7 +55,7 @@ class MobileOrderController extends Controller
         $proofPath = null;
 
         try {
-            $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules, $pricing): Order {
+            $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules, $pricing, $tableId): Order {
                 $schedules->lock();
                 $order = $orders->create(
                     user: $request->user(), quantities: $quantities, paymentStatus: 'pending',
@@ -68,6 +72,7 @@ class MobileOrderController extends Controller
                         'reference' => $this->newReservationReference(),
                         'type' => 'table',
                         'table_size' => $tableSize,
+                        'dining_table_id' => $tableId,
                         'customer_name' => $request->user()->name,
                         'email' => $request->user()->email,
                         'phone' => $validated['phone'],
@@ -123,6 +128,7 @@ class MobileOrderController extends Controller
             'reservation' => $order->reservation ? [
                 'id' => $order->reservation->id, 'reference' => $order->reservation->reference,
                 'type' => $order->reservation->type, 'table_size' => $order->reservation->table_size,
+                'dining_table_id' => $order->reservation->dining_table_id, 'table_label' => $order->reservation->table_label,
                 'guests' => $order->reservation->guests,
                 'reservation_at' => $order->reservation->reservation_at?->toIso8601String(),
                 'reservation_end_at' => $order->reservation->reservation_end_at?->toIso8601String(),

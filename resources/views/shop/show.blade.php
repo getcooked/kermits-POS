@@ -29,7 +29,7 @@
                 <div><dt>Customer</dt><dd>{{ auth()->user()->name }}</dd></div>
                 @if($reservation)
                     <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>
-                    <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }}</dd></div>
+                    <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }} · {{ $reservation->table_label }}</dd></div>
                     <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range }}</dd></div>
                 @endif
                 <div><dt>Payment</dt><dd>{{ match($order->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>

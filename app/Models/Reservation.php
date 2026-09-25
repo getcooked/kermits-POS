@@ -14,6 +14,7 @@ class Reservation extends Model
         'reference',
         'type',
         'table_size',
+        'dining_table_id',
         'customer_name',
         'email',
         'phone',
@@ -51,6 +52,25 @@ class Reservation extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by');
+    }
+
+    public function diningTable(): BelongsTo
+    {
+        return $this->belongsTo(DiningTable::class);
+    }
+
+    /**
+     * What the customer asked for: a specific numbered table, or any table that fits.
+     */
+    public function getTableLabelAttribute(): string
+    {
+        if ($this->type !== 'table') {
+            return 'Exclusive venue';
+        }
+
+        return $this->dining_table_id && $this->diningTable
+            ? $this->diningTable->label()
+            : 'Any available table';
     }
 
     public function getBookingStatusAttribute(): string

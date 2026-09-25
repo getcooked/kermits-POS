@@ -54,18 +54,28 @@ class GoogleLoginTest extends TestCase
         $this->assertStringNotContainsString('test-google-secret', $location);
     }
 
-    public function test_new_gmail_user_is_registered_as_verified_customer_and_logged_in(): void
+    public function test_unregistered_google_user_is_rejected_and_no_account_is_created(): void
     {
         $this->fakeGoogleUser('google-123', 'New.Customer@Gmail.com', 'New Customer');
 
+        $this->get(route('auth.google.callback'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors([
+                'google' => 'No customer account uses this Google email. Please create an account first.',
+            ]);
+
+        $this->assertGuest();
+        $this->assertSame(0, User::query()->count());
+    }
+
+    public function test_existing_customer_email_is_matched_case_insensitively(): void
+    {
+        $customer = User::factory()->create(['email' => 'mixed.case@gmail.com', 'role' => User::ROLE_CUSTOMER]);
+        $this->fakeGoogleUser('google-case', 'Mixed.Case@Gmail.com');
+
         $this->get(route('auth.google.callback'))->assertRedirect(route('shop'));
 
-        $user = User::query()->where('email', 'new.customer@gmail.com')->firstOrFail();
-        $this->assertAuthenticatedAs($user);
-        $this->assertSame('google-123', $user->google_id);
-        $this->assertSame(User::ROLE_CUSTOMER, $user->role);
-        $this->assertSame('New Customer', $user->name);
-        $this->assertNotNull($user->email_verified_at);
+        $this->assertAuthenticatedAs($customer);
     }
 
     public function test_existing_verified_customer_is_linked_by_email_and_logged_in(): void
@@ -134,17 +144,6 @@ class GoogleLoginTest extends TestCase
 
         $this->assertGuest();
         $this->assertSame('google-original', $customer->fresh()->google_id);
-    }
-
-    public function test_new_accounts_require_a_gmail_address(): void
-    {
-        $this->fakeGoogleUser('google-work', 'person@company.com');
-
-        $this->get(route('auth.google.callback'))
-            ->assertSessionHasErrors(['google' => 'Please continue with a Gmail account.']);
-
-        $this->assertGuest();
-        $this->assertDatabaseMissing('users', ['email' => 'person@company.com']);
     }
 
     public function test_disabled_accounts_cannot_log_in_or_be_recreated(): void

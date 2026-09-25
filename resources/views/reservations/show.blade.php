@@ -63,7 +63,7 @@
                         <div><dt>Name</dt><dd>{{ $reservation->customer_name }}</dd></div>
                         <div><dt>Email</dt><dd>{{ $reservation->email }}</dd></div>
                         <div><dt>Phone</dt><dd>{{ $reservation->phone }}</dd></div>
-                        <div><dt>Reservation type</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : 'Exclusive venue' }}</dd></div>
+                        <div><dt>Reservation type</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : 'Exclusive venue' }}</dd></div>@if($reservation->type === 'table')<div><dt>Table</dt><dd>{{ $reservation->table_label }}</dd></div>@endif
                     </dl>
                 </section>
 

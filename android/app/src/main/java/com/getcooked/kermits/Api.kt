@@ -49,7 +49,7 @@ data class Order(
     val items: List<OrderItem> = emptyList(),
 )
 @JsonClass(generateAdapter = true)
-data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null)
+data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null, val table_label: String? = null)
 @JsonClass(generateAdapter = true)
 data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
@@ -62,7 +62,8 @@ data class ApiError(
     val code: String? = null,
 )
 @JsonClass(generateAdapter = true)
-data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0)
+data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0, val tables: List<DiningTableOption>? = null)
+data class DiningTableOption(val id: Int, val number: Int, val seats: Int)
 @JsonClass(generateAdapter = true)
 data class CatalogResponse(val data: CatalogData)
 @JsonClass(generateAdapter = true)
@@ -89,13 +90,13 @@ data class PushInstallationRequest(
 fun String.formPart(): RequestBody = toRequestBody("text/plain".toMediaType())
 
 @JsonClass(generateAdapter = true)
-data class ReservationSlot(val start: String, val end: String, val label: String, val available: Boolean)
+data class ReservationSlot(val start: String, val end: String, val label: String, val available: Boolean, val tables_left: Int? = null)
 @JsonClass(generateAdapter = true)
 data class ReservationSlotsResponse(val data: List<ReservationSlot>)
 
 interface KermitsApi {
     @GET("recaptcha/config") suspend fun recaptchaConfig(): RecaptchaConfigResponse
-    @GET("reservation-availability") suspend fun reservationSlots(@Query("date") date: String, @Query("type") type: String, @Query("guests") guests: Int): ReservationSlotsResponse
+    @GET("reservation-availability") suspend fun reservationSlots(@Query("date") date: String, @Query("type") type: String, @Query("guests") guests: Int, @Query("table") table: Int? = null): ReservationSlotsResponse
     @POST("login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     @POST("password/forgot") suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ApiError>
     @POST("register/email") suspend fun sendRegistrationCode(@Body request: SendCodeRequest): Response<SendCodeResponse>
@@ -122,6 +123,7 @@ interface KermitsApi {
         @Part("guests") guests: RequestBody?, @Part("food_request") foodRequest: RequestBody?,
         @Part("payment_method") payment: RequestBody, @Part("payment_reference") reference: RequestBody?,
         @Part proof: MultipartBody.Part? = null, @PartMap menuItems: Map<String, @JvmSuppressWildcards RequestBody> = emptyMap(),
-        @Part("notes") notes: RequestBody? = null
+        @Part("notes") notes: RequestBody? = null,
+        @Part("dining_table_id") diningTableId: RequestBody? = null
     ): retrofit2.Response<Map<String, Reservation>>
 }

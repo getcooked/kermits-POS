@@ -4,8 +4,11 @@ namespace App\Http\Requests;
 
 use App\Rules\ReservationHours;
 use App\Services\PayMongoCheckout;
+use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
+use App\Services\TableLayout;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class OrderRequest extends FormRequest
@@ -20,7 +23,8 @@ class OrderRequest extends FormRequest
         return [
             'quantities' => ['required', 'array'],
             'quantities.*' => ['nullable', 'integer', 'min:0', 'max:999'],
-            'table_size' => ['required', 'integer', 'in:1,2,4,8,12'],
+            'table_size' => ['required', 'integer', Rule::in(app(ReservationPricing::class)->tableSizes())],
+            'dining_table_id' => app(TableLayout::class)->requestRules(),
             'phone' => ['required', 'regex:/^09\d{9}$/'],
             'reservation_at' => ['required', 'bail', 'date', 'after:now', new ReservationHours],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -38,10 +42,16 @@ class OrderRequest extends FormRequest
             if ($this->input('payment_method') === 'paymongo' && ! PayMongoCheckout::enabled()) {
                 $validator->errors()->add('payment_method', 'PayMongo checkout is not available.');
             }
+            $tableId = $this->filled('dining_table_id') ? (int) $this->input('dining_table_id') : null;
             if ($this->filled('reservation_at')
-                && ! $validator->errors()->hasAny(['reservation_at', 'table_size'])
-                && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'), 'table', (int) $this->input('table_size', 1))) {
-                $validator->errors()->add('reservation_at', 'This reservation time is no longer available. Please choose another schedule.');
+                && ! $validator->errors()->hasAny(['reservation_at', 'table_size', 'dining_table_id'])
+                && ! app(ReservationSchedule::class)->isAvailable($this->input('reservation_at'), 'table', (int) $this->input('table_size', 1), $tableId)) {
+                $validator->errors()->add(
+                    $tableId !== null ? 'dining_table_id' : 'reservation_at',
+                    $tableId !== null
+                        ? 'The table you chose is not free at this time. Choose another time, another table, or any available table.'
+                        : 'This reservation time is no longer available. Please choose another schedule.',
+                );
             }
         }];
     }

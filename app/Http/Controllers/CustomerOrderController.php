@@ -12,6 +12,7 @@ use App\Services\OrderService;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
+use App\Services\TableLayout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ use Throwable;
 
 class CustomerOrderController extends Controller
 {
-    public function index(ReservationPricing $pricing): View
+    public function index(ReservationPricing $pricing, TableLayout $tables): View
     {
         $qrPath = SystemSetting::get('gcash_qr_path');
         $disk = Storage::disk('public');
@@ -36,6 +37,7 @@ class CustomerOrderController extends Controller
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'gcashQrSrc' => $gcashQrSrc,
             'tableFees' => $pricing->tableFees(),
+            'diningTables' => $tables->activeTables()->sortBy('number')->values(),
             'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
     }
@@ -70,6 +72,7 @@ class CustomerOrderController extends Controller
                     'reference' => $this->newReservationReference(),
                     'type' => 'table',
                     'table_size' => $tableSize,
+                    'dining_table_id' => $request->validated('dining_table_id'),
                     'customer_name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'phone' => $request->validated('phone'),

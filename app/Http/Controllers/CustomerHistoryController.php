@@ -18,7 +18,7 @@ class CustomerHistoryController extends Controller
 
         return view('customer.history', [
             'reservations' => $customer->reservations()
-                ->with(['items.product', 'statusHistories.changedBy'])
+                ->with(['items.product', 'statusHistories.changedBy', 'diningTable'])
                 ->latest('reservation_at')
                 ->get(),
             'orders' => $orders,

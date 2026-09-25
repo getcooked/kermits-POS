@@ -11,6 +11,7 @@ use App\Models\SystemSetting;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
+use App\Services\TableLayout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,11 +24,12 @@ use Throwable;
 
 class ReservationController extends Controller
 {
-    public function create(Request $request, ReservationPricing $pricing): View
+    public function create(Request $request, ReservationPricing $pricing, TableLayout $tables): View
     {
         return view('reservations.create', [
             'products' => Product::query()->available()->where('stock', '>', 0)->menuOrder()->get(),
             'tableFees' => $pricing->tableFees(),
+            'diningTables' => $tables->activeTables()->sortBy('number')->values(),
             'exclusiveFee' => $pricing->exclusiveFee(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
             'paymongoEnabled' => PayMongoCheckout::enabled(),
@@ -185,7 +187,7 @@ class ReservationController extends Controller
         ]);
 
         $reservations = Reservation::query()
-            ->with(['handler', 'items.product'])
+            ->with(['handler', 'items.product', 'diningTable'])
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->orderBy('reservation_at')
             ->get()->when($filters['status'] ?? null, fn ($items, $status) => $items->where('booking_status', $status));

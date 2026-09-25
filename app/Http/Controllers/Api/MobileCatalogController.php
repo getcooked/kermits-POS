@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DiningTable;
 use App\Models\Product;
 use App\Models\SystemSetting;
 use App\Services\ReservationPricing;
+use App\Services\TableLayout;
 use Illuminate\Http\JsonResponse;
 
 class MobileCatalogController extends Controller
 {
-    public function index(ReservationPricing $pricing): JsonResponse
+    public function index(ReservationPricing $pricing, TableLayout $tables): JsonResponse
     {
         $products = Product::query()->available()->where('stock', '>', 0)->menuOrder()->get()
             ->map(fn (Product $product): array => [
@@ -26,6 +28,10 @@ class MobileCatalogController extends Controller
             'gcash_qr_url' => $qrPath ? route('public.media', ['path' => $qrPath]) : null,
             'table_fees' => $pricing->tableFees(),
             'exclusive_fee' => $pricing->exclusiveFee(),
+            'tables' => $tables->activeTables()
+                ->sortBy('number')
+                ->map(fn (DiningTable $table): array => ['id' => $table->id, 'number' => $table->number, 'seats' => $table->seats])
+                ->values(),
         ]]);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Reservation;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,57 +80,6 @@ class PaymentSettingsTest extends TestCase
         $this->actingAs($customer)->get('/shop')
             ->assertOk()
             ->assertSee('value="2" data-fee="150.00"', false);
-    }
-
-    public function test_super_admin_can_change_party_size_prices_used_by_new_bookings(): void
-    {
-        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-
-        $this->actingAs($superAdmin)->put(route('settings.reservation-pricing.update'), [
-            'table_fees' => [1 => 125, 2 => 225.50, 4 => 325, 8 => 525, 12 => 725],
-        ])->assertRedirect()->assertSessionHas('status', 'Party size prices updated successfully.');
-
-        $this->assertDatabaseHas('system_settings', [
-            'key' => 'reservation_table_fee_4',
-            'value' => '325.00',
-        ]);
-
-        $this->actingAs($customer)->get(route('reservations.create'))
-            ->assertOk()
-            ->assertSee('value="4" data-fee="325.00"', false);
-
-        $this->actingAs($customer)->post(route('reservations.store'), [
-            'type' => 'table',
-            'table_size' => 4,
-            'customer_name' => $customer->name,
-            'email' => $customer->email,
-            'phone' => '09171234567',
-            'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
-            'payment_method' => 'cash',
-        ])->assertRedirect();
-
-        $reservation = Reservation::query()->whereBelongsTo($customer)->firstOrFail();
-        $this->assertSame(325.0, (float) $reservation->reservation_fee);
-        $this->assertSame(325.0, (float) $reservation->total_amount);
-    }
-
-    public function test_party_size_prices_require_valid_values_and_super_admin_access(): void
-    {
-        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $fees = [1 => 100, 2 => 150, 4 => -1, 8 => 450, 12 => 650];
-
-        $this->actingAs($superAdmin)->put(route('settings.reservation-pricing.update'), [
-            'table_fees' => $fees,
-        ])->assertSessionHasErrors('table_fees.4');
-
-        $fees[4] = 250;
-        $this->actingAs($admin)->put(route('settings.reservation-pricing.update'), [
-            'table_fees' => $fees,
-        ])->assertForbidden();
-
-        $this->assertDatabaseMissing('system_settings', ['key' => 'reservation_table_fee_4']);
     }
 
     private function fakePng(string $name): UploadedFile

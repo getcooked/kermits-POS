@@ -6,6 +6,7 @@
     @case('reports')<path d="M5 20V10h3v10M10.5 20V4h3v16M16 20v-7h3v7M3 20h18"/>@break
     @case('inventory')<path d="m4 7 8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10"/>@break
     @case('reservations')<path d="M5 5h14v15H5zM8 3v4M16 3v4M5 9h14M8 13h3M13 13h3M8 16h3"/>@break
+    @case('tables')<path d="M3 9h18M5 9l1.5-4h11L19 9M6 9v10M18 9v10M9 13h6"/>@break
     @case('products')<path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5"/>@break
     @case('crud')<path d="M5 5h14v14H5zM8 9h8M8 13h5M16.5 14.5l2 2-2 2M7.5 14.5l-2 2 2 2"/>@break
     @case('users')<path d="M8.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20v-2a5.5 5.5 0 0 1 11 0v2M16 11a3 3 0 1 0 0-6M15.5 14a5 5 0 0 1 6 4.9V20"/>@break
