@@ -81,7 +81,9 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('role:customer')->group(function (): void {
         Route::get('/book/availability', ReservationAvailabilityController::class)->name('reservations.availability');
         Route::get('/shop', [CustomerOrderController::class, 'index'])->name('shop');
-        Route::post('/shop/orders', [CustomerOrderController::class, 'store'])->name('shop.orders.store');
+        Route::post('/shop/orders', [CustomerOrderController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('shop.orders.store');
         Route::get('/shop/orders/{order}', [CustomerOrderController::class, 'show'])->name('shop.orders.show');
         Route::get('/shop/orders/{order}/receipt', [CustomerOrderController::class, 'receipt'])->name('shop.orders.receipt');
         Route::post('/shop/orders/{order}/paymongo', [PayMongoController::class, 'checkout'])

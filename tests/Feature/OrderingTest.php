@@ -249,6 +249,30 @@ class OrderingTest extends TestCase
             ->assertSee('localStorage.removeItem("kermits-customer-cart-v1-'.$customer->id.'")', false);
     }
 
+    public function test_customer_order_submissions_are_limited_to_ten_per_minute_per_customer(): void
+    {
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $otherCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
+            $this->actingAs($customer)
+                ->post(route('shop.orders.store'))
+                ->assertRedirect()
+                ->assertSessionHasErrors('quantities');
+        }
+
+        $this->actingAs($customer)
+            ->post(route('shop.orders.store'))
+            ->assertTooManyRequests();
+
+        $this->actingAs($otherCustomer)
+            ->post(route('shop.orders.store'))
+            ->assertRedirect()
+            ->assertSessionHasErrors('quantities');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
     public function test_customer_shop_uses_one_ordered_multi_step_checkout_dialog_without_food_request_fields(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
