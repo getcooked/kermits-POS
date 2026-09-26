@@ -173,6 +173,16 @@ class AuthController extends Controller
             ])->onlyInput('email');
         }
 
+        if ($request->user()->isDisabled()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')
+                ->withErrors(['email' => 'This account has been disabled. Please contact a Super Admin.'])
+                ->onlyInput('email');
+        }
+
         $this->updateLegacySuperAdminEmail($request->user());
         $loginAttempts->clear($request, $login);
         $request->session()->regenerate();

@@ -25,7 +25,7 @@ use App\Http\Controllers\ReservationAvailabilityController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\ReverseGeocodingController;
 use App\Http\Controllers\SalesHistoryController;
-use App\Http\Controllers\SuperAdminSecurityController;
+use App\Http\Controllers\SuperAdminAccountController;
 use App\Http\Controllers\TableManagementController;
 use App\Http\Controllers\WebSeederController;
 use Illuminate\Support\Facades\Route;
@@ -134,16 +134,23 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('role:super_admin')->group(function (): void {
-        Route::get('/staff/security', [SuperAdminSecurityController::class, 'edit'])
+        Route::get('/staff/security', [SuperAdminAccountController::class, 'index'])
             ->name('superadmin.security.edit');
+        Route::post('/staff/security/admins/email-code', [SuperAdminAccountController::class, 'sendVerificationCode'])
+            ->middleware('throttle:3,1')
+            ->name('superadmin.admins.email-code');
+        Route::post('/staff/security/admins', [SuperAdminAccountController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('superadmin.admins.store');
+        Route::put('/staff/security/admins/{admin}', [SuperAdminAccountController::class, 'update'])
+            ->middleware('throttle:10,1')
+            ->name('superadmin.admins.update');
+        Route::patch('/staff/security/admins/{admin}/disable', [SuperAdminAccountController::class, 'disable'])
+            ->name('superadmin.admins.disable');
+        Route::patch('/staff/security/admins/{admin}/enable', [SuperAdminAccountController::class, 'enable'])
+            ->name('superadmin.admins.enable');
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])
             ->name('activity-logs.index');
-        Route::post('/staff/security/email-code', [SuperAdminSecurityController::class, 'sendVerificationCode'])
-            ->middleware('throttle:3,1')
-            ->name('superadmin.security.email-code');
-        Route::put('/staff/security/password', [SuperAdminSecurityController::class, 'updatePassword'])
-            ->middleware('throttle:5,1')
-            ->name('superadmin.security.password.update');
         Route::get('/staff/admins', [AdminAccountController::class, 'index'])->name('admins.index');
         Route::put('/staff/admins/{admin}/password', [AdminAccountController::class, 'updatePassword'])
             ->middleware('throttle:5,1')
