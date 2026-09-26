@@ -45,8 +45,26 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => env('MAIL_TIMEOUT', 10),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        // Same account over implicit TLS; many hosts block outbound 587 but allow 465.
+        'smtp_ssl' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtps',
+            'host' => env('MAIL_HOST', '127.0.0.1'),
+            'port' => env('MAIL_SSL_PORT', 465),
+            'username' => env('MAIL_USERNAME'),
+            'password' => env('MAIL_PASSWORD'),
+            'timeout' => env('MAIL_TIMEOUT', 10),
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'smtp_failover' => [
+            'transport' => 'failover',
+            'mailers' => ['smtp', 'smtp_ssl'],
+            'retry_after' => 60,
         ],
 
         'ses' => [

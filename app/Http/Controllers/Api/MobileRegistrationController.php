@@ -38,9 +38,12 @@ class MobileRegistrationController extends Controller
             Mail::raw("Your Kermit's verification code is {$code}. It expires in 10 minutes.", function ($message) use ($email): void {
                 $message->to($email)->subject("Kermit's account verification code");
             });
-        } catch (TransportExceptionInterface) {
+        } catch (TransportExceptionInterface $exception) {
             Cache::forget($this->challengeKey($challenge));
-            Log::warning('Mobile registration email delivery failed.');
+            Log::warning('Mobile registration email delivery failed.', [
+                'exception' => $exception::class,
+                'error' => $exception->getMessage(),
+            ]);
 
             return response()->json(['message' => 'The verification email could not be sent. Please try again later.'], 503);
         }

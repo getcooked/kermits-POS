@@ -63,9 +63,12 @@ class AuthController extends Controller
                 $message->to($validated['email'])
                     ->subject("Kermit's account verification code");
             });
-        } catch (TransportExceptionInterface) {
+        } catch (TransportExceptionInterface $exception) {
             session()->forget('registration_email_verification');
-            Log::warning('Web registration email delivery failed.');
+            Log::warning('Web registration email delivery failed.', [
+                'exception' => $exception::class,
+                'error' => $exception->getMessage(),
+            ]);
 
             return back()
                 ->withInput($request->only('email'))
