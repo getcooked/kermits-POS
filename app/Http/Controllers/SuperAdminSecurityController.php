@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateSuperAdminPasswordRequest;
+use App\Models\User;
 use App\Notifications\SuperAdminPasswordVerification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,10 @@ class SuperAdminSecurityController extends Controller
 {
     public function edit(): View
     {
-        return view('staff.security');
+        return view('staff.security', [
+            'cashierCount' => User::query()->where('role', User::ROLE_CASHIER)->count(),
+            'customerCount' => User::query()->where('role', User::ROLE_CUSTOMER)->count(),
+        ]);
     }
 
     public function sendVerificationCode(Request $request): RedirectResponse
