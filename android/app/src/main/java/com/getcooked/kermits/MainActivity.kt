@@ -370,13 +370,11 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     fun sendCode(email: String, done: (String?) -> Unit) {
         if (busy) return
         registrationMessage = null
-        withRecaptcha { token ->
-            runAuthRequest({
-                val data = mobileAuth.sendCode(email, token)
-                registrationMessage = "Verification code sent to ${data.email}. Check your inbox and spam folder."
-                data.challenge
-            }, done)
-        }
+        runAuthRequest({
+            val data = mobileAuth.sendCode(email)
+            registrationMessage = "Verification code sent to ${data.email}. Check your inbox and spam folder."
+            data.challenge
+        }, done)
     }
     fun requestPasswordReset(email: String, done: (String?) -> Unit) =
         withRecaptcha { token -> runAuthRequest({ mobileAuth.requestPasswordReset(email, token) }, done) }

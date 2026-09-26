@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Rules\MobileRecaptcha;
 use App\Services\CustomerDetailsSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,8 +22,7 @@ class MobileRegistrationController extends Controller
         $this->normalizeEmail($request);
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
-            'recaptcha_token' => MobileRecaptcha::rules($request),
-        ], MobileRecaptcha::messages());
+        ]);
         $email = Str::lower($validated['email']);
         $code = (string) random_int(100000, 999999);
         $challenge = Str::random(64);

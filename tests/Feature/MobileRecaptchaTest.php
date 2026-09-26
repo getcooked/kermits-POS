@@ -41,7 +41,7 @@ class MobileRecaptchaTest extends TestCase
             ->assertDontSee('shared-web-secret-key');
     }
 
-    public function test_missing_token_blocks_login_registration_email_and_recovery(): void
+    public function test_missing_token_blocks_login_and_recovery(): void
     {
         Http::fake();
         Mail::fake();
@@ -49,13 +49,23 @@ class MobileRecaptchaTest extends TestCase
 
         $this->postJson('/api/v1/login', ['login' => $user->email, 'password' => 'Password123!'])
             ->assertUnprocessable()->assertJsonValidationErrors('recaptcha_token');
-        $this->postJson('/api/v1/register/email', ['email' => 'new@gmail.com'])
-            ->assertUnprocessable()->assertJsonValidationErrors('recaptcha_token');
         $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
             ->assertUnprocessable()->assertJsonValidationErrors('recaptcha_token');
 
         Http::assertNothingSent();
         Mail::assertNothingOutgoing();
+    }
+
+    public function test_registration_email_does_not_require_a_token(): void
+    {
+        Http::fake();
+        Mail::fake();
+
+        $this->postJson('/api/v1/register/email', ['email' => 'new@gmail.com'])
+            ->assertOk()
+            ->assertJsonMissingValidationErrors('recaptcha_token');
+
+        Http::assertNothingSent();
     }
 
     public function test_valid_shared_web_token_allows_mobile_login(): void
@@ -83,22 +93,19 @@ class MobileRecaptchaTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('recaptcha_token');
     }
 
-    public function test_registration_and_recovery_use_shared_web_verification(): void
+    public function test_recovery_uses_shared_web_verification(): void
     {
         Http::fake(['www.google.com/recaptcha/api/siteverify' => Http::response($this->verification())]);
         Mail::fake();
         Notification::fake();
         $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
-        $this->postJson('/api/v1/register/email', [
-            'email' => 'new@gmail.com', 'recaptcha_token' => 'signup-token',
-        ])->assertOk();
         $this->postJson('/api/v1/password/forgot', [
             'email' => $user->email, 'recaptcha_token' => 'recovery-token',
         ])->assertOk();
 
-        Http::assertSent(fn (Request $request) => $request['response'] === 'signup-token');
         Http::assertSent(fn (Request $request) => $request['response'] === 'recovery-token');
+        Http::assertSentCount(1);
     }
 
     private function verification(string $hostname = 'localhost'): array
