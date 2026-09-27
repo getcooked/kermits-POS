@@ -9,15 +9,14 @@
 @endphp
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard table-management">
     <header>
-        <p>SUPER ADMIN SETTINGS</p>
         <h1>Table Management</h1>
-        <span>Set what customers can book, and the tables in the restaurant that seat them.</span>
     </header>
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error table-error" role="alert">{{ $errors->first() }}</div>@endif
 
     @include('tables.partials.floor')
 
+    <div class="table-settings-grid">
     <section class="welcome">
         <h2>Table options</h2>
         <p class="table-help">The party sizes customers choose from when booking, and the reservation price for each.</p>
@@ -101,6 +100,7 @@
             </div>
         </form>
     </section>
+    </div>
 </div></main></div>
 @push('styles')
 @include('tables.partials.styles')

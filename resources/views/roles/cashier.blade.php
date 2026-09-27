@@ -7,7 +7,6 @@
     @if($errors->any())<div class="error sell-error">{{ $errors->first() }}</div>@endif
     @if($canSell)<form method="POST" action="{{ route('cashier.checkout') }}">@csrf
     @else<div class="pos-view-only">
-        <div class="notice pos-view-only-notice" role="note"><strong>View only.</strong> Admins can browse the POS menu but cannot make sales.</div>
     @endif
         <header class="pos-menu-header">
             <div class="pos-catalog-head">
@@ -153,7 +152,7 @@
     .sell-shell .product-card:hover {transform: none !important;}
 }
 .sell-shell .product-meta span.low-stock {color:#c62828!important;font-weight:850!important;}
-.sell-shell .sell-layout.is-view-only{grid-template-columns:1fr!important}.pos-view-only-notice{margin:0 0 18px;padding:12px 16px;border-radius:10px;color:#3e4410}
+.sell-shell .sell-layout.is-view-only{grid-template-columns:1fr!important}
 </style>
 @endpush
 

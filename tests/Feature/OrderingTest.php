@@ -66,7 +66,6 @@ class OrderingTest extends TestCase
             ->get('/cashier')
             ->assertOk()
             ->assertSee('Test Product')
-            ->assertSee('View only.')
             ->assertDontSee('class="add-cart"', false)
             ->assertDontSee('id="checkout-button"', false)
             ->assertDontSee(route('cashier.checkout'), false);
