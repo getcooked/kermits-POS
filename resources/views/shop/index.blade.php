@@ -1130,6 +1130,10 @@
             order: -1
         }
 
+        .customer-cart-items {
+            min-height: 0
+        }
+
         .customer-shop .shop-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important
         }
@@ -1138,6 +1142,11 @@
     @media(max-width:650px) {
         .customer-shop>header {
             display: grid !important
+        }
+
+        .customer-cart-controls button {
+            width: 32px;
+            height: 32px
         }
 
         .shop-search {

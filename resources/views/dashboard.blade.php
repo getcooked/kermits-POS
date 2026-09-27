@@ -278,6 +278,17 @@
         pointer-events: none
     }
 
+    .bars i:first-child:after {
+        left: 0;
+        transform: none
+    }
+
+    .bars i:last-child:after {
+        left: auto;
+        right: 0;
+        transform: none
+    }
+
     .bars i:hover:after,
     .bars i:focus:after {
         opacity: 1;

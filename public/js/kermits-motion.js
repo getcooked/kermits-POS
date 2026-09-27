@@ -128,4 +128,12 @@
             enter('.notice', {distance:'0 -4px', duration:250, limit:1});
         }
     } catch {}
+
+    // On phones the sidebar collapses into a scrolling strip; keep the current page's tab in view.
+    document.querySelectorAll('.admin-sidebar nav, .side-nav').forEach(nav => {
+        const active = nav.querySelector('a.active, a[aria-current="page"]');
+        if (!active || nav.scrollWidth <= nav.clientWidth) return;
+        const navBox = nav.getBoundingClientRect(), linkBox = active.getBoundingClientRect();
+        nav.scrollLeft += linkBox.left - navBox.left - (navBox.width - linkBox.width) / 2;
+    });
 })();

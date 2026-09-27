@@ -72,7 +72,7 @@ button,a,input,select,textarea{transition:border-color .18s,background .18s,colo
 .customer-shop,.history-page{background:linear-gradient(180deg,#f7f6f0,#eeefe7)!important}.customer-shop nav,.history-page nav{position:sticky;top:0;z-index:30;width:100%!important;height:74px!important;padding:0 max(18px,calc((100% - 1180px)/2));background:rgba(247,246,240,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(14px)}.customer-shop header,.history-page>header{padding:44px 0 26px!important}.customer-shop header h1,.history-page>header h1{letter-spacing:-.04em}.shop-grid article{box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s}.shop-grid article:hover{transform:translateY(-3px);box-shadow:0 20px 46px rgba(24,25,22,.12)}.order-bar{bottom:18px!important;border:1px solid #3d403a;box-shadow:0 16px 46px rgba(0,0,0,.28)!important}.order-bar button{min-height:46px;cursor:pointer}.history-grid{align-items:start}.history-card{transition:transform .18s}.history-card:hover{transform:translateY(-2px)}
 .booking-page{background:radial-gradient(circle at 20% 10%,#eef0d2,transparent 34%),#dfe2dc!important}.booking-shell{width:min(1320px,calc(100% - 24px))!important;height:calc(100dvh - 24px)!important;border-width:7px!important}.booking-brand{background:linear-gradient(155deg,#171817,#292c25)!important}.booking-form{background:#f8f7f1}.booking-inner{width:min(760px,100%)!important}.booking-button{position:sticky;bottom:0;z-index:5;margin-top:16px;box-shadow:0 -10px 25px #f8f7f1,0 10px 22px rgba(0,0,0,.15)!important}
 @media(max-width:1100px){.admin-shell,.app-shell{grid-template-columns:205px minmax(0,1fr)!important}.admin-workspace,.workspace{padding:22px!important}.sell-layout{grid-template-columns:1fr!important}.payment-card{position:relative!important;max-height:none;order:-1}.product-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
-@media(max-width:780px){body{background:var(--paper)}.admin-shell,.app-shell{width:100%!important;height:auto!important;min-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important;grid-template-columns:1fr!important;overflow:visible!important}.admin-sidebar,.sidebar{position:sticky!important;top:0;z-index:50;padding:10px 12px!important;box-shadow:0 7px 24px rgba(0,0,0,.2)}.admin-brand,.side-brand{margin:0 0 8px!important}.admin-sidebar nav,.side-nav{display:flex!important;gap:6px;overflow-x:auto;padding-bottom:2px}.admin-sidebar nav a,.side-nav a{min-height:40px;white-space:nowrap;padding:8px 11px!important;font-size:13px}.admin-sidebar nav a span,.side-nav a span{display:none}.admin-user,.side-user{display:none!important}.admin-workspace,.workspace{height:auto!important;overflow:visible!important;padding:18px 14px 90px!important}.topbar,.dash-head{align-items:flex-start!important;min-height:auto}.topbar>a,.topbar>.logout{flex:0 0 auto}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.payment-card{order:-1}.customer-shop nav,.history-page nav{padding:0 12px}.customer-shop header,.customer-shop>form,.shop-error,.history-page>header,.history-grid{width:calc(100% - 24px)!important}.history-grid{grid-template-columns:1fr!important}.booking-page{padding:0!important}.booking-shell{width:100%!important;height:auto!important;min-height:100dvh!important;border:0!important;border-radius:0!important}.booking-form{overflow:visible!important}.booking-button{bottom:10px}.admin-workspace [style*="grid-template-columns"]{grid-template-columns:1fr!important}.admin-workspace [style*="display:flex"]{align-items:stretch}.admin-workspace .button,.admin-workspace .logout{width:100%;justify-content:center}}
+@media(max-width:780px){body{background:var(--paper)}.admin-shell,.app-shell{width:100%!important;height:auto!important;min-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important;grid-template-columns:minmax(0,1fr)!important;overflow:visible!important}.admin-sidebar,.sidebar{position:sticky!important;top:0;z-index:50;padding:10px 12px!important;box-shadow:0 7px 24px rgba(0,0,0,.2)}.admin-brand,.side-brand{margin:0 0 8px!important}.admin-sidebar nav,.side-nav{display:flex!important;gap:6px;overflow-x:auto;padding-bottom:2px}.admin-sidebar nav a,.side-nav a{min-height:40px;white-space:nowrap;padding:8px 11px!important;font-size:13px}.admin-sidebar nav a span,.side-nav a span{display:none}.admin-user,.side-user{display:none!important}.admin-workspace,.workspace{height:auto!important;overflow:visible!important;padding:18px 14px 90px!important}.topbar,.dash-head{align-items:flex-start!important;min-height:auto}.topbar>a,.topbar>.logout{flex:0 0 auto}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.payment-card{order:-1}.customer-shop nav,.history-page nav{padding:0 12px}.customer-shop header,.customer-shop>form,.shop-error,.history-page>header,.history-grid{width:calc(100% - 24px)!important}.history-grid{grid-template-columns:1fr!important}.booking-page{padding:0!important}.booking-shell{width:100%!important;height:auto!important;min-height:100dvh!important;border:0!important;border-radius:0!important}.booking-form{overflow:visible!important}.booking-button{bottom:10px}.admin-workspace [style*="grid-template-columns"]{grid-template-columns:1fr!important}.admin-workspace [style*="display:flex"]{align-items:stretch}.admin-workspace .button,.admin-workspace .logout{width:100%;justify-content:center}.admin-workspace .topbar>.logout{width:auto}}
 @media(max-width:520px){.admin-workspace,.workspace{padding:14px 10px 86px!important}.topbar{display:grid!important;grid-template-columns:1fr auto;gap:12px}.topbar .logout{width:auto!important}.welcome{padding:17px!important;border-radius:14px!important}.product-grid,.shop-grid{grid-template-columns:1fr!important}.product-photo,.product-placeholder{height:190px!important}.payment-options{grid-template-columns:1fr}.sell-head h1{font-size:27px!important}.customer-actions{gap:5px!important}.customer-actions a,.customer-actions button{padding:8px!important;font-size:12px}.customer-shop header h1,.history-page>header h1{font-size:34px!important}.order-bar{bottom:8px!important;width:calc(100% - 16px)!important;padding:10px!important}.booking-form{padding:22px 14px!important}.booking-types{grid-template-columns:1fr!important}.reservation-menu-item{grid-template-columns:52px minmax(0,1fr) 58px!important}.admin-workspace table{min-width:680px}.global-back{flex:0 0 auto}}
 /* Uniform Admin and Super Admin sidebar */
 @media(min-width:781px){.admin-shell{grid-template-columns:250px minmax(0,1fr)!important}.admin-sidebar{box-sizing:border-box!important;width:250px!important;min-width:250px!important;max-width:250px!important;height:100dvh!important;padding:30px 20px!important;background:linear-gradient(160deg,#151615,#21231f)!important}.admin-sidebar>.admin-brand{box-sizing:border-box!important;width:100%;min-height:87px;display:flex!important;align-items:center!important;gap:10px!important;margin:0 0 28px!important;padding:4px 8px 28px!important;border-bottom:1px solid #343630!important;color:#fff!important;text-decoration:none!important}.admin-sidebar>.admin-brand img{box-sizing:border-box!important;width:58px!important;height:58px!important;min-width:58px!important;max-width:58px!important;padding:0!important;border-radius:50%!important;object-fit:contain!important;background:#fff!important}.admin-sidebar>.admin-brand strong{color:#fff!important;letter-spacing:.1em!important;white-space:nowrap}.admin-sidebar>nav{display:grid!important;align-content:start!important;gap:8px!important;min-height:0;overflow-y:auto!important;flex:1}.admin-sidebar>nav>a{box-sizing:border-box!important;width:100%;height:46px!important;min-height:46px!important;padding:12px 14px!important;border-radius:11px!important;background:#292b27!important;color:#eee!important;gap:12px!important}.admin-sidebar>nav>a:hover{background:#363933!important}.admin-sidebar>nav>a.active{background:#34372f!important;box-shadow:inset 4px 0 #b5c019!important;color:#fff!important}.admin-sidebar>nav>a span{width:22px!important}.admin-sidebar>.admin-user{box-sizing:border-box!important;min-height:73px;margin:14px 0 0!important;padding:15px 0 0 12px!important;border-top:1px solid #343630!important;display:grid!important;grid-template-columns:minmax(0,1fr) 42px;align-items:center;gap:8px}.admin-sidebar>.admin-user>div{min-width:0;display:grid}.admin-sidebar>.admin-user strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.admin-sidebar>.admin-user small{color:#969991;font-size:11px;margin-top:3px}.admin-sidebar>.admin-user form{width:42px;margin:0!important}.admin-sidebar>.admin-user .logout-icon{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}}
@@ -253,6 +253,45 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
         color:#fff!important;
         border-left-color:#b5c019!important;
         box-shadow:none!important;
+    }
+}
+/* Customer account navigation on phones and tablets */
+@media(max-width:900px){
+    .history-page>nav>.history-actions>a,
+    .history-page>nav>.history-actions>a:link,
+    .history-page>nav>.history-actions>a:visited,
+    .history-page>nav>.history-actions>a:hover,
+    .history-page>nav>.history-actions>a:focus,
+    .history-page>nav>.history-actions>a:active{
+        min-height:40px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:8px 12px!important;
+        border:1px solid #ccd0c5;
+        border-radius:10px;
+        background:#fff;
+        color:#171817!important;
+        font-size:14px!important;
+    }
+    .history-page>nav>.history-actions>a.active,
+    .history-page>nav>.history-actions>a[aria-current="page"]{
+        border-color:#171817;
+        background:#171817;
+        color:#fff!important;
+    }
+    .history-page>nav>.history-actions>a:focus-visible{
+        outline:3px solid rgba(174,187,25,.32)!important;
+        outline-offset:2px;
+    }
+    .history-page>nav>.history-brand{color:#171817}
+}
+@media(max-width:420px){
+    .history-page>nav>.history-actions>a,
+    .history-page>nav>.history-actions>a:link,
+    .history-page>nav>.history-actions>a:visited{
+        padding:8px 9px!important;
+        font-size:13px!important;
     }
 }
 /* Keep Super Admin pages scrollable without displaying browser scrollbars. */
