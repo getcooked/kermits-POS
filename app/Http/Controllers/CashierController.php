@@ -17,8 +17,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CashierController extends Controller
 {
@@ -30,13 +32,47 @@ class CashierController extends Controller
         ]);
     }
 
-    public function customerOrders(): View
+    public function customerOrders(Request $request): View
     {
-        return view('roles.cashier-orders', [
-            'orders' => $this->pendingCustomerOrdersQuery()
+        $method = $request->query('method');
+        $method = in_array($method, ['gcash', 'cash', 'paymongo'], true) ? $method : 'all';
+
+        $orders = $method === 'paymongo'
+            ? Order::query()
+                ->whereNotNull('customer_id')
+                ->where('payment_method', 'paymongo')
                 ->with(['customer', 'items.product', 'reservation'])
                 ->latest()
-                ->get(),
+                ->limit(50)
+                ->get()
+            : $this->pendingCustomerOrdersQuery()
+                ->when($method !== 'all', fn (Builder $query) => $query->where('payment_method', $method))
+                ->with(['customer', 'items.product', 'reservation'])
+                ->latest()
+                ->get();
+
+        return view('roles.cashier-orders', [
+            'orders' => $orders,
+            'method' => $method,
+            'counts' => [
+                'all' => $this->pendingCustomerOrdersQuery()->count(),
+                'gcash' => $this->pendingCustomerOrdersQuery()->where('payment_method', 'gcash')->count(),
+                'cash' => $this->pendingCustomerOrdersQuery()->where('payment_method', 'cash')->count(),
+                'paymongo' => Order::query()->whereNotNull('customer_id')->where('payment_method', 'paymongo')
+                    ->where('payment_status', 'pending')->count(),
+            ],
+        ]);
+    }
+
+    public function paymentProof(Order $order): StreamedResponse
+    {
+        abort_unless($order->customer_id !== null && $order->payment_method === 'gcash', 404);
+        $path = $order->reservation?->payment_proof_path;
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -280,6 +316,10 @@ class CashierController extends Controller
             if ($lockedOrder->payment_method === 'gcash') {
                 if (! preg_match('/^\d{13}$/', (string) $lockedOrder->payment_reference)) {
                     throw ValidationException::withMessages(['payment_reference' => 'A valid 13-digit GCash reference is required.']);
+                }
+                $proofPath = $lockedOrder->reservation?->payment_proof_path;
+                if (! $proofPath || ! Storage::disk('local')->exists($proofPath)) {
+                    throw ValidationException::withMessages(['payment_proof' => 'This GCash order has no payment proof to verify. Ask the customer for proof or reject the order.']);
                 }
                 $lockedOrder->update([
                     'payment_status' => 'paid',

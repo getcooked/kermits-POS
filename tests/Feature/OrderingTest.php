@@ -296,7 +296,8 @@ class OrderingTest extends TestCase
             ->assertSee('data-checkout-step="payment"', false)
             ->assertSee('Walk In Pay')
             ->assertSee('value="cash"', false)
-            ->assertDontSee('value="gcash"', false)
+            ->assertSee('GCash')
+            ->assertSee('value="gcash"', false)
             ->assertDontSee('Food Request')
             ->assertDontSee('name="menu_items[', false)
             ->assertDontSee('name="food_request"', false)
@@ -305,6 +306,7 @@ class OrderingTest extends TestCase
                 'Submit reservation',
                 'data-checkout-step="payment"',
                 'Walk In Pay',
+                'GCash',
             ], false);
 
         $this->assertSame(0, substr_count($menu->getContent(), 'href="'.route('reservations.create').'"'));
@@ -381,7 +383,7 @@ class OrderingTest extends TestCase
             ->assertSee('color:#c62828!important', false);
     }
 
-    public function test_customer_manual_gcash_checkout_is_rejected(): void
+    public function test_customer_gcash_checkout_requires_a_thirteen_digit_reference_and_image_proof(): void
     {
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $product = Product::query()->create(['name' => 'Reference Product', 'price' => 100, 'stock' => 5, 'active' => true]);
@@ -393,14 +395,14 @@ class OrderingTest extends TestCase
             'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
             'payment_method' => 'gcash',
             'payment_reference' => '12345',
-        ])->assertSessionHasErrors(['payment_method', 'payment_reference']);
+        ])->assertSessionHasErrors(['payment_reference', 'payment_proof']);
 
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('reservations', 0);
         $this->assertSame(5, $product->fresh()->stock);
     }
 
-    public function test_customer_manual_gcash_checkout_is_rejected_even_with_proof(): void
+    public function test_customer_can_complete_gcash_checkout_with_proof_and_receive_the_order_receipt(): void
     {
         Storage::fake('local');
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
@@ -414,12 +416,32 @@ class OrderingTest extends TestCase
             'payment_method' => 'gcash',
             'payment_reference' => '1234567890123',
             'payment_proof' => $this->fakePng('checkout-proof.png'),
-        ])->assertSessionHasErrors(['payment_method', 'payment_reference', 'payment_proof']);
+        ])->assertRedirect(route('shop.orders.show', 1));
 
-        $this->assertDatabaseCount('orders', 0);
-        $this->assertDatabaseCount('reservations', 0);
-        $this->assertSame(5, $product->fresh()->stock);
-        $this->assertSame([], Storage::disk('local')->allFiles('payment-proofs'));
+        $order = Order::query()->firstOrFail();
+        $reservation = Reservation::query()->where('order_id', $order->id)->firstOrFail();
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'order_id' => $order->id,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_status' => 'pending',
+        ]);
+        $this->assertNotNull($reservation->payment_proof_path);
+        Storage::disk('local')->assertExists($reservation->payment_proof_path);
+
+        $this->get(route('shop.orders.show', $order))
+            ->assertOk()
+            ->assertSee('Order Receipt')
+            ->assertSee('GCash')
+            ->assertSee('1234567890123');
     }
 
     public function test_customer_checkout_rolls_back_order_stock_and_uploaded_proof_when_reservation_creation_fails(): void
@@ -438,7 +460,9 @@ class OrderingTest extends TestCase
                 'table_size' => 2,
                 'phone' => '09171234567',
                 'reservation_at' => now()->addDay()->setTime(12, 0)->format('Y-m-d\TH:i'),
-                'payment_method' => 'cash',
+                'payment_method' => 'gcash',
+                'payment_reference' => '1234567890123',
+                'payment_proof' => $this->fakePng('rollback-proof.png'),
             ]);
 
             $this->fail('The simulated reservation failure was not thrown.');
@@ -500,6 +524,15 @@ class OrderingTest extends TestCase
 
         $this->actingAs($cashier)
             ->patch(route('cashier.orders.confirm-payment', $order))
+            ->assertSessionHasErrors('payment_proof');
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'pending']);
+
+        Storage::fake('local');
+        Storage::disk('local')->put('payment-proofs/review-proof.png', 'proof');
+        $this->gcashReservationFor($order, 'payment-proofs/review-proof.png');
+
+        $this->actingAs($cashier)
+            ->patch(route('cashier.orders.confirm-payment', $order))
             ->assertRedirect();
 
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'paid']);
@@ -508,6 +541,80 @@ class OrderingTest extends TestCase
             ->assertOk()
             ->assertSee('275.00')
             ->assertSee('GCash · 1 sales');
+    }
+
+    public function test_cashier_can_view_gcash_proof_and_filter_orders_by_payment_method(): void
+    {
+        Storage::fake('local');
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $otherCustomer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $product = Product::query()->create(['name' => 'Proof Meal', 'price' => 150, 'stock' => 10, 'active' => true]);
+        $gcashOrder = app(OrderService::class)->create(
+            user: $customer, quantities: [$product->id => 1], paymentStatus: 'pending',
+            paymentMethod: 'gcash', paymentReference: '9876543210123', customer: $customer,
+        );
+        Storage::disk('local')->put('payment-proofs/cashier-proof.png', 'proof image');
+        $this->gcashReservationFor($gcashOrder, 'payment-proofs/cashier-proof.png');
+        $cashOrder = app(OrderService::class)->create(
+            user: $customer, quantities: [$product->id => 1], paymentStatus: 'pending',
+            paymentMethod: 'cash', customer: $customer,
+        );
+        Order::query()->create([
+            'user_id' => $customer->id, 'customer_id' => $customer->id, 'total' => 150,
+            'payment_method' => 'paymongo', 'payment_status' => 'paid', 'paid_at' => now(),
+            'paymongo_checkout_id' => 'cs_paid_example',
+        ]);
+
+        $this->actingAs($cashier)->get(route('cashier.orders.payment-proof', $gcashOrder))->assertOk();
+        $this->actingAs($cashier)->get(route('cashier.orders.payment-proof', $cashOrder))->assertNotFound();
+        $this->actingAs($admin)->get(route('cashier.orders.payment-proof', $gcashOrder))->assertForbidden();
+        $this->actingAs($otherCustomer)->get(route('cashier.orders.payment-proof', $gcashOrder))->assertForbidden();
+
+        $this->actingAs($cashier)->get(route('cashier.orders.review', $gcashOrder))
+            ->assertOk()
+            ->assertSee(route('cashier.orders.payment-proof', $gcashOrder), false)
+            ->assertSee('Open full-size proof');
+
+        $this->actingAs($cashier)->get(route('cashier.orders.index', ['method' => 'gcash']))
+            ->assertOk()
+            ->assertSee('9876543210123')
+            ->assertDontSee(route('cashier.orders.review', $cashOrder), false);
+
+        $this->actingAs($cashier)->get(route('cashier.orders.index', ['method' => 'cash']))
+            ->assertOk()
+            ->assertSee(route('cashier.orders.review', $cashOrder), false)
+            ->assertDontSee('9876543210123');
+
+        $this->actingAs($cashier)->get(route('cashier.orders.index', ['method' => 'paymongo']))
+            ->assertOk()
+            ->assertSee('verified by PayMongo')
+            ->assertDontSee('9876543210123');
+    }
+
+    private function gcashReservationFor(Order $order, string $proofPath): Reservation
+    {
+        return Reservation::query()->create([
+            'user_id' => $order->customer_id,
+            'order_id' => $order->id,
+            'reference' => 'KRM-PROOF-'.$order->id,
+            'type' => 'table',
+            'table_size' => 2,
+            'customer_name' => 'Proof Customer',
+            'email' => 'proof'.$order->id.'@example.com',
+            'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->setTime(12, 0),
+            'guests' => 2,
+            'reservation_fee' => 0,
+            'food_total' => 0,
+            'total_amount' => 0,
+            'payment_method' => 'gcash',
+            'payment_reference' => $order->payment_reference,
+            'payment_status' => 'pending',
+            'payment_proof_path' => $proofPath,
+            'status' => 'pending',
+        ]);
     }
 
     public function test_cashier_can_poll_for_new_pending_customer_orders(): void

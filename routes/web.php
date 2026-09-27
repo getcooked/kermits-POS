@@ -186,6 +186,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/cashier/customer-orders/{order}/review', [CashierController::class, 'reviewCustomerOrder'])
             ->middleware('role:cashier')
             ->name('cashier.orders.review');
+        Route::get('/cashier/customer-orders/{order}/payment-proof', [CashierController::class, 'paymentProof'])
+            ->middleware('role:cashier')
+            ->name('cashier.orders.payment-proof');
         Route::put('/cashier/customer-orders/{order}', [CashierController::class, 'updateCustomerOrder'])
             ->middleware(['role:cashier', 'throttle:30,1'])
             ->name('cashier.orders.update');

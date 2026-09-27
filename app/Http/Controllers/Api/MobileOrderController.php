@@ -34,9 +34,9 @@ class MobileOrderController extends Controller
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', 'distinct'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999'],
-            'payment_method' => ['required', 'in:cash'],
-            'payment_reference' => ['prohibited'],
-            'payment_proof' => ['prohibited'],
+            'payment_method' => ['required', 'in:cash,gcash'],
+            'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
+            'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'table_size' => ['nullable', 'required_with:phone,reservation_at', 'integer', Rule::in($pricing->tableSizes())],
             'dining_table_id' => $tables->requestRules(),
             'phone' => ['nullable', 'required_with:table_size,reservation_at', 'regex:/^09\d{9}$/'],
@@ -46,13 +46,20 @@ class MobileOrderController extends Controller
         $quantities = collect($validated['items'])->mapWithKeys(fn (array $item): array => [(int) $item['product_id'] => (int) $item['quantity']])->all();
         $needsReservation = isset($validated['table_size'], $validated['phone'], $validated['reservation_at']);
         $tableId = isset($validated['dining_table_id']) ? (int) $validated['dining_table_id'] : null;
-        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'], $tableId)) {
+        if ($validated['payment_method'] === 'gcash' && ! $needsReservation) {
+            throw ValidationException::withMessages([
+                'table_size' => 'Add table reservation details before submitting a GCash checkout.',
+            ]);
+        }
+        if ($needsReservation &&! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'], $tableId)) {
             throw ValidationException::withMessages([
                 'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
             ]);
         }
 
-        $proofPath = null;
+        $proofPath = $validated['payment_method'] === 'gcash' && $request->hasFile('payment_proof')
+            ? $request->file('payment_proof')->store('payment-proofs', 'local')
+            : null;
 
         try {
             $order = DB::transaction(function () use ($request, $orders, $validated, $quantities, $proofPath, $needsReservation, $schedules, $pricing, $tableId): Order {

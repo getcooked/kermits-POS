@@ -43,7 +43,7 @@ class PaymentSettingsTest extends TestCase
         $this->actingAs($customer)->get('/settings/payment')->assertForbidden();
     }
 
-    public function test_checkout_does_not_expose_the_uploaded_gcash_qr(): void
+    public function test_checkout_embeds_the_current_uploaded_gcash_qr(): void
     {
         Storage::fake('public');
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
@@ -55,11 +55,11 @@ class PaymentSettingsTest extends TestCase
 
         $this->actingAs($customer)->get('/shop')
             ->assertOk()
-            ->assertDontSee('src="'.$expectedSource.'"', false)
-            ->assertDontSee('Scan using your GCash app.');
+            ->assertSee('src="'.$expectedSource.'"', false)
+            ->assertSee('Scan using your GCash app.');
     }
 
-    public function test_checkout_does_not_render_the_legacy_gcash_qr_placeholder(): void
+    public function test_checkout_handles_a_missing_uploaded_qr(): void
     {
         Storage::fake('public');
         SystemSetting::query()->create(['key' => 'gcash_qr_path', 'value' => 'payment/missing.png']);
@@ -67,8 +67,8 @@ class PaymentSettingsTest extends TestCase
 
         $this->actingAs($customer)->get('/shop')
             ->assertOk()
-            ->assertDontSee('gcash-qr-placeholder.svg')
-            ->assertDontSee('The GCash QR is unavailable.')
+            ->assertSee('gcash-qr-placeholder.svg')
+            ->assertSee('The GCash QR is unavailable.')
             ->assertDontSee('Scan using your GCash app.');
     }
 
