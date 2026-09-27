@@ -4,7 +4,7 @@
 <main class="customer-shop">
     <nav>
         <a href="{{ route('home') }}"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT'S</strong></a>
-        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">Menu</a><a href="{{ route('customer.history') }}">History</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>@endif<span>Hi, {{ auth()->user()->name }}</span>
+        <div class="customer-actions"><a class="active" href="{{ route('shop') }}" aria-current="page">@include('partials.nav-icon', ['name' => 'products']) Menu</a><a href="{{ route('customer.history') }}">@include('partials.nav-icon', ['name' => 'activity']) History</a>@if($appDownloadAvailable)<a class="customer-app-link" href="{{ $appDownloadUrl }}" download>@include('partials.nav-icon', ['name' => 'app'])<span>Download app</span><b>App</b></a>@else<a class="customer-app-link disabled" aria-disabled="true">@include('partials.nav-icon', ['name' => 'app'])<span>App coming soon</span><b>App</b></a>@endif<span class="customer-user"><strong>Hi, {{ auth()->user()->name }}</strong><small>Customer</small></span>
             <form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" />
                     </svg></button></form>

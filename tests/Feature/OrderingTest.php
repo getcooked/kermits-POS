@@ -279,8 +279,8 @@ class OrderingTest extends TestCase
 
         $menu = $this->actingAs($customer)->get('/shop')
             ->assertOk()
-            ->assertSee('>Menu</a>', false)
-            ->assertDontSee('>Shop</a>', false)
+            ->assertSee('Menu</a>', false)
+            ->assertDontSee('Shop</a>', false)
             ->assertDontSee('data-menu-reserve', false)
             ->assertSee('data-checkout-modal', false)
             ->assertSee('data-checkout-step="reservation"', false)
@@ -319,8 +319,8 @@ class OrderingTest extends TestCase
         foreach (['/history', '/book'] as $page) {
             $this->actingAs($customer)->get($page)
                 ->assertOk()
-                ->assertSee('>Menu</a>', false)
-                ->assertDontSee('>Shop</a>', false)
+                ->assertSee('Menu</a>', false)
+                ->assertDontSee('Shop</a>', false)
                 ->assertDontSee('>Reserve</a>', false);
         }
     }

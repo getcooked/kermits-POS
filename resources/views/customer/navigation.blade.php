@@ -5,14 +5,14 @@
     </a>
 
     <div class="history-actions">
-        <a @class(['active' => ($activeCustomerNav ?? '') === 'menu']) href="{{ route('shop') }}" @if(($activeCustomerNav ?? '') === 'menu') aria-current="page" @endif>Menu</a>
-        <a @class(['active' => ($activeCustomerNav ?? '') === 'history']) href="{{ route('customer.history') }}" @if(($activeCustomerNav ?? '') === 'history') aria-current="page" @endif>History</a>
+        <a @class(['active' => ($activeCustomerNav ?? '') === 'menu']) href="{{ route('shop') }}" @if(($activeCustomerNav ?? '') === 'menu') aria-current="page" @endif>@include('partials.nav-icon', ['name' => 'products']) Menu</a>
+        <a @class(['active' => ($activeCustomerNav ?? '') === 'history']) href="{{ route('customer.history') }}" @if(($activeCustomerNav ?? '') === 'history') aria-current="page" @endif>@include('partials.nav-icon', ['name' => 'activity']) History</a>
         @if($appDownloadAvailable)
-            <a class="history-app-link" href="{{ $appDownloadUrl }}" download><span>Download app</span><b>App</b></a>
+            <a class="history-app-link" href="{{ $appDownloadUrl }}" download>@include('partials.nav-icon', ['name' => 'app'])<span>Download app</span><b>App</b></a>
         @else
-            <a class="history-app-link disabled" aria-disabled="true"><span>App coming soon</span><b>App</b></a>
+            <a class="history-app-link disabled" aria-disabled="true">@include('partials.nav-icon', ['name' => 'app'])<span>App coming soon</span><b>App</b></a>
         @endif
-        <span>Hi, {{ auth()->user()->name }}</span>
+        <span class="customer-user"><strong>Hi, {{ auth()->user()->name }}</strong><small>Customer</small></span>
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button class="logout-icon" type="submit" title="Log out" aria-label="Log out">

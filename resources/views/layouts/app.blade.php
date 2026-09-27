@@ -113,79 +113,95 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 .logout-icon{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;padding:0!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:11px!important;background:rgba(255,255,255,.06)!important;color:#fff!important;display:inline-grid!important;place-items:center!important;cursor:pointer}.logout-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.logout-icon:hover{background:rgba(174,187,25,.18)!important;border-color:rgba(174,187,25,.5)!important}.customer-shop .logout-icon,.history-page .logout-icon{color:#fff!important}.customer-actions form,.history-page nav form{display:flex;justify-content:flex-end}
 @media(max-width:900px){.customer-shop .logout-icon,.history-page .logout-icon{color:#171817!important;background:#fff!important;border-color:#ccd0c5!important}}
-/* Uniform customer sidebar typography and active state */
+/* Customer sidebar: same look, font and sizes as the cashier sidebar (.admin-sidebar) */
 @media(min-width:901px){
+    .customer-shop>nav>a strong,
+    .history-page>nav>a strong,
+    .booking-brand>.booking-logo strong{
+        font-family:inherit!important;
+        font-size:16px!important;
+        font-weight:700!important;
+        line-height:1.3!important;
+        letter-spacing:.1em!important;
+    }
     .customer-shop>nav .customer-actions,
     .history-page>nav>.history-actions{
-        font-family:Arial, Helvetica, sans-serif!important;
+        column-gap:0!important;
+    }
+    .history-page>nav>.history-actions>form{
+        margin:0!important;
     }
     .customer-shop>nav .customer-actions>a,
-    .history-page>nav>.history-actions>a{
+    .history-page>nav>.history-actions>a,
+    .booking-brand>.booking-nav>a{
         box-sizing:border-box!important;
         width:100%!important;
         height:46px!important;
         min-height:46px!important;
+        max-height:46px!important;
         display:flex!important;
         align-items:center!important;
         justify-content:flex-start!important;
+        gap:12px!important;
         padding:12px 14px!important;
+        border:0!important;
         border-radius:11px!important;
         background:#292b27!important;
-        color:#f2f2ee!important;
-        font-family:Arial, Helvetica, sans-serif!important;
-        font-size:16px!important;
-        font-weight:700!important;
-        line-height:1!important;
-        letter-spacing:0!important;
-        text-decoration:none!important;
+        color:#eee!important;
         box-shadow:none!important;
+    }
+    .customer-shop>nav .customer-actions>a:hover,
+    .history-page>nav>.history-actions>a:hover,
+    .booking-brand>.booking-nav>a:hover{
+        background:#363933!important;
+        color:#fff!important;
     }
     .customer-shop>nav .customer-actions>a.active,
     .history-page>nav>.history-actions>a.active,
     .customer-shop>nav .customer-actions>a[aria-current="page"],
-    .history-page>nav>.history-actions>a[aria-current="page"]{
+    .history-page>nav>.history-actions>a[aria-current="page"],
+    .booking-brand>.booking-nav>a.active{
         background:#34372f!important;
         color:#fff!important;
-        font-family:Arial, Helvetica, sans-serif!important;
-        font-size:16px!important;
-        font-weight:700!important;
-        line-height:1!important;
-        letter-spacing:0!important;
         box-shadow:inset 4px 0 #b5c019!important;
     }
-    .customer-shop>nav .customer-actions>a:hover,
-    .history-page>nav>.history-actions>a:hover{
-        background:#34372f!important;
-        color:#fff!important;
-        font-size:16px!important;
-        font-weight:700!important;
-    }
-    .customer-shop>nav>a strong,
-    .history-page>nav>a strong{
-        font-family:Arial, Helvetica, sans-serif!important;
-        font-size:20px!important;
-        font-weight:800!important;
-        line-height:1!important;
-        letter-spacing:.1em!important;
-    }
-    .customer-shop>nav .customer-actions>span,
-    .history-page>nav>.history-actions>span{
-        font-family:Arial, Helvetica, sans-serif!important;
-        font-size:14px!important;
-        font-weight:400!important;
-        line-height:1.2!important;
+    .customer-shop>nav .customer-actions>.customer-user,
+    .history-page>nav>.history-actions>.customer-user,
+    .booking-brand>.booking-account>.customer-user{
+        min-width:0;
+        display:flex!important;
+        flex-direction:column!important;
+        align-items:flex-start!important;
+        justify-content:center!important;
+        font-family:inherit!important;
         letter-spacing:0!important;
+    }
+    .customer-user strong{
+        max-width:100%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+        color:#f7f7f2;
+        font-size:13px;
+        font-weight:700;
+        line-height:1.3;
+    }
+    .customer-user small{
+        margin-top:3px;
+        color:#969991;
+        font-size:11px;
+        line-height:1.3;
     }
 }
 @media(max-width:900px){
-    .customer-shop .customer-actions>a,
-    .history-page .history-actions>a{
-        font-family:Arial, Helvetica, sans-serif!important;
-        font-size:13px!important;
-        font-weight:700!important;
-        line-height:1!important;
-        letter-spacing:0!important;
+    .customer-actions>a .nav-icon,
+    .history-actions>a .nav-icon,
+    .booking-nav>a .nav-icon{
+        display:none;
     }
+}
+.booking-brand>.booking-nav>a{
+    font-weight:400!important;
 }
 /* Stop sidebar link flicker while clicking between customer pages */
 .customer-shop>nav .customer-actions>a,
@@ -200,9 +216,9 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 .history-page>nav>.history-actions>a:focus,
 .customer-shop>nav .customer-actions>a:active,
 .history-page>nav>.history-actions>a:active{
-    font-family:Arial, Helvetica, sans-serif!important;
+    font-family:inherit!important;
     font-size:16px!important;
-    font-weight:700!important;
+    font-weight:400!important;
     line-height:1!important;
     letter-spacing:0!important;
     text-decoration:none!important;
@@ -210,50 +226,6 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
     filter:none!important;
     outline:0!important;
     transition:none!important;
-}
-@media(min-width:901px){
-    .customer-shop>nav .customer-actions>a,
-    .history-page>nav>.history-actions>a{
-        height:46px!important;
-        min-height:46px!important;
-        max-height:46px!important;
-        background:#292b27!important;
-        color:#f2f2ee!important;
-        border-left:4px solid transparent!important;
-        box-shadow:none!important;
-    }
-    .customer-shop>nav .customer-actions>a:hover,
-    .history-page>nav>.history-actions>a:hover,
-    .customer-shop>nav .customer-actions>a:focus,
-    .history-page>nav>.history-actions>a:focus,
-    .customer-shop>nav .customer-actions>a:active,
-    .history-page>nav>.history-actions>a:active{
-        background:#292b27!important;
-        color:#f2f2ee!important;
-        border-left-color:transparent!important;
-        box-shadow:none!important;
-    }
-    .customer-shop>nav .customer-actions>a.active,
-    .history-page>nav>.history-actions>a.active,
-    .customer-shop>nav .customer-actions>a[aria-current="page"],
-    .history-page>nav>.history-actions>a[aria-current="page"],
-    .customer-shop>nav .customer-actions>a.active:hover,
-    .history-page>nav>.history-actions>a.active:hover,
-    .customer-shop>nav .customer-actions>a[aria-current="page"]:hover,
-    .history-page>nav>.history-actions>a[aria-current="page"]:hover,
-    .customer-shop>nav .customer-actions>a.active:focus,
-    .history-page>nav>.history-actions>a.active:focus,
-    .customer-shop>nav .customer-actions>a[aria-current="page"]:focus,
-    .history-page>nav>.history-actions>a[aria-current="page"]:focus,
-    .customer-shop>nav .customer-actions>a.active:active,
-    .history-page>nav>.history-actions>a.active:active,
-    .customer-shop>nav .customer-actions>a[aria-current="page"]:active,
-    .history-page>nav>.history-actions>a[aria-current="page"]:active{
-        background:#34372f!important;
-        color:#fff!important;
-        border-left-color:#b5c019!important;
-        box-shadow:none!important;
-    }
 }
 /* Customer account navigation on phones and tablets */
 @media(max-width:900px){
