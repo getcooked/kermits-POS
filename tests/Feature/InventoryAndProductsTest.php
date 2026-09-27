@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Product;
 use App\Models\User;
+use App\Services\ProductImageProcessor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -72,6 +73,7 @@ class InventoryAndProductsTest extends TestCase
         ])->assertRedirect();
 
         Storage::disk('public')->assertExists($product->fresh()->image_path);
+        $this->assertStringEndsWith('.webp', $product->fresh()->image_path);
         $this->actingAs($superAdmin)->post('/products', [
             'name' => 'Super Admin Product',
             'category' => 'Drinks',
@@ -347,6 +349,31 @@ class InventoryAndProductsTest extends TestCase
         ]);
 
         $this->assertSame('https://images.example.com/menu-picture.jpg', $product->imageUrl());
+    }
+
+    public function test_uploaded_menu_pictures_are_trimmed_squared_and_resized(): void
+    {
+        // A small dark dish in the middle of a wide 1600x1000 white studio shot.
+        $image = imagecreatetruecolor(1600, 1000);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        imagefilledrectangle($image, 700, 400, 899, 599, imagecolorallocate($image, 120, 40, 20));
+        ob_start();
+        imagepng($image);
+        $processed = app(ProductImageProcessor::class)->processContents(ob_get_clean());
+
+        [$width, $height, $type] = getimagesizefromstring($processed);
+        $this->assertSame(IMAGETYPE_WEBP, $type);
+        $this->assertSame($width, $height);
+        $this->assertLessThanOrEqual(ProductImageProcessor::SIZE, $width);
+
+        // The dish now fills most of the frame instead of about an eighth of its width.
+        $result = imagecreatefromstring($processed);
+        $center = imagecolorsforindex($result, imagecolorat($result, intdiv($width, 2), intdiv($height, 2)));
+        $nearEdge = imagecolorsforindex($result, imagecolorat($result, (int) ($width * 0.1), intdiv($height, 2)));
+        $corner = imagecolorsforindex($result, imagecolorat($result, 2, 2));
+        $this->assertLessThan(160, $center['red']);
+        $this->assertLessThan(160, $nearEdge['red']);
+        $this->assertGreaterThan(240, $corner['green']);
     }
 
     private function fakePng(string $name): UploadedFile

@@ -6,6 +6,7 @@ use App\Http\Requests\ProductRequest;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\ProductImageProcessor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -43,14 +44,14 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(ProductRequest $request): RedirectResponse
+    public function store(ProductRequest $request, ProductImageProcessor $images): RedirectResponse
     {
         $data = $request->productData();
         $data['category_order'] = $this->categoryOrder($data['category']);
         $newImage = null;
 
         if ($request->hasFile('image')) {
-            $newImage = $request->file('image')->store('products', 'public');
+            $newImage = $images->store($request->file('image'));
             $data['image_path'] = $newImage;
         }
 
@@ -67,7 +68,7 @@ class ProductController extends Controller
         return redirect()->route('products.index')->with('status', 'Product added successfully.');
     }
 
-    public function update(ProductRequest $request, Product $product): RedirectResponse
+    public function update(ProductRequest $request, Product $product, ProductImageProcessor $images): RedirectResponse
     {
         $data = $request->productData();
         $data['category_order'] = $this->categoryOrder($data['category'], $product);
@@ -79,7 +80,7 @@ class ProductController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            $newImage = $request->file('image')->store('products', 'public');
+            $newImage = $images->store($request->file('image'));
             $data['image_path'] = $newImage;
         }
 
