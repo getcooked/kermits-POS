@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\StockMovement;
 use App\Models\SystemSetting;
+use App\Models\User;
 use App\Services\OrderService;
 use App\Services\PayMongoCounterPayment;
 use App\Services\ReservationPushNotifier;
@@ -35,6 +36,7 @@ class CashierController extends Controller
             'products' => Product::query()->available()->menuOrder()->get(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
             'paymongoEnabled' => PayMongoCounterPayment::enabled(),
+            'canSell' => $request->user()->hasRole(User::ROLE_CASHIER),
         ]);
     }
 

@@ -52,6 +52,35 @@ class OrderingTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_pos_is_view_only_and_cannot_checkout(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $product = Product::query()->create([
+            'name' => 'Test Product',
+            'price' => 50,
+            'stock' => 5,
+            'active' => true,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->get('/cashier')
+            ->assertOk()
+            ->assertSee('Test Product')
+            ->assertSee('View only.')
+            ->assertDontSee('class="add-cart"', false)
+            ->assertDontSee('id="checkout-button"', false)
+            ->assertDontSee(route('cashier.checkout'), false);
+
+        $this->actingAs($superAdmin)->post('/cashier/checkout', [
+            'quantities' => [$product->id => 2],
+            'payment_method' => 'cash',
+            'cash_received' => 150,
+        ])->assertForbidden();
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame(5, $product->fresh()->stock);
+    }
+
     public function test_cashier_cannot_complete_sale_when_customer_cash_is_insufficient(): void
     {
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);

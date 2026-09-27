@@ -5,7 +5,10 @@
     <header class="sell-head"><div><p>POINT OF SALE</p><h1>Sell products</h1><span>Choose items and complete the customer’s payment.</span></div></header>
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error sell-error">{{ $errors->first() }}</div>@endif
-    <form method="POST" action="{{ route('cashier.checkout') }}">@csrf
+    @if($canSell)<form method="POST" action="{{ route('cashier.checkout') }}">@csrf
+    @else<div class="pos-view-only">
+        <div class="notice pos-view-only-notice" role="note"><strong>View only.</strong> Admins can browse the POS menu but cannot make sales.</div>
+    @endif
         <header class="pos-menu-header">
             <div class="pos-catalog-head">
                 <h2>Menu</h2>
@@ -21,15 +24,16 @@
             </div>
             <p id="pos-filter-summary" class="pos-filter-summary" role="status">Showing: All categories</p>
         </header>
-        <div class="sell-layout">
+        <div @class(['sell-layout', 'is-view-only' => ! $canSell])>
             <section aria-label="Menu products">
                 <div class="product-grid">@foreach($products->groupBy('category') as $category => $items)@foreach($items as $product)
                     <article class="product-card">
                         @if($imageUrl = $product->imageUrl())<img class="product-photo" src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="product-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
-                        <div class="product-copy" data-product="{{ $product->id }}" data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}" data-stock="{{ $product->stock }}"><div><h3>{{ $product->name }}</h3><p>{{ $product->description }}</p></div><div class="product-meta"><strong>₱{{ number_format($product->price,2) }}</strong><span data-pos-stock @class(['low-stock' => $product->stock < 10])>{{ $product->stock < 10 ? 'Low stock · '.$product->stock.' in stock' : $product->stock.' in stock' }}</span></div><input class="cart-quantity" name="quantities[{{ $product->id }}]" type="hidden" value="{{ old('quantities.'.$product->id,0) }}"><button class="add-cart" type="button" aria-label="Add {{ $product->name }} to cart"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 4.5H6l1.5 8.5h10l2-6H6.5"/><circle cx="9" cy="18" r="1.25"/><circle cx="17" cy="18" r="1.25"/><path d="M12.5 7v4M10.5 9h4"/></svg></button></div>
+                        <div class="product-copy" data-product="{{ $product->id }}" data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}" data-stock="{{ $product->stock }}"><div><h3>{{ $product->name }}</h3><p>{{ $product->description }}</p></div><div class="product-meta"><strong>₱{{ number_format($product->price,2) }}</strong><span data-pos-stock @class(['low-stock' => $product->stock < 10])>{{ $product->stock < 10 ? 'Low stock · '.$product->stock.' in stock' : $product->stock.' in stock' }}</span></div>@if($canSell)<input class="cart-quantity" name="quantities[{{ $product->id }}]" type="hidden" value="{{ old('quantities.'.$product->id,0) }}"><button class="add-cart" type="button" aria-label="Add {{ $product->name }} to cart"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 4.5H6l1.5 8.5h10l2-6H6.5"/><circle cx="9" cy="18" r="1.25"/><circle cx="17" cy="18" r="1.25"/><path d="M12.5 7v4M10.5 9h4"/></svg></button>@endif</div>
                     </article>
                 @endforeach @endforeach</div>
             </section>
+            @if($canSell)
             <aside class="payment-card"><div class="payment-title">@include('partials.nav-icon',['name'=>'pos'])<div><h2>Cart</h2><p id="cart-count">0 items</p></div></div>
                 <div id="cart-items" class="cart-items"><p>Your cart is empty.</p></div><div class="cart-total"><span>Total</span><strong id="cart-total">₱0.00</strong></div>
                 <div class="payment-options"><label><input type="radio" name="payment_method" value="cash" @checked(old('payment_method','cash') === 'cash')><span><b>Cash</b><small>Enter cash and calculate change</small></span></label><label><input type="radio" name="payment_method" value="gcash" @checked(old('payment_method') === 'gcash')><span><b>GCash</b><small>Scan QR and verify reference</small></span></label>@if($paymongoEnabled)<label><input type="radio" name="payment_method" value="paymongo" @checked(old('payment_method') === 'paymongo')><span><b>PayMongo QR Ph</b><small>Any bank or e-wallet app &middot; confirmed automatically</small></span></label>@endif</div>
@@ -37,8 +41,9 @@
                 <div id="gcash-fields" hidden><div class="pos-gcash-qr" role="img" aria-label="GCash QR code"></div><label class="cash-label" for="payment_reference">GCash transaction reference</label><input class="gcash-reference" id="payment_reference" name="payment_reference" type="text" inputmode="numeric" autocomplete="off" value="{{ old('payment_reference') }}" minlength="13" maxlength="13" pattern="[0-9]{13}" placeholder="13-digit reference" aria-describedby="gcash-reference-help"><small id="gcash-reference-help">Enter exactly 13 digits.</small></div>
                 <div id="payment-note" class="payment-note">Add items and enter the customer’s cash.</div><button id="checkout-button" class="checkout-button" type="submit" disabled>Complete payment <span>→</span></button>
             </aside>
+            @endif
         </div>
-    </form>
+    @if($canSell)</form>@else</div>@endif
 </div></main></div>
 @push('styles')
 <style>
@@ -148,10 +153,12 @@
     .sell-shell .product-card:hover {transform: none !important;}
 }
 .sell-shell .product-meta span.low-stock {color:#c62828!important;font-weight:850!important;}
+.sell-shell .sell-layout.is-view-only{grid-template-columns:1fr!important}.pos-view-only-notice{margin:0 0 18px;padding:12px 16px;border-radius:10px;color:#3e4410}
 </style>
 @endpush
 
 
+@if($canSell)
 <script nonce="{{ Vite::cspNonce() }}">
 (()=>{
     const rows=[...document.querySelectorAll('[data-product]')],box=document.getElementById('cart-items'),count=document.getElementById('cart-count'),totalEl=document.getElementById('cart-total'),money=n=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(n),products=new Map(rows.map(row=>[row.dataset.product,{id:row.dataset.product,name:row.dataset.name,price:+row.dataset.price,stock:+row.dataset.stock,input:row.querySelector('.cart-quantity'),stockEl:row.querySelector('[data-pos-stock]'),add:row.querySelector('.add-cart')} ]));
@@ -175,6 +182,7 @@
     methods.forEach(input=>input.addEventListener('change',updatePayment));cash.addEventListener('input',updatePayment);reference.addEventListener('input',()=>{reference.value=reference.value.replace(/\D/g,'').slice(0,13);updatePayment()});updatePayment();
 })();
 </script>
+@endif
 
 
 
