@@ -171,6 +171,9 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('role:super_admin,cashier')->group(function (): void {
         Route::get('/cashier', [CashierController::class, 'index'])->name('cashier');
+        Route::get('/floor', [TableManagementController::class, 'floor'])->name('floor.index');
+        Route::post('/tables/{diningTable}/seat', [TableManagementController::class, 'seat'])->name('tables.seat');
+        Route::post('/tables/{diningTable}/free', [TableManagementController::class, 'free'])->name('tables.free');
         Route::post('/cashier/checkout', [CashierController::class, 'checkout'])->name('cashier.checkout');
         Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
         Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');

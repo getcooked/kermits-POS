@@ -28,6 +28,7 @@ class UpdateTableLayoutRequest extends FormRequest
             'dining_tables.*.seats' => ['required', 'integer', 'min:1', 'max:'.self::MAX_SEATS],
             'dining_tables.*.active' => ['nullable', 'boolean'],
             'turnover_minutes' => ['required', 'integer', 'min:0', 'max:'.TableLayout::MAX_TURNOVER_MINUTES],
+            'stay_minutes' => ['required', 'integer', 'min:'.TableLayout::MIN_STAY_MINUTES, 'max:'.TableLayout::MAX_STAY_MINUTES],
         ];
     }
 
@@ -63,6 +64,10 @@ class UpdateTableLayoutRequest extends FormRequest
             'turnover_minutes.integer' => 'Cleanup time must be a whole number of minutes.',
             'turnover_minutes.min' => 'Cleanup time cannot be negative.',
             'turnover_minutes.max' => 'Cleanup time can be at most '.TableLayout::MAX_TURNOVER_MINUTES.' minutes.',
+            'stay_minutes.required' => 'Enter the estimated stay used to space out bookings.',
+            'stay_minutes.integer' => 'Estimated stay must be a whole number of minutes.',
+            'stay_minutes.min' => 'Estimated stay must be at least '.TableLayout::MIN_STAY_MINUTES.' minutes.',
+            'stay_minutes.max' => 'Estimated stay can be at most '.TableLayout::MAX_STAY_MINUTES.' minutes.',
         ];
     }
 

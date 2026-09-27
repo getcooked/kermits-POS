@@ -39,7 +39,7 @@
                 </div>
                 <div>
                     <span>Time</span>
-                    <strong>{{ $reservation->time_range }}</strong>
+                    <strong>{{ $reservation->arrival_time }}</strong>
                 </div>
                 <div>
                     <span>Party</span>

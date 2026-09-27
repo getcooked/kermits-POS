@@ -34,7 +34,7 @@ class OrderReceiptPdf
             $this->labelValue($commands, 44, $y, 'RESERVATION', $reservation->reference);
             $this->labelValue($commands, 320, $y, 'TABLE', $reservation->table_size.' '.($reservation->table_size === 1 ? 'seat' : 'seats'));
             $y -= 48;
-            $this->labelValue($commands, 44, $y, 'SCHEDULE', $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range);
+            $this->labelValue($commands, 44, $y, 'SCHEDULE', $reservation->reservation_at->format('M d, Y').' - '.$reservation->arrival_time);
             if ($order->payment_reference) {
                 $this->labelValue($commands, 320, $y, 'REFERENCE', $order->payment_reference);
             }

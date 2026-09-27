@@ -2,21 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SeatTableRequest;
 use App\Http\Requests\UpdateTableLayoutRequest;
 use App\Http\Requests\UpdateTableManagementRequest;
 use App\Models\DiningTable;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
+use App\Services\TableFloor;
 use App\Services\TableLayout;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class TableManagementController extends Controller
 {
-    public function index(ReservationPricing $pricing, TableLayout $layout): View
+    public function index(ReservationPricing $pricing, TableLayout $layout, TableFloor $floor): View
     {
         return view('tables.index', [
             'tableFees' => $pricing->tableFees(),
@@ -27,6 +31,11 @@ class TableManagementController extends Controller
             'maxSeats' => UpdateTableLayoutRequest::MAX_SEATS,
             'turnoverMinutes' => $layout->turnoverMinutes(),
             'maxTurnoverMinutes' => TableLayout::MAX_TURNOVER_MINUTES,
+            'stayMinutes' => $layout->stayMinutes(),
+            'minStayMinutes' => TableLayout::MIN_STAY_MINUTES,
+            'maxStayMinutes' => TableLayout::MAX_STAY_MINUTES,
+            'floor' => $floor->board(),
+            'lateMinutes' => TableFloor::LATE_MINUTES,
         ]);
     }
 
@@ -45,8 +54,9 @@ class TableManagementController extends Controller
     ): RedirectResponse {
         $tables = $request->tables();
         $turnover = (int) $request->validated('turnover_minutes');
+        $stay = (int) $request->validated('stay_minutes');
 
-        DB::transaction(function () use ($tables, $turnover, $schedules, $pricing, $layout): void {
+        DB::transaction(function () use ($tables, $turnover, $stay, $schedules, $pricing, $layout): void {
             $schedules->lock();
             $this->ensureLayoutKeepsBookings($tables, $turnover, $schedules, $pricing);
 
@@ -63,9 +73,43 @@ class TableManagementController extends Controller
             }
 
             $layout->saveTurnoverMinutes($turnover);
+            $layout->saveStayMinutes($stay);
         });
 
         return redirect()->route('tables.index')->with('status', 'Tables updated successfully.');
+    }
+
+    /**
+     * The floor on its own, for cashiers: they can mark tables occupied or free but not change settings.
+     */
+    public function floor(TableFloor $floor): View
+    {
+        return view('tables.floor', [
+            'floor' => $floor->board(),
+            'lateMinutes' => TableFloor::LATE_MINUTES,
+        ]);
+    }
+
+    public function seat(SeatTableRequest $request, DiningTable $diningTable, TableFloor $floor): RedirectResponse
+    {
+        $reservation = $request->reservation();
+        $floor->seat($diningTable, $reservation, (int) $request->user()->id);
+
+        $who = $reservation !== null ? $reservation->reference : 'Walk-in party';
+
+        return $this->backToFloor($request->user())->with('status', "{$diningTable->label()} marked occupied ({$who}).");
+    }
+
+    public function free(Request $request, DiningTable $diningTable, TableFloor $floor): RedirectResponse
+    {
+        $floor->free($diningTable, (int) $request->user()->id);
+
+        return $this->backToFloor($request->user())->with('status', "{$diningTable->label()} marked free.");
+    }
+
+    private function backToFloor(User $user): RedirectResponse
+    {
+        return redirect()->route($user->hasRole(User::ROLE_SUPER_ADMIN) ? 'tables.index' : 'floor.index');
     }
 
     /**

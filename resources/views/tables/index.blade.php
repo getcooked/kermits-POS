@@ -16,6 +16,8 @@
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error table-error" role="alert">{{ $errors->first() }}</div>@endif
 
+    @include('tables.partials.floor')
+
     <section class="welcome">
         <h2>Table options</h2>
         <p class="table-help">The party sizes customers choose from when booking, and the reservation price for each.</p>
@@ -83,9 +85,14 @@
                 </tr>
             </template>
             <div class="field turnover-field">
+                <label for="stay_minutes">Estimated stay (minutes)</label>
+                <input class="control" id="stay_minutes" name="stay_minutes" type="number" min="{{ $minStayMinutes }}" max="{{ $maxStayMinutes }}" step="15" value="{{ old('stay_minutes', $stayMinutes) }}" required>
+                <small>Customers only choose an arrival time and never see this. It spaces out bookings on the same table until staff mark it free. Existing bookings keep their estimate.</small>
+            </div>
+            <div class="field turnover-field">
                 <label for="turnover_minutes">Cleanup time between bookings (minutes)</label>
                 <input class="control" id="turnover_minutes" name="turnover_minutes" type="number" min="0" max="{{ $maxTurnoverMinutes }}" step="5" value="{{ old('turnover_minutes', $turnoverMinutes) }}" required>
-                <small>A table stays free for this long after each booking ends so staff can clear and reset it. Use 0 for back-to-back bookings.</small>
+                <small>A table stays free for this long after it is marked free (or after a booking's estimated stay) so staff can clear and reset it. Use 0 for back-to-back bookings.</small>
             </div>
             <p class="table-help">Tables with reservations can't be removed; untick Bookable to stop new bookings instead. Changes that would leave an upcoming reservation without a table are refused.</p>
             <div class="table-actions">
@@ -96,7 +103,7 @@
     </section>
 </div></main></div>
 @push('styles')
-<style>.table-management>header{margin-bottom:22px}.table-management>header p{font-size:11px;letter-spacing:.15em;color:#7b8308}.table-management>header h1{font-size:30px;margin:6px 0}.table-management>header span,.table-help{color:#687286}.table-management .welcome{padding:24px;max-width:760px;margin-bottom:18px}.table-management h2{margin:0 0 4px;font-size:20px}.table-error{background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px}.table-list-scroll{overflow-x:auto}.table-list{width:100%;border-collapse:collapse}.table-list th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#687286;padding:0 8px 10px}.table-list td{padding:6px 8px;vertical-align:middle}.table-list td:last-child{width:1%;white-space:nowrap}.table-list .control{width:100%;min-width:0}.bookable{display:flex;align-items:center;justify-content:center;min-height:44px}.bookable input{width:20px;height:20px;accent-color:#171817}.row-remove,.row-add{border:1px solid #d3d6cd;border-radius:10px;background:#fff;padding:10px 14px;font-weight:700;cursor:pointer;color:#171817}.row-remove{color:#b3261e}.row-remove:hover{background:#fff0f0}.row-add:hover{background:#f1f2ec}.row-remove:disabled,.row-add:disabled{opacity:.45;cursor:not-allowed;background:#fff}.table-help{font-size:13px;line-height:1.6;margin:8px 8px 16px}.seat-summary{display:flex;flex-wrap:wrap;gap:8px;margin:0 8px 14px}.seat-summary span{background:#f1f2ec;border-radius:999px;padding:5px 11px;font-size:13px;font-weight:700}.turnover-field{margin:16px 8px 0;max-width:340px}.turnover-field small{color:#687286}.table-actions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 8px}.table-actions .button{width:auto;min-width:160px}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}@media(max-width:560px){.table-management .welcome{padding:16px}.table-list thead{display:none}.table-list,.table-list tbody{display:block}.table-list tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px 0;border-bottom:1px solid #e6e8e0}.layout-list tr{grid-template-columns:1fr 1fr auto}.table-list td{padding:0}.table-list td:last-child{grid-column:1/-1;width:auto}.table-list .visually-hidden{position:static;width:auto;height:auto;clip:auto;display:block;margin-bottom:4px;font-size:12px;font-weight:700;color:#687286}.bookable{flex-direction:column-reverse;align-items:flex-start;min-height:0}.row-remove{width:100%}.table-help{margin:8px 0 14px}.seat-summary,.turnover-field{margin-left:0;margin-right:0}.table-actions{flex-direction:column;align-items:stretch;margin:0}.table-actions .button{width:100%}}</style>
+@include('tables.partials.styles')
 @endpush
 @push('scripts')
 <script nonce="{{ Vite::cspNonce() }}">

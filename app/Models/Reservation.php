@@ -41,6 +41,7 @@ class Reservation extends Model
             'reservation_at' => 'datetime',
             'reservation_end_at' => 'datetime',
             'hold_expires_at' => 'datetime',
+            'seated_at' => 'datetime',
             'guests' => 'integer',
             'table_size' => 'integer',
             'reservation_fee' => 'decimal:2',
@@ -88,18 +89,12 @@ class Reservation extends Model
         return $this->created_at->copy()->addMinutes(config('reservations.hold_minutes'))->lte(now()) ? 'expired' : 'pending';
     }
 
-    public function getTimeRangeAttribute(): string
+    /**
+     * Customers book an arrival time only; staff free the table when they leave.
+     */
+    public function getArrivalTimeAttribute(): string
     {
-        $end = $this->reservation_end_at;
-        if (! $end) {
-            $closing = $this->reservation_at->copy()->setTimeFromTimeString(config('reservations.closing_time'));
-            $end = $this->reservation_at->copy()->addMinutes(config('reservations.duration_minutes'));
-            if ($end->gt($closing)) {
-                $end = $closing;
-            }
-        }
-
-        return $this->reservation_at->format('h:i A').' – '.$end->format('h:i A');
+        return $this->reservation_at->format('h:i A');
     }
 
     public function user(): BelongsTo

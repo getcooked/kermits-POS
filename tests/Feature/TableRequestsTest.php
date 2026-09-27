@@ -212,7 +212,7 @@ class TableRequestsTest extends TestCase
         $layout[1]['active'] = '0';
         $layout[] = ['number' => 9, 'seats' => 6, 'active' => '1'];
 
-        $this->put(route('tables.layout.update'), ['dining_tables' => $layout, 'turnover_minutes' => 30])
+        $this->put(route('tables.layout.update'), ['dining_tables' => $layout, 'turnover_minutes' => 30, 'stay_minutes' => 120])
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('tables.index'))
             ->assertSessionHas('status', 'Tables updated successfully.');
@@ -232,7 +232,7 @@ class TableRequestsTest extends TestCase
         $removedId = $layout[2]['id'];
         unset($layout[2]);
 
-        $this->actingAs($admin)->put(route('tables.layout.update'), ['dining_tables' => array_values($layout), 'turnover_minutes' => 15])
+        $this->actingAs($admin)->put(route('tables.layout.update'), ['dining_tables' => array_values($layout), 'turnover_minutes' => 15, 'stay_minutes' => 120])
             ->assertSessionHasNoErrors();
 
         $this->assertSame(2, DiningTable::query()->find($layout[0]['id'])->number);
@@ -257,7 +257,7 @@ class TableRequestsTest extends TestCase
 
         foreach ($cases as $case => $change) {
             $this->actingAs($admin)->from(route('tables.index'))
-                ->put(route('tables.layout.update'), ['dining_tables' => $change($this->currentLayout()), 'turnover_minutes' => 15])
+                ->put(route('tables.layout.update'), ['dining_tables' => $change($this->currentLayout()), 'turnover_minutes' => 15, 'stay_minutes' => 120])
                 ->assertSessionHasErrors('dining_tables', "Expected a refusal to: {$case}");
         }
 
@@ -270,7 +270,7 @@ class TableRequestsTest extends TestCase
     {
         foreach ([User::ROLE_ADMIN, User::ROLE_CASHIER, User::ROLE_CUSTOMER] as $role) {
             $this->actingAs(User::factory()->create(['role' => $role]))
-                ->put(route('tables.layout.update'), ['dining_tables' => $this->currentLayout(), 'turnover_minutes' => 0])
+                ->put(route('tables.layout.update'), ['dining_tables' => $this->currentLayout(), 'turnover_minutes' => 0, 'stay_minutes' => 120])
                 ->assertForbidden();
         }
 

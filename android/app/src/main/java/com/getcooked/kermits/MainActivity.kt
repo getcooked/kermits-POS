@@ -1504,7 +1504,7 @@ private fun showDateTimePicker(context: Context, calendar: Calendar, dateFormat:
                 context,
                 { _, hour, minute ->
                     if (hour < 8 || hour > 22 || (hour == 22 && minute > 0)) {
-                        android.widget.Toast.makeText(context, "Choose 8:00 AM-10:00 PM. Last booking ends at 11:00 PM.", android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(context, "Choose an arrival from 8:00 AM to 10:00 PM.", android.widget.Toast.LENGTH_LONG).show()
                         return@TimePickerDialog
                     }
                     calendar.set(Calendar.SECOND, 0)
@@ -2428,7 +2428,8 @@ private fun CartAmount(amount: Double) {
         label = "cartAmount",
     ) { value -> Text(value, fontSize = 19.sp, fontWeight = FontWeight.Black) }
 }
-private fun reservationScheduleLabel(reservation: Reservation): String = receiptDate(reservation.reservation_at) + (reservation.reservation_end_at?.let { " - " + receiptDate(it) } ?: "")
+// Customers book an arrival time only; staff free the table when they leave.
+private fun reservationScheduleLabel(reservation: Reservation): String = receiptDate(reservation.reservation_at)
 
 @Composable
 private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String, guests: Int, tableId: Int? = null, onSelect: (String) -> Unit) {

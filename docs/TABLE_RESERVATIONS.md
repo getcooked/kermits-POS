@@ -16,7 +16,7 @@ Table Management refuses changes that would strand a booking: removing a table w
 - Availability shows how many more parties of the chosen size fit in each time slot ("3 tables left"). The web booking form refreshes the list every minute and when the tab regains focus; the Android app refreshes every minute.
 - **Cleanup time** (default 15 minutes, `config('reservations.turnover_minutes')`, editable in Table Management and stored in the `reservation_turnover_minutes` setting) keeps a table empty after each booking. It also applies to exclusive-venue bookings.
 
-Bookings start between 8:00 AM and 10:00 PM in the application timezone (Asia/Manila). They normally last 120 minutes and end no later than 11:00 PM. The final booking is 10:00–11:00 PM. Suggested start times are shown at 30-minute intervals; other arrival minutes within opening hours are accepted and checked for overlap.
+Customers choose an arrival time only, between 8:00 AM and 10:00 PM in the application timezone (Asia/Manila); there is no time limit shown to them. Behind the scenes each booking gets an **estimated stay** (default 120 minutes, `config('reservations.duration_minutes')`, editable in Table Management and stored in the `reservation_stay_minutes` setting, capped at the 11:00 PM closing time). It is only used to space out bookings on the same table; staff free the table by hand when the party leaves (see below). Changing it affects new bookings only. Suggested start times are shown at 30-minute intervals; other arrival minutes within opening hours are accepted and checked for overlap.
 
 The smallest suitable capacity is reserved at submission. An exclusive booking conflicts with any active overlapping reservation. The intervals are half-open and extended by the cleanup time: with the default 15 minutes, a booking ending at 8:00 PM frees its table for another starting at 8:15 PM. Set the cleanup time to 0 to allow back-to-back bookings.
 
@@ -35,3 +35,12 @@ Configuration is in `config/reservations.php`. Existing stored reservation perio
 The Android API adds `reservation_end_at` and `hold_expires_at`. Availability is available at authenticated `/api/v1/reservation-availability?date=YYYY-MM-DD&type=table&guests=2`; add `&table={dining_table_id}` to check one table. Each slot includes `tables_left` (null for exclusive bookings). `/api/v1/products` lists bookable `tables`, and reservation and order requests accept an optional `dining_table_id`; responses include `table_label`. Deploy the API changes before distributing an Android build that uses availability previews.
 
 Verification: `php artisan test` covers capacity, overlap, exclusivity, opening/closing boundaries, timezone offsets, expiry, approval, payments, web/mobile validation, code-only deployment compatibility, and competing SQLite subprocesses.
+
+## Seating and freeing tables
+
+**Today's tables** at the top of Table Management shows every table as Free or Occupied. Staff:
+
+- **Mark occupied** when guests sit down, as a walk-in party or by choosing one of today's approved bookings (the table must seat the party). This sets `dining_tables.occupied_at`, `expected_free_at` (now + estimated stay) and `occupied_reservation_id`, and `reservations.seated_at`; the booking is moved to the table it actually sits at.
+- **Mark free** when they leave. A seated booking that is still approved is marked completed with `reservation_end_at` set to the real leaving time. The table's `freed_at` then keeps it empty for the cleanup time.
+
+While a table is occupied, availability treats it as taken until its expected free time, or until now if the party stays longer. Seated bookings are held by the table, not by their own period. An existing booking that requested an occupied table is seated elsewhere instead of blocking other bookings; staff see "Next booking for this table" on the card, and a notice when upcoming bookings no longer fit. Parties staying past the estimate are flagged. Arrivals more than 15 minutes late are marked; cancel no-shows from Reservations.

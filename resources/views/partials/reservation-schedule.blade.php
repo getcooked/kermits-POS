@@ -12,7 +12,7 @@
     <label for="{{ $reservationDateId }}">Select date</label>
     <input class="control" id="{{ $reservationDateId }}" type="date" min="{{ now()->toDateString() }}" value="{{ $oldReservationDate }}" data-reservation-date required>
     <input id="{{ $reservationInputId }}" name="reservation_at" type="hidden" value="{{ $oldReservationAt }}" data-reservation-at>
-    <p><strong>Open 8:00 AM–11:00 PM.</strong> Reservations last up to two hours. Last booking: 10:00–11:00 PM ({{ config('app.timezone') }}).</p>
+    <p><strong>Open 8:00 AM–11:00 PM.</strong> Choose the time you will arrive; there is no time limit. Last arrival: 10:00 PM ({{ config('app.timezone') }}).</p>
     <label for="{{ $reservationSlotsId }}">Available times for your selected date</label>
     <select class="control" id="{{ $reservationSlotsId }}" data-slots aria-label="Available reservation times" required><option value="">Choose a date first</option></select>
     <small data-schedule-message role="status" aria-live="polite"></small>

@@ -51,7 +51,7 @@ class LegacyReservationSchemaCompatibilityTest extends TestCase
         $this->book('2030-01-02 18:30:00');
         $schedule = app(ReservationSchedule::class);
 
-        $this->assertSame('06:00 PM – 08:00 PM', $first->time_range);
+        $this->assertSame('06:00 PM', $first->arrival_time);
         $this->assertFalse($schedule->isAvailable('2030-01-02 18:00:00', 'table', 2));
 
         try {

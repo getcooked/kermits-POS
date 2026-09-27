@@ -50,7 +50,7 @@
                     @if($reservation)
                         <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>
                         <div><dt>Party</dt><dd>{{ $reservation->table_size }} seats reserved · {{ $reservation->table_label }}</dd></div>
-                        <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at?->format('M d, Y') }} · {{ $reservation->time_range }}</dd></div>
+                        <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at?->format('M d, Y') }} · {{ $reservation->arrival_time }}</dd></div>
                     @endif
                 </dl>
 

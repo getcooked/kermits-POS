@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class ReservationSchedule
 {
-    public const HOURS_MESSAGE = 'Open 8:00 AM–11:00 PM. Choose an arrival from 8:00 AM to 10:00 PM. The last reservation is 10:00–11:00 PM.';
+    public const HOURS_MESSAGE = 'Open 8:00 AM–11:00 PM. Choose an arrival from 8:00 AM to 10:00 PM. The last arrival is 10:00 PM.';
 
     private ?bool $hasReservationEndAt = null;
 
@@ -25,9 +25,14 @@ class ReservationSchedule
 
     private ?bool $hasDiningTableColumn = null;
 
+    private ?bool $hasSeatedAt = null;
+
+    private ?int $stayMinutes = null;
+
     public function __construct(private readonly TableLayout $layout)
     {
         $this->hasDiningTableColumn = Schema::hasColumn('reservations', 'dining_table_id');
+        $this->hasSeatedAt = Schema::hasColumn('reservations', 'seated_at');
         $this->hasReservationEndAt = Schema::hasColumn('reservations', 'reservation_end_at');
         $this->hasHoldExpiresAt = Schema::hasColumn('reservations', 'hold_expires_at');
         $this->hasReservationLock = Schema::hasTable('reservation_locks');
@@ -59,6 +64,19 @@ class ReservationSchedule
         return $this->hasDiningTableColumn ??= Schema::hasColumn('reservations', 'dining_table_id');
     }
 
+    private function hasSeatedAt(): bool
+    {
+        return $this->hasSeatedAt ??= Schema::hasColumn('reservations', 'seated_at');
+    }
+
+    /**
+     * Estimated stay used to space out bookings; customers only choose an arrival time.
+     */
+    public function stayMinutes(): int
+    {
+        return $this->stayMinutes ??= $this->layout->stayMinutes();
+    }
+
     /**
      * Store every reservation time in one canonical format so duplicate checks
      * work consistently for web datetime inputs and mobile ISO-8601 inputs.
@@ -82,7 +100,7 @@ class ReservationSchedule
         $start = CarbonImmutable::parse($this->normalize($at));
         $closing = $start->setTimeFromTimeString(config('reservations.closing_time'));
 
-        return $start->addMinutes(config('reservations.duration_minutes'))->min($closing)->format('Y-m-d H:i:s');
+        return $start->addMinutes($this->stayMinutes())->min($closing)->format('Y-m-d H:i:s');
     }
 
     public function active(): Builder
@@ -106,18 +124,46 @@ class ReservationSchedule
 
     /**
      * Active bookings whose period, plus the cleanup time either side, overlaps [start, end).
+     * Seated parties are left out unless asked for: their table is marked
+     * occupied on the floor, and that is what holds it (see TableLayout::slots()).
      */
-    private function conflicts(string $start, string $end, ?int $ignore = null, int $turnoverMinutes = 0): Builder
+    private function conflicts(string $start, string $end, ?int $ignore = null, int $turnoverMinutes = 0, bool $includeSeated = false): Builder
     {
         $windowStart = CarbonImmutable::parse($start)->subMinutes($turnoverMinutes)->format('Y-m-d H:i:s');
         $windowEnd = CarbonImmutable::parse($end)->addMinutes($turnoverMinutes)->format('Y-m-d H:i:s');
         $query = $this->active()->when($ignore, fn (Builder $q) => $q->whereKeyNot($ignore))
+            ->when(! $includeSeated && $this->hasSeatedAt(), fn (Builder $q) => $q->whereNull('seated_at'))
             ->where('reservation_at', '<', $windowEnd);
 
         return $this->hasReservationEndAt()
             ? $query->where(fn (Builder $q) => $q->where('reservation_end_at', '>', $windowStart)->orWhereNull('reservation_end_at'))
             : $query->where('reservation_at', '>', CarbonImmutable::parse($windowStart)
-                ->subMinutes(config('reservations.duration_minutes'))->format('Y-m-d H:i:s'));
+                ->subMinutes($this->stayMinutes())->format('Y-m-d H:i:s'));
+    }
+
+    /**
+     * An exclusive booking needs no overlapping reservation and no table in use on the floor.
+     */
+    private function venueFree(string $start, string $end, ?int $ignore = null): bool
+    {
+        $turnover = $this->layout->turnoverMinutes();
+        if ($this->conflicts($start, $end, $ignore, $turnover)->exists()) {
+            return false;
+        }
+
+        return ! $this->floorBusy($this->layout->slots(), $start, $end, $turnover);
+    }
+
+    private function floorBusy(array $slots, string $start, string $end, int $turnoverMinutes): bool
+    {
+        $period = ['start' => $start, 'end' => $end];
+        foreach ($slots as $slot) {
+            if ($this->isBusy($slot['busy'] ?? [], $period, $turnoverMinutes * 60)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasCapacity(string $start, string $end, int $guests, ?int $ignore = null, ?int $tableId = null): bool
@@ -168,7 +214,7 @@ class ReservationSchedule
         }
 
         $periods = $bookings->map(fn (Reservation $reservation): array => $this->period($reservation))
-            ->push(['start' => $start, 'end' => $end, 'guests' => $guests, 'table' => $tableId])
+            ->push(['start' => $start, 'end' => $end, 'guests' => $guests, 'table' => $tableId, 'strict' => true])
             ->all();
 
         return $this->allocate($periods, $slots, $turnoverMinutes);
@@ -199,12 +245,15 @@ class ReservationSchedule
     /**
      * Seat every period: requested tables first, then the remaining parties in
      * start order at the smallest free table that fits. A table must stay
-     * empty for the cleanup time after each booking.
+     * empty for the cleanup time after each booking. Tables start with what
+     * staff marked on the floor. An existing booking whose requested table is
+     * taken there is seated elsewhere; the booking being checked (`strict`)
+     * must get the table it asks for.
      */
     private function allocate(array $periods, array $slots, int $turnoverMinutes): bool
     {
         $turnoverSeconds = $turnoverMinutes * 60;
-        $tables = array_map(fn (array $slot): array => [...$slot, 'busy' => []], $slots);
+        $tables = array_map(fn (array $slot): array => [...$slot, 'busy' => $slot['busy'] ?? []], $slots);
         $indexById = [];
         foreach ($tables as $index => $table) {
             if ($table['id'] !== null) {
@@ -221,7 +270,12 @@ class ReservationSchedule
                 continue;
             }
             if ($this->isBusy($tables[$index]['busy'], $period, $turnoverSeconds)) {
-                return false;
+                if (! empty($period['strict'])) {
+                    return false;
+                }
+                $unassigned[] = $period;
+
+                continue;
             }
             $tables[$index]['busy'][] = $period;
         }
@@ -266,10 +320,11 @@ class ReservationSchedule
      */
     public function upcomingBookingsFit(array $slots, int $turnoverMinutes): bool
     {
-        $query = $this->active()->where('type', 'table');
+        $query = $this->active()->where('type', 'table')
+            ->when($this->hasSeatedAt(), fn (Builder $q) => $q->whereNull('seated_at'));
         $query = $this->hasReservationEndAt()
             ? $query->where(fn (Builder $q) => $q->where('reservation_end_at', '>', now())->orWhereNull('reservation_end_at'))
-            : $query->where('reservation_at', '>', now()->subMinutes(config('reservations.duration_minutes')));
+            : $query->where('reservation_at', '>', now()->subMinutes($this->stayMinutes()));
 
         $periods = $query->get($this->conflictColumns())
             ->map(fn (Reservation $reservation): array => $this->period($reservation))
@@ -299,7 +354,7 @@ class ReservationSchedule
             $slotBookings = $bookings->filter(function (Reservation $reservation) use ($windowStart, $windowEnd): bool {
                 $reservationStart = $this->normalize($reservation->reservation_at);
                 $reservationEnd = $reservation->reservation_end_at?->format('Y-m-d H:i:s')
-                    ?? CarbonImmutable::parse($reservationStart)->addMinutes(config('reservations.duration_minutes'))->format('Y-m-d H:i:s');
+                    ?? CarbonImmutable::parse($reservationStart)->addMinutes($this->stayMinutes())->format('Y-m-d H:i:s');
 
                 return $reservationStart < $windowEnd && $reservationEnd > $windowStart;
             });
@@ -309,7 +364,7 @@ class ReservationSchedule
                 $available = false;
             } elseif ($available) {
                 $available = $type === 'exclusive'
-                    ? $slotBookings->isEmpty()
+                    ? $slotBookings->isEmpty() && ! $this->floorBusy($tables, $slotStart, $slotEnd, $turnover)
                     : $this->hasCapacityForBookings($slotBookings, $slotStart, $slotEnd, $guests, $tables, $turnover, $tableId);
             }
 
@@ -322,11 +377,11 @@ class ReservationSchedule
                 };
             }
 
-            $end = CarbonImmutable::parse($slotEnd);
             $slots[] = [
                 'start' => $at->format('Y-m-d\\TH:i'),
-                'end' => $end->format('Y-m-d\\TH:i'),
-                'label' => $at->format('g:i A').' – '.$end->format('g:i A'),
+                // Kept for older app builds; customers are shown the arrival time only.
+                'end' => CarbonImmutable::parse($slotEnd)->format('Y-m-d\\TH:i'),
+                'label' => $at->format('g:i A'),
                 'available' => $available,
                 'tables_left' => $tablesLeft,
             ];
@@ -349,7 +404,7 @@ class ReservationSchedule
         }
 
         return $type === 'exclusive'
-            ? ! $this->conflicts($start, $end, turnoverMinutes: $this->layout->turnoverMinutes())->exists()
+            ? $this->venueFree($start, $end)
             : $this->hasCapacity($start, $end, $guests, tableId: $tableId);
     }
 
@@ -357,7 +412,7 @@ class ReservationSchedule
     {
         $start = $this->normalize($at);
 
-        return $this->conflicts($start, $this->endAt($start), $ignore)->where('user_id', $userId)->exists();
+        return $this->conflicts($start, $this->endAt($start), $ignore, includeSeated: true)->where('user_id', $userId)->exists();
     }
 
     public function lock(): void
@@ -416,7 +471,7 @@ class ReservationSchedule
             }
 
             if ($attributes['type'] === 'exclusive') {
-                $available = ! $this->conflicts($start, $end, turnoverMinutes: $this->layout->turnoverMinutes())->exists();
+                $available = $this->venueFree($start, $end);
             } else {
                 $available = $this->hasCapacity($start, $end, $guests, tableId: $tableId);
             }
@@ -465,7 +520,7 @@ class ReservationSchedule
                 $end = $reservation->reservation_end_at?->format('Y-m-d H:i:s') ?? $this->endAt($start);
                 $tableId = $this->hasDiningTableColumn() && $reservation->dining_table_id ? (int) $reservation->dining_table_id : null;
                 if (($reservation->type === 'table' && ! $this->hasCapacity($start, $end, $reservation->guests, $reservation->id, $tableId))
-                    || ($reservation->type === 'exclusive' && $this->conflicts($start, $end, $reservation->id, $this->layout->turnoverMinutes())->exists())) {
+                    || ($reservation->type === 'exclusive' && ! $this->venueFree($start, $end, $reservation->id))) {
                     throw ValidationException::withMessages(['status' => 'No suitable capacity or venue is available for this reservation.']);
                 }
                 if ($this->hasReservationEndAt()) {

@@ -30,7 +30,7 @@
                 @if($reservation)
                     <div><dt>Reservation</dt><dd>{{ $reservation->reference }}</dd></div>
                     <div><dt>Table</dt><dd>{{ $reservation->table_size }} {{ $reservation->table_size === 1 ? 'seat' : 'seats' }} · {{ $reservation->table_label }}</dd></div>
-                    <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->time_range }}</dd></div>
+                    <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->arrival_time }}</dd></div>
                 @endif
                 <div><dt>Payment</dt><dd>{{ match($order->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>
                 <div><dt>Status</dt><dd>{{ $isRejected ? 'Rejected' : ($isAccepted ? ($order->payment_method === 'paymongo' ? 'Paid' : 'Accepted') : 'Pending '.match($order->payment_method) { 'gcash' => 'payment verification', 'paymongo' => 'PayMongo payment', default => 'counter payment' }) }}</dd></div>
