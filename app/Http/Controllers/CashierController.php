@@ -9,27 +9,52 @@ use App\Models\Reservation;
 use App\Models\StockMovement;
 use App\Models\SystemSetting;
 use App\Services\OrderService;
+use App\Services\PayMongoCounterPayment;
 use App\Services\ReservationPushNotifier;
 use App\Services\ReservationSchedule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class CashierController extends Controller
 {
-    public function index(): View
+    public function index(Request $request, PayMongoCounterPayment $payMongo): View
     {
+        $this->releaseExpiredPayMongoSales($request, $payMongo);
+
         return view('roles.cashier', [
             'products' => Product::query()->available()->menuOrder()->get(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
+            'paymongoEnabled' => PayMongoCounterPayment::enabled(),
         ]);
+    }
+
+    private function releaseExpiredPayMongoSales(Request $request, PayMongoCounterPayment $payMongo): void
+    {
+        Order::query()
+            ->whereNull('customer_id')
+            ->where('payment_method', 'paymongo')
+            ->where('payment_status', 'pending')
+            ->where('created_at', '<', now()->subMinutes(PayMongoCounterPayment::QR_LIFETIME_MINUTES))
+            ->oldest()
+            ->limit(5)
+            ->get()
+            ->each(function (Order $order) use ($request, $payMongo): void {
+                try {
+                    $payMongo->cancel($order, $request->user());
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
+            });
     }
 
     public function customerOrders(Request $request): View
@@ -284,8 +309,28 @@ class CashierController extends Controller
         return redirect()->route('cashier.orders.review', $order)->with('status', $message);
     }
 
-    public function checkout(CashierCheckoutRequest $request, OrderService $orders): RedirectResponse
+    public function checkout(CashierCheckoutRequest $request, OrderService $orders, PayMongoCounterPayment $payMongo): RedirectResponse
     {
+        if ($request->validated('payment_method') === 'paymongo') {
+            $order = $orders->create(
+                user: $request->user(),
+                quantities: $request->selectedQuantities(),
+                paymentStatus: 'pending',
+                paymentMethod: 'paymongo',
+            );
+
+            try {
+                $payMongo->start($order);
+            } catch (Throwable $exception) {
+                report($exception);
+                $payMongo->cancel($order, $request->user());
+
+                return back()->withInput()->withErrors(['payment_method' => 'PayMongo QR could not be created. Try again or use Cash or GCash.']);
+            }
+
+            return redirect()->route('cashier.paymongo.show', $order);
+        }
+
         $order = $orders->create(
             user: $request->user(),
             quantities: $request->selectedQuantities(),
@@ -298,6 +343,55 @@ class CashierController extends Controller
         return redirect()
             ->route('receipts.show', $order)
             ->with('status', 'Payment completed successfully.');
+    }
+
+    public function showPayMongo(Order $order, PayMongoCounterPayment $payMongo): View|RedirectResponse
+    {
+        abort_unless(PayMongoCounterPayment::isCounterOrder($order), 404);
+        if ($order->payment_status === 'paid') {
+            return redirect()->route('receipts.show', $order);
+        }
+        if ($order->payment_status !== 'pending') {
+            return redirect()->route('cashier')->withErrors(['order' => 'This PayMongo QR sale was cancelled.']);
+        }
+
+        return view('roles.cashier-paymongo', [
+            'order' => $order->load('items.product'),
+            'qr' => $payMongo->qrFor($order),
+            'expiresAt' => $payMongo->expiresAt($order),
+        ]);
+    }
+
+    public function payMongoStatus(Order $order, PayMongoCounterPayment $payMongo): JsonResponse
+    {
+        abort_unless(PayMongoCounterPayment::isCounterOrder($order), 404);
+
+        // Ask PayMongo directly at most every 5 seconds per order, in case the webhook cannot reach this server.
+        if ($order->payment_status === 'pending' && Cache::add('paymongo-counter-poll:'.$order->id, true, 5)) {
+            try {
+                $payMongo->refresh($order);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+            $order->refresh();
+        }
+
+        return response()->json([
+            'status' => $order->payment_status,
+            'receipt_url' => $order->payment_status === 'paid' ? route('receipts.show', $order) : null,
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
+    public function cancelPayMongo(Request $request, Order $order, PayMongoCounterPayment $payMongo): RedirectResponse
+    {
+        abort_unless(PayMongoCounterPayment::isCounterOrder($order), 404);
+
+        if (! $payMongo->cancel($order, $request->user())) {
+            return redirect()->route('receipts.show', $order)
+                ->with('status', 'PayMongo already received this payment, so the sale was completed instead of cancelled.');
+        }
+
+        return redirect()->route('cashier')->with('status', 'PayMongo QR sale cancelled. Items were returned to stock.');
     }
 
     public function confirmCustomerPayment(Request $request, Order $order): RedirectResponse

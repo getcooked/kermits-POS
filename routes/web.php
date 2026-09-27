@@ -186,6 +186,14 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/cashier/customer-orders/{order}/review', [CashierController::class, 'reviewCustomerOrder'])
             ->middleware('role:cashier')
             ->name('cashier.orders.review');
+        Route::get('/cashier/paymongo/{order}', [CashierController::class, 'showPayMongo'])
+            ->name('cashier.paymongo.show');
+        Route::get('/cashier/paymongo/{order}/status', [CashierController::class, 'payMongoStatus'])
+            ->middleware('throttle:120,1')
+            ->name('cashier.paymongo.status');
+        Route::post('/cashier/paymongo/{order}/cancel', [CashierController::class, 'cancelPayMongo'])
+            ->middleware('throttle:20,1')
+            ->name('cashier.paymongo.cancel');
         Route::get('/cashier/customer-orders/{order}/payment-proof', [CashierController::class, 'paymentProof'])
             ->middleware('role:cashier')
             ->name('cashier.orders.payment-proof');

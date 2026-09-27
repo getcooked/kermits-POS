@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Services\PayMongoCounterPayment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
 
 class PayMongoWebhookController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, PayMongoCounterPayment $counter): JsonResponse
     {
         $secret = config('services.paymongo.webhook_secret');
         $key = config('services.paymongo.secret_key');
@@ -32,12 +33,25 @@ class PayMongoWebhookController extends Controller
             return response()->json(['error' => 'Invalid signature'], 401);
         }
 
-        $payload = $request->json()->all();
-        if (data_get($payload, 'data.type') !== 'checkout_session.payment.paid') {
+        // PayMongo wraps events as data.attributes.{type,livemode,data}; accept the flat shape too.
+        $raw = $request->json()->all();
+        $payload = is_string(data_get($raw, 'data.attributes.type')) ? ['data' => data_get($raw, 'data.attributes')] : $raw;
+        $type = data_get($payload, 'data.type');
+        if (! in_array($type, ['checkout_session.payment.paid', 'payment.paid'], true)) {
             return response()->json(['received' => true]);
         }
         if (data_get($payload, 'data.livemode') !== ($mode === 'li')) {
             return response()->json(['error' => 'Payment mode mismatch'], 422);
+        }
+
+        if ($type === 'payment.paid') {
+            $intentId = data_get($payload, 'data.data.attributes.payment_intent_id');
+            if (is_string($intentId) && $intentId !== '') {
+                $counter->markPaid($intentId, data_get($payload, 'data.data'));
+            }
+
+            // Online checkout payments also emit payment.paid; those are settled by checkout_session.payment.paid.
+            return response()->json(['received' => true]);
         }
 
         $sessionId = data_get($payload, 'data.data.id');
