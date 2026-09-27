@@ -19,7 +19,7 @@
     }
 
     // Headings orient the page; dense work areas stay still and immediately usable.
-    enter('.topbar, .dash-head, .report-topbar, .sell-head, .reservation-view-header, .customer-shop > header, .history-page > header', {distance:'0 5px', duration:220, limit:1});
+    enter('.topbar, .dash-head, .report-topbar, .sell-head, .reservation-view-header, .customer-shop > header, .history-page > header, .history-body > .history-header', {distance:'0 5px', duration:220, limit:1});
     enter('.hero-copy > h1, .hero-copy > .hero-text, .hero-copy > .hero-actions', {distance:'0 10px', duration:380, stagger:50, limit:3});
     enter('.hero-visual .plate', {distance:'12px 0', duration:480, limit:1});
     enter('table tbody > tr', {distance:'0 6px', duration:260, stagger:35, limit:6});
