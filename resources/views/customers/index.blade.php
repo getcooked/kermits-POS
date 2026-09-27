@@ -2,14 +2,14 @@
 @section('title', 'Customer Information')
 @section('content')
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard customer-accounts">
-    <header class="account-head"><div><p>SUPER ADMIN</p><h1>Customers</h1><span>Registered customer accounts and their activity.</span></div></header>
+    <header class="account-head"><div><h1>Customer Accounts</h1><span>Registered customer accounts and their activity.</span></div></header>
     @include('partials.account-tabs')
     @if(session('status'))<div class="notice account-message">{{ session('status') }}</div>@endif
 
     <section class="account-summary-cards">
-        <div class="welcome"><span>Registered customers</span><h2>{{ $customers->count() }}</h2></div>
-        <div class="welcome"><span>Customer orders</span><h2>{{ $customers->sum('orders_count') }}</h2></div>
-        <div class="welcome"><span>Customer order value</span><h2>&#8369;{{ number_format($customers->sum('orders_sum_total'), 2) }}</h2></div>
+        <div class="welcome"><span>Customer Accounts</span><h2>{{ $customers->count() }}</h2></div>
+        <div class="welcome"><span>Active Customer Accounts</span><h2>{{ $customers->whereNull('disabled_at')->count() }}</h2></div>
+        <div class="welcome"><span>Disabled Customer Accounts</span><h2>{{ $customers->whereNotNull('disabled_at')->count() }}</h2></div>
     </section>
 
     <section class="welcome account-card customer-list">

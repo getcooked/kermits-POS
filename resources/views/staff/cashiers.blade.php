@@ -2,11 +2,11 @@
 @section('title','Cashier Accounts')
 @section('content')
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard cashier-accounts">
-    <header class="topbar"><div><p>SUPER ADMIN</p><h1>Cashier accounts</h1><span>Create secure staff access for the point of sale.</span></div></header>
+    <header class="topbar"><div><h1>Cashier Accounts</h1><span>Create secure staff access for the point of sale.</span></div></header>
     @include('partials.account-tabs')
     @if(session('status'))<div class="notice account-notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="error account-notice">{{ $errors->first() }}</div>@endif
-    <section class="cashier-summary-cards"><div class="welcome"><span>Active cashiers</span><h2>{{ $cashiers->count() }}</h2></div><div class="welcome"><span>Completed cashier sales</span><h2>{{ $cashiers->sum('paid_sales_count') }}</h2></div><div class="welcome"><span>Cashier sales value</span><h2>&#8369;{{ number_format($cashiers->sum('paid_sales_total'),2) }}</h2></div></section>
+    <section class="cashier-summary-cards"><div class="welcome"><span>Cashier Accounts</span><h2>{{ $cashiers->count() }}</h2></div><div class="welcome"><span>Active Cashier Accounts</span><h2>{{ $cashiers->whereNull('disabled_at')->count() }}</h2></div><div class="welcome"><span>Disabled Cashier Accounts</span><h2>{{ $cashiers->whereNotNull('disabled_at')->count() }}</h2></div></section>
     <div class="cashier-account-grid">
         <section class="welcome create-cashier"><p>NEW CASHIER</p><h2>Create cashier account</h2><form method="POST" action="{{ route('cashiers.store') }}" data-ajax-form data-ajax-target=".cashier-accounts" data-ajax-loading="Creating...">@csrf
             <div class="field"><label for="name">Full name</label><input class="control" id="name" name="name" value="{{ old('name') }}" maxlength="100" required><small>Maximum 100 characters.</small></div>
