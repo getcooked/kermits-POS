@@ -150,18 +150,13 @@ class AuthController extends Controller
 
     public function store(LoginRequest $request, LoginAttemptLimiter $loginAttempts): RedirectResponse
     {
-        $login = $request->string('email')->trim()->toString();
-        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $login = Str::lower($login);
-        }
+        $login = Str::lower($request->string('email')->trim()->toString());
 
         if ($loginAttempts->isLocked($request, $login)) {
             return $this->lockoutResponse($request, $loginAttempts, $login);
         }
 
-        $credentialLogin = $this->resolveSuperAdminEmail($login);
-        $field = filter_var($credentialLogin, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
-        $credentials = [$field => $credentialLogin, 'password' => $request->validated('password')];
+        $credentials = ['email' => $this->resolveSuperAdminEmail($login), 'password' => $request->validated('password')];
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             if ($loginAttempts->recordFailure($request, $login)) {
@@ -169,7 +164,7 @@ class AuthController extends Controller
             }
 
             return back()->withErrors([
-                'email' => 'The username/email or password is incorrect.',
+                'email' => 'The email or password is incorrect.',
             ])->onlyInput('email');
         }
 

@@ -62,7 +62,6 @@ class CashierAccountController extends Controller
         $deletedIdentity = 'deleted-cashier-'.$cashier->id.'-'.Str::lower(Str::random(10));
         $cashier->forceFill([
             'name' => 'Deleted Cashier #'.$cashier->id,
-            'username' => $deletedIdentity,
             'email' => $deletedIdentity.'@invalid.local',
             'phone' => null,
             'password' => Str::random(64),

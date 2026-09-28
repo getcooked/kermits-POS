@@ -31,7 +31,6 @@ class CustomerDetailsSchemaCompatibilityTest extends TestCase
             ],
         ])->post('/register', [
             'name' => 'Schema Repair',
-            'username' => 'schema.repair',
             'email' => 'schema.repair@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',

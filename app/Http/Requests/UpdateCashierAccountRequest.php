@@ -28,7 +28,6 @@ class UpdateCashierAccountRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:100'],
-            'username' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($cashier)],
             'email' => ['required', 'email', 'max:160', Rule::unique('users', 'email')->ignore($cashier)],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
             'password' => ['nullable', 'confirmed', Password::defaults()],

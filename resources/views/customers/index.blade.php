@@ -20,16 +20,16 @@
         @if($customers->isNotEmpty())
             <div class="customer-search">
                 <label class="visually-hidden" for="customer-search">Search customers</label>
-                <input class="control" id="customer-search" type="search" placeholder="Search by name, username, email, or phone" autocomplete="off" data-customer-search>
+                <input class="control" id="customer-search" type="search" placeholder="Search by name, email, or phone" autocomplete="off" data-customer-search>
             </div>
         @endif
         <div data-customer-records>
             @forelse($customers as $customer)
                 @php($reservationCount = $reservationCounts[$customer->email] ?? 0)
-                <article class="account-record" data-search="{{ strtolower(implode(' ', array_filter([$customer->name, $customer->username, $customer->email, $customer->phone]))) }}">
+                <article class="account-record" data-search="{{ strtolower(implode(' ', array_filter([$customer->name, $customer->email, $customer->phone]))) }}">
                     <div class="account-record-summary">
                         <span>{{ strtoupper(substr($customer->name, 0, 1)) }}</span>
-                        <div><strong>{{ $customer->name }}</strong><small>{{ $customer->username ?: 'No username' }} · {{ $customer->email }}</small><small>{{ $customer->phone ?: 'No phone' }} · Joined {{ $customer->created_at->format('M d, Y') }}</small></div>
+                        <div><strong>{{ $customer->name }}</strong><small>{{ $customer->email }}</small><small>{{ $customer->phone ?: 'No phone' }} · Joined {{ $customer->created_at->format('M d, Y') }}</small></div>
                         <div class="account-stats">
                             <b class="account-badge">{{ $customer->orders_count }} {{ Str::plural('order', $customer->orders_count) }}</b>
                             <b class="account-badge">{{ $reservationCount }} {{ Str::plural('reservation', $reservationCount) }}</b>

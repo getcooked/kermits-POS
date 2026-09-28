@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -22,18 +21,9 @@ class MobileAccountController extends Controller
         $customer = $request->user();
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'username' => [
-                'required',
-                'string',
-                'min:3',
-                'max:30',
-                'regex:/^[A-Za-z0-9._-]+$/',
-                Rule::unique('users', 'username')->ignore($customer),
-            ],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
             'address' => ['sometimes', 'required', 'string', 'max:500'],
         ], [
-            'username.regex' => 'The username may only contain letters, numbers, dots, underscores, and hyphens.',
             'phone.regex' => 'Enter an 11-digit Philippine mobile number starting with 09.',
         ]);
 
@@ -44,7 +34,7 @@ class MobileAccountController extends Controller
         return response()->json([
             'message' => 'Your personal information was updated.',
             'data' => [
-                ...$customer->only(['id', 'name', 'username', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
+                ...$customer->only(['id', 'name', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
                 'birthday' => $customer->birthday?->format('Y-m-d'),
                 'age' => $customer->birthday?->age,
             ],

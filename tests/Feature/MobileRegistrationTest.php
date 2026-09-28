@@ -49,7 +49,6 @@ class MobileRegistrationTest extends TestCase
         $this->postJson('/api/v1/register', [
             'registration_token' => $token,
             'name' => str_repeat('A', 49).' '.str_repeat('B', 50),
-            'username' => str_repeat('u', 30),
             'email' => 'new.customer@gmail.com',
             'phone' => '09171234567',
             'birthday' => $birthday,
@@ -85,7 +84,6 @@ class MobileRegistrationTest extends TestCase
         $this->postJson('/api/v1/register', [
             'registration_token' => $registrationToken,
             'name' => str_repeat('A', 101),
-            'username' => str_repeat('u', 31),
             'email' => 'invalid-limits@gmail.com',
             'phone' => '0817123456a',
             'birthday' => now()->addDay()->toDateString(),
@@ -94,7 +92,7 @@ class MobileRegistrationTest extends TestCase
             'password' => $password,
             'password_confirmation' => $password,
         ])->assertUnprocessable()->assertJsonValidationErrors([
-            'name', 'username', 'phone', 'birthday', 'sex', 'address', 'password',
+            'name', 'phone', 'birthday', 'sex', 'address', 'password',
         ]);
 
         $this->assertDatabaseMissing('users', ['email' => 'invalid-limits@gmail.com']);
@@ -105,7 +103,6 @@ class MobileRegistrationTest extends TestCase
         $this->postJson('/api/v1/register', [
             'registration_token' => str_repeat('x', 64),
             'name' => 'Unverified Customer',
-            'username' => 'unverified',
             'email' => 'unverified@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',

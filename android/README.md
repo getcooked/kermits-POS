@@ -38,7 +38,7 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 
 ## Included customer flow
 
-- Customer login with username or Gmail address
+- Customer login with Gmail address
 - Inline 30-second cooldown after five failed credential attempts
 - Encrypted bearer-token persistence and logout/revocation
 - Live product catalog with stock-aware cart

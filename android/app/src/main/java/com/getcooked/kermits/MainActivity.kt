@@ -239,7 +239,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                         response.code() >= 500 -> error = "Kermit's server is temporarily unavailable. Please try again shortly."
                         else -> error = parsedError?.errors?.get("recaptcha_token")?.firstOrNull()
                             ?: apiErrorMessage(parsedError)
-                            ?: "The username/email or password is incorrect. The mobile app accepts customer accounts only."
+                            ?: "The email or password is incorrect. The mobile app accepts customer accounts only."
                     }
                     return@launch
                 }
@@ -460,12 +460,12 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             }
         }
     }
-    fun updateProfile(name: String, username: String, phone: String, address: String, done: (String?) -> Unit) = viewModelScope.launch {
+    fun updateProfile(name: String, phone: String, address: String, done: (String?) -> Unit) = viewModelScope.launch {
         if (busy) return@launch
         busy = true
         error = null
         try {
-            val response = api.updateProfile(UpdateProfileRequest(name.trim(), username.trim(), phone.trim(), address.trim()))
+            val response = api.updateProfile(UpdateProfileRequest(name.trim(), phone.trim(), address.trim()))
             if (!response.isSuccessful) {
                 error = apiError(response.errorBody()?.string()) ?: "Your personal information could not be updated."
                 done(null)
@@ -849,7 +849,7 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
             Spacer(Modifier.height(8.dp)); Text("Log in to your account", color = Color(0xFF202124), fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(7.dp)); Text("Enter your details to continue to Kermit’s.", color = Color(0xFF687286), fontSize = 15.sp)
             Spacer(Modifier.height(28.dp))
-            OutlinedTextField(login, setLogin, label = { Text("Username or email address") }, placeholder = { Text("Username or name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(login, setLogin, label = { Text("Email address") }, placeholder = { Text("name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submitLogin() }), trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (passwordVisible) "Hide password" else "Show password") } }, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             vm.registrationMessage?.let { Text(it, color = Color(0xFF626B00), fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             loginError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
@@ -908,7 +908,7 @@ private fun AccountScreen(vm: AppViewModel) {
                 Column(Modifier.padding(18.dp)) {
                     Text(vm.user?.name.orEmpty(), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp, bottom = 18.dp))
-                    AccountOption(Icons.Default.Person, "Personal Information", "Update your name, username, and phone number") { vm.clearError(); section = "personal" }
+                    AccountOption(Icons.Default.Person, "Personal Information", "Update your name and phone number") { vm.clearError(); section = "personal" }
                     Spacer(Modifier.height(10.dp))
                     AccountOption(Icons.Default.Lock, "Change Password", "Verify your email before choosing a new password") { vm.clearError(); section = "password" }
                     Spacer(Modifier.height(20.dp))
@@ -1078,11 +1078,10 @@ private val PLUS_CODE = Regex("^[23456789CFGHJMPQRVWX]{4,8}\\+[23456789CFGHJMPQR
 private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
     val customer = vm.user
     var name by rememberSaveable(customer?.id) { mutableStateOf(customer?.name.orEmpty()) }
-    var username by rememberSaveable(customer?.id) { mutableStateOf(customer?.username.orEmpty()) }
     var phone by rememberSaveable(customer?.id) { mutableStateOf(customer?.phone.orEmpty()) }
     var address by rememberSaveable(customer?.id) { mutableStateOf(customer?.address.orEmpty()) }
     var status by rememberSaveable { mutableStateOf<String?>(null) }
-    val canSave = name.isNotBlank() && name.length <= 100 && username.length in 3..30 && Regex("^[A-Za-z0-9._-]+$").matches(username) && Regex("^09\\d{9}$").matches(phone) && address.isNotBlank() && address.length <= 500
+    val canSave = name.isNotBlank() && name.length <= 100 && Regex("^09\\d{9}$").matches(phone) && address.isNotBlank() && address.length <= 500
 
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
         TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
@@ -1091,7 +1090,6 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
             Column(Modifier.padding(18.dp)) {
                 RegistrationField("Full name", name, "Maximum 100 characters") { name = it.take(100); status = null; vm.clearError() }
-                RegistrationField("Username", username, "3–30 characters: letters, numbers, dots, underscores, and hyphens") { username = it.filter { character -> character.isLetterOrDigit() || character in "._-" }.take(30); status = null; vm.clearError() }
                 RegistrationField("Phone number", phone, "11 digits starting with 09", keyboardType = KeyboardType.Number) { phone = it.filter(Char::isDigit).take(11); status = null; vm.clearError() }
                 OutlinedTextField(
                     value = address,
@@ -1120,7 +1118,7 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 status?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp)) }
                 Spacer(Modifier.height(16.dp))
                 Button(
-                    onClick = { status = null; vm.updateProfile(name, username, phone, address) { status = it } },
+                    onClick = { status = null; vm.updateProfile(name, phone, address) { status = it } },
                     enabled = canSave && !vm.busy,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
                     shape = RoundedCornerShape(8.dp),
@@ -1203,7 +1201,7 @@ private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
 @Composable
 private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }; var challenge by rememberSaveable { mutableStateOf<String?>(null) }; var code by rememberSaveable { mutableStateOf("") }; var token by rememberSaveable { mutableStateOf<String?>(null) }
-    var name by rememberSaveable { mutableStateOf("") }; var username by rememberSaveable { mutableStateOf("") }; var phone by rememberSaveable { mutableStateOf("") }; var birthday by rememberSaveable { mutableStateOf("") }; var sex by rememberSaveable { mutableStateOf("") }; var address by rememberSaveable { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }; var phone by rememberSaveable { mutableStateOf("") }; var birthday by rememberSaveable { mutableStateOf("") }; var sex by rememberSaveable { mutableStateOf("") }; var address by rememberSaveable { mutableStateOf("") }; var password by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf("") }
     val context = LocalContext.current
     var resendSeconds by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(resendSeconds) {
@@ -1219,12 +1217,6 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         normalizedName.isBlank() -> "Enter your full name."
         name.length > 100 || !normalizedName.matches(Regex("^\\p{L}[\\p{L}\\p{M}]*(?: \\p{L}[\\p{L}\\p{M}]*)*$")) ->
             "Full name can contain only letters and single spaces, up to 100 characters."
-        else -> null
-    }
-    val usernameError = when {
-        username.isBlank() -> "Enter a username."
-        username.length < 3 -> "Username must contain at least 3 characters."
-        !username.matches(Regex("^[A-Za-z0-9._-]{3,30}$")) -> "Username can use only letters, numbers, dots, underscores, and hyphens, up to 30 characters."
         else -> null
     }
     val phoneError = when {
@@ -1255,7 +1247,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         confirmation != password -> "Passwords do not match."
         else -> null
     }
-    val firstRegistrationError = nameError ?: usernameError ?: phoneError ?: birthdayError ?: sexError ?: addressError ?: passwordError ?: confirmationError
+    val firstRegistrationError = nameError ?: phoneError ?: birthdayError ?: sexError ?: addressError ?: passwordError ?: confirmationError
     Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).imePadding()) {
         RegistrationBrandPanel(Modifier.fillMaxWidth().height(170.dp))
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp)) {
@@ -1293,13 +1285,6 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
                 errorText = nameError.takeIf { showRegistrationErrors },
                 keyboardType = KeyboardType.Text,
             ) { input -> name = input.filter { it.isLetter() || it == ' ' }.take(100) }
-            RegistrationField(
-                label = "Username",
-                value = username,
-                helperText = "3–30 characters: letters, numbers, dot, underscore, or hyphen (${username.length}/30)",
-                errorText = usernameError.takeIf { showRegistrationErrors },
-                keyboardType = KeyboardType.Ascii,
-            ) { input -> username = input.filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it in "._-" }.take(30) }
             RegistrationField(
                 label = "Phone number",
                 value = phone,
@@ -1363,7 +1348,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
                     showRegistrationErrors = true
                     vm.clearError()
                     if (firstRegistrationError == null) {
-                        vm.register(RegisterRequest(token!!, normalizedName, username, email.trim(), phone, birthday, sex, address.trim(), password, confirmation)) { ok -> if (ok) onBack() }
+                        vm.register(RegisterRequest(token!!, normalizedName, email.trim(), phone, birthday, sex, address.trim(), password, confirmation)) { ok -> if (ok) onBack() }
                     }
                 },
                 enabled = !vm.busy,

@@ -36,13 +36,6 @@
                     </div>
 
                     <div class="field">
-                        <label for="username">Username</label>
-                        <input class="control" id="username" name="username" value="{{ old('username', $customer->username) }}" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" autocomplete="username" required>
-                        <small>3–30 characters: letters, numbers, dots, underscores, and hyphens.</small>
-                        @error('username')<small class="field-error">{{ $message }}</small>@enderror
-                    </div>
-
-                    <div class="field">
                         <label for="phone">Phone number</label>
                         <input class="control" id="phone" name="phone" type="tel" inputmode="numeric" value="{{ old('phone', $customer->phone) }}" minlength="11" maxlength="11" pattern="09[0-9]{9}" autocomplete="tel" placeholder="09XXXXXXXXX" required>
                         <small>11 digits starting with 09.</small>

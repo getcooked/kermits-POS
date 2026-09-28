@@ -95,7 +95,6 @@ class AdminAccountManagementTest extends TestCase
 
         $admin = User::query()->where('email', 'new.admin@gmail.com')->firstOrFail();
         $this->assertSame(User::ROLE_SUPER_ADMIN, $admin->role);
-        $this->assertSame('newadmin', $admin->username);
         $this->assertNotNull($admin->email_verified_at);
         $this->assertTrue(Hash::check('NewAdmin123!', $admin->password));
         $this->assertNull(session('admin_email_verification'));
@@ -109,7 +108,7 @@ class AdminAccountManagementTest extends TestCase
             ->assertSessionHasNoErrors();
         auth()->logout();
 
-        $this->post(route('login.store'), ['email' => 'newadmin', 'password' => 'NewAdmin123!'])
+        $this->post(route('login.store'), ['email' => 'new.admin@gmail.com', 'password' => 'NewAdmin123!'])
             ->assertRedirect(route('dashboard'));
         $this->get(route('dashboard'))->assertOk();
     }
@@ -121,19 +120,19 @@ class AdminAccountManagementTest extends TestCase
         $this->addSession($other, 'other-session');
 
         $this->actingAs($me)->put(route('superadmin.admins.update', $other), [
-            'name' => 'Renamed Admin', 'username' => 'renamed', 'email' => 'Renamed@Gmail.com', 'phone' => '09171234567',
+            'name' => 'Renamed Admin', 'email' => 'Renamed@Gmail.com', 'phone' => '09171234567',
             'password' => 'Changed123!', 'password_confirmation' => 'Changed123!',
         ])->assertSessionHasNoErrors()->assertSessionHas('status', 'Admin account updated successfully.');
 
         $other->refresh();
-        $this->assertSame(['Renamed Admin', 'renamed', 'renamed@gmail.com', '09171234567'], [$other->name, $other->username, $other->email, $other->phone]);
+        $this->assertSame(['Renamed Admin', 'renamed@gmail.com', '09171234567'], [$other->name, $other->email, $other->phone]);
         $this->assertTrue(Hash::check('Changed123!', $other->password));
         $this->assertDatabaseMissing('sessions', ['id' => 'other-session']);
     }
 
     public function test_admin_can_change_their_own_password_from_edit_account(): void
     {
-        $me = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'username' => null, 'phone' => null]);
+        $me = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'phone' => null]);
         $this->addSession($me, 'my-other-browser');
 
         $this->actingAs($me)->put(route('superadmin.admins.update', $me), [
@@ -149,7 +148,7 @@ class AdminAccountManagementTest extends TestCase
     public function test_disabled_admin_is_signed_out_and_cannot_log_in_until_enabled(): void
     {
         $me = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        $other = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'username' => 'otheradmin', 'password' => 'Other123!']);
+        $other = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'email' => 'other.admin@gmail.com', 'password' => 'Other123!']);
         $this->addSession($other, 'other-session');
 
         $this->actingAs($me)->patch(route('superadmin.admins.disable', $other))
@@ -160,14 +159,14 @@ class AdminAccountManagementTest extends TestCase
         $this->actingAs($other->fresh())->get(route('dashboard'))->assertRedirect(route('login'));
         $this->assertGuest();
 
-        $this->post(route('login.store'), ['email' => 'otheradmin', 'password' => 'Other123!'])
+        $this->post(route('login.store'), ['email' => 'other.admin@gmail.com', 'password' => 'Other123!'])
             ->assertRedirect(route('login'))
             ->assertSessionHasErrors(['email' => 'This account has been disabled. Please contact a Super Admin.']);
         $this->assertGuest();
 
         $this->actingAs($me)->patch(route('superadmin.admins.enable', $other))->assertSessionHas('status');
         auth()->logout();
-        $this->post(route('login.store'), ['email' => 'otheradmin', 'password' => 'Other123!'])
+        $this->post(route('login.store'), ['email' => 'other.admin@gmail.com', 'password' => 'Other123!'])
             ->assertRedirect(route('dashboard'));
     }
 
@@ -188,7 +187,7 @@ class AdminAccountManagementTest extends TestCase
     private function newAdminForm(): array
     {
         return [
-            'name' => 'New Admin', 'username' => 'newadmin', 'email' => 'New.Admin@gmail.com',
+            'name' => 'New Admin', 'email' => 'New.Admin@gmail.com',
             'verification_code' => '123456', 'phone' => '09170000009',
             'password' => 'NewAdmin123!', 'password_confirmation' => 'NewAdmin123!',
         ];

@@ -103,7 +103,6 @@ class CustomerController extends Controller
 
             $customer->forceFill([
                 'name' => 'Deleted Customer #'.$customer->id,
-                'username' => $deletedIdentity,
                 'email' => $deletedIdentity.'@invalid.local',
                 'phone' => null,
                 'birthday' => null,

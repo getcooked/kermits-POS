@@ -31,7 +31,7 @@ Confirm the server uses the public HTTPS `APP_URL` and a working email provider.
 
 - Registration email, code verification, account creation, and password reset have independent request limits. Resending a code or correcting it no longer consumes the account-creation or password-reset limit.
 - The app can resend a code and change the email. Expired verification restarts the email step while retaining entered account details.
-- Specific validation errors, such as a taken username, appear in the app. Account creation success appears on the login screen.
+- Specific validation errors, such as an invalid phone number, appear in the app. Account creation success appears on the login screen.
 - Password recovery scrolls when the keyboard is open and explains how to complete the email link flow.
 - An SMTP failure returns an actionable error. A failed reset email removes its undelivered token, allowing a retry rather than silently throttling it.
 - Incorrect verification attempts do not extend the original code expiry.

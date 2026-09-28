@@ -24,7 +24,7 @@ n(p,'open','Open the system website',215,220,'input');
 d(p,'account','Have an\naccount?',215,320);
 off(p,'register','R',580,346); note(p,'regnote','Register\nPage 2',525,407,180);
 c(p,'retry','A',132,482);
-n(p,'login','Enter username / email\nand password',215,470,'input');
+n(p,'login','Enter email\nand password',215,470,'input');
 off(p,'forgot','F',650,474);
 d(p,'valid','Input and enabled\nreCAPTCHA valid?',215,575);
 n(p,'invalid','Show input error',535,596); c(p,'retry2','A',606,692);
@@ -187,7 +187,7 @@ note(p,'separate','Approval does not mark payment as paid.\nCashier confirms pay
 
 p=page('Mobile customer access','Android customer app • verified accounts • token authentication','M = mobile home  |  E → booking on p.4  |  K → cashier order review on p.5');
 n(p,'start','Start',215,110,'terminator',160,60);
-n(p,'login','Open app; enter\nusername / email and password',185,215,'input',220,66);
+n(p,'login','Open app; enter\nemail and password',185,215,'input',220,66);
 d(p,'valid','Valid login and\nnot locked out?',205,324);
 n(p,'err','Show error or retry delay',540,346); c(p,'retry','M1',611,448); c(p,'entry','M1',116,229);
 d(p,'customer','Customer with\nverified email?',205,480);

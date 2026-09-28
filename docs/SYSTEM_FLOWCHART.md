@@ -10,7 +10,7 @@ flowchart TD
     Home --> Account{Have an account?}
     Account -->|No| Register[Register and verify Gmail code]
     Register --> Customer[Customer shop]
-    Account -->|Yes| Login[Enter username or email and password]
+    Account -->|Yes| Login[Enter email and password]
     Login --> Valid{Login accepted?}
     Valid -->|No| Error[Show error or temporary lockout]
     Error --> Login
@@ -62,7 +62,7 @@ flowchart TD
     FormOK -->|No| Details
     FormOK -->|Yes| Create[Create customer account and sign in]
     Create --> Shop([Customer shop])
-    Action -->|Login| Credentials[Enter username or email and password]
+    Action -->|Login| Credentials[Enter email and password]
     Credentials --> InputOK{Input and enabled reCAPTCHA valid?}
     InputOK -->|No| Credentials
     InputOK -->|Yes| Locked{Temporarily locked out?}

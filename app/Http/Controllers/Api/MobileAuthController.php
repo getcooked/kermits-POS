@@ -22,23 +22,19 @@ class MobileAuthController extends Controller
             'device_name' => ['nullable', 'string', 'max:100'],
             'recaptcha_token' => MobileRecaptcha::rules($request),
         ], MobileRecaptcha::messages());
-        $login = trim($validated['login']);
-        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $login = Str::lower($login);
-        }
+        $login = Str::lower(trim($validated['login']));
 
         if ($loginAttempts->isLocked($request, $login)) {
             return $this->lockoutResponse($request, $loginAttempts, $login);
         }
 
-        $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
-        $user = User::query()->where($field, $login)->first();
+        $user = User::query()->where('email', $login)->first();
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
             if ($loginAttempts->recordFailure($request, $login)) {
                 return $this->lockoutResponse($request, $loginAttempts, $login);
             }
 
-            return response()->json(['message' => 'The username/email or password is incorrect.'], 422);
+            return response()->json(['message' => 'The email or password is incorrect.'], 422);
         }
 
         $loginAttempts->clear($request, $login);
@@ -83,7 +79,7 @@ class MobileAuthController extends Controller
     private function userData(User $user): array
     {
         return [
-            ...$user->only(['id', 'name', 'username', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
+            ...$user->only(['id', 'name', 'email', 'phone', 'birthday', 'sex', 'address', 'role']),
             'birthday' => $user->birthday?->format('Y-m-d'),
             'age' => $user->birthday?->age,
         ];

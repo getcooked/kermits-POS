@@ -80,7 +80,6 @@ class CustomerAccountTest extends TestCase
     {
         $customer = User::factory()->create([
             'name' => 'Old Name',
-            'username' => 'old.name',
             'email' => 'verified@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',
@@ -91,7 +90,6 @@ class CustomerAccountTest extends TestCase
 
         $this->actingAs($customer)->put(route('customer.profile.update'), [
             'name' => 'New Name',
-            'username' => 'new.name',
             'phone' => '09181234567',
             'birthday' => '1999-05-20',
             'sex' => 'male',
@@ -102,7 +100,6 @@ class CustomerAccountTest extends TestCase
 
         $customer->refresh();
         $this->assertSame('New Name', $customer->name);
-        $this->assertSame('new.name', $customer->username);
         $this->assertSame('09181234567', $customer->phone);
         $this->assertSame('1999-05-20', $customer->birthday->format('Y-m-d'));
         $this->assertSame('male', $customer->sex);
@@ -111,19 +108,17 @@ class CustomerAccountTest extends TestCase
         $this->assertSame(User::ROLE_CUSTOMER, $customer->role);
     }
 
-    public function test_profile_update_rejects_an_existing_username_and_invalid_phone(): void
+    public function test_profile_update_rejects_an_invalid_phone(): void
     {
-        User::factory()->create(['username' => 'already.used']);
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
 
         $this->actingAs($customer)->put(route('customer.profile.update'), [
             'name' => 'Customer',
-            'username' => 'already.used',
             'phone' => '12345',
             'birthday' => '2000-09-15',
             'sex' => 'female',
             'address' => 'Bantayan, Cebu',
-        ])->assertSessionHasErrors(['username', 'phone']);
+        ])->assertSessionHasErrors(['phone']);
     }
 
     public function test_customer_can_change_password_with_email_code_and_mobile_sessions_are_revoked(): void

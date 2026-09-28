@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateCustomerProfileRequest extends FormRequest
 {
@@ -17,14 +16,6 @@ class UpdateCustomerProfileRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'username' => [
-                'required',
-                'string',
-                'min:3',
-                'max:30',
-                'regex:/^[A-Za-z0-9._-]+$/',
-                Rule::unique('users', 'username')->ignore($this->user()),
-            ],
             'phone' => ['required', 'regex:/^09\d{9}$/'],
             'birthday' => ['required', 'date_format:Y-m-d', 'after_or_equal:1900-01-01', 'before_or_equal:today'],
             'sex' => ['required', 'in:male,female'],
@@ -35,7 +26,6 @@ class UpdateCustomerProfileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'username.regex' => 'The username may only contain letters, numbers, dots, underscores, and hyphens.',
             'phone.regex' => 'Enter an 11-digit Philippine mobile number starting with 09.',
         ];
     }

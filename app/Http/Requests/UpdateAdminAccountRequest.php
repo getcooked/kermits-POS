@@ -26,10 +26,9 @@ class UpdateAdminAccountRequest extends FormRequest
     {
         $admin = $this->route('admin');
 
-        // Username and phone stay optional so older admin accounts without them can still be edited.
+        // Phone stays optional so older admin accounts without one can still be edited.
         return [
             'name' => ['required', 'string', 'max:100'],
-            'username' => ['nullable', 'string', 'min:3', 'max:30', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($admin)],
             'email' => ['required', 'email', 'max:160', Rule::unique('users', 'email')->ignore($admin)],
             'phone' => ['nullable', 'regex:/^09\d{9}$/'],
             'password' => ['nullable', 'confirmed', Password::defaults()],

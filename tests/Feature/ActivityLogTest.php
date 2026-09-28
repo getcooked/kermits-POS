@@ -171,7 +171,6 @@ class ActivityLogTest extends TestCase
         ])->actingAs($superAdmin)
             ->post(route('cashiers.store'), [
                 'name' => 'Logged Cashier',
-                'username' => 'logged.cashier',
                 'email' => 'logged.cashier@example.com',
                 'phone' => '09171234567',
                 'password' => $password,

@@ -53,10 +53,10 @@ class WebSeederTest extends TestCase
         ])->assertRedirect('/seeder');
 
         $this->assertDatabaseCount('users', 4);
-        $this->assertDatabaseHas('users', ['username' => 'superadmin', 'email' => 'kermitsbantayan1@gmail.com', 'role' => User::ROLE_SUPER_ADMIN]);
-        $this->assertDatabaseHas('users', ['username' => 'admin', 'role' => User::ROLE_ADMIN]);
-        $this->assertDatabaseHas('users', ['username' => 'cashier', 'email' => 'kermitscashier@gmail.com', 'role' => User::ROLE_CASHIER]);
-        $this->assertDatabaseHas('users', ['username' => 'customer', 'role' => User::ROLE_CUSTOMER]);
+        $this->assertDatabaseHas('users', ['email' => 'kermitsbantayan1@gmail.com', 'role' => User::ROLE_SUPER_ADMIN]);
+        $this->assertDatabaseHas('users', ['email' => 'admin@gmail.com', 'role' => User::ROLE_ADMIN]);
+        $this->assertDatabaseHas('users', ['email' => 'kermitscashier@gmail.com', 'role' => User::ROLE_CASHIER]);
+        $this->assertDatabaseHas('users', ['email' => 'customer@gmail.com', 'role' => User::ROLE_CUSTOMER]);
         $this->assertFileExists($this->lockPath);
 
         $this->get('/seeder')->assertSee('Setup complete');
@@ -65,7 +65,6 @@ class WebSeederTest extends TestCase
     public function test_existing_super_admin_email_is_changed_without_replacing_the_account(): void
     {
         $superAdmin = User::factory()->create([
-            'username' => 'superadmin',
             'email' => 'superadmin@gmail.com',
             'role' => User::ROLE_SUPER_ADMIN,
         ]);
@@ -76,14 +75,12 @@ class WebSeederTest extends TestCase
 
         $superAdmin->refresh();
         $this->assertSame('kermitsbantayan1@gmail.com', $superAdmin->email);
-        $this->assertSame('superadmin', $superAdmin->username);
         $this->assertSame($password, $superAdmin->getRawOriginal('password'));
     }
 
     public function test_existing_cashier_email_is_changed_without_replacing_the_account(): void
     {
         $cashier = User::factory()->create([
-            'username' => 'cashier',
             'email' => 'cashier@gmail.com',
             'role' => User::ROLE_CASHIER,
         ]);
@@ -94,7 +91,6 @@ class WebSeederTest extends TestCase
 
         $cashier->refresh();
         $this->assertSame('kermitscashier@gmail.com', $cashier->email);
-        $this->assertSame('cashier', $cashier->username);
         $this->assertSame($password, $cashier->getRawOriginal('password'));
     }
 }

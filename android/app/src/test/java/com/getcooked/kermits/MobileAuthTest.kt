@@ -63,17 +63,17 @@ class MobileAuthTest {
         assertTrue(failureOf { auth.register(registration()) }.restartVerification)
     }
 
-    @Test fun duplicateUsernameDisplaysTheValidationErrorAndKeepsVerifiedEmail() = runBlocking {
-        val auth = MobileAuth(api { _, _ -> failure(422, """{"message":"The given data was invalid.","errors":{"username":["The username has already been taken."]}}""") })
+    @Test fun invalidFieldDisplaysTheValidationErrorAndKeepsVerifiedEmail() = runBlocking {
+        val auth = MobileAuth(api { _, _ -> failure(422, """{"message":"The given data was invalid.","errors":{"phone":["The phone number must contain exactly 11 digits and start with 09."]}}""") })
         val error = failureOf { auth.register(registration()) }
-        assertEquals("The username has already been taken.", error.message)
+        assertEquals("The phone number must contain exactly 11 digits and start with 09.", error.message)
         assertFalse(error.restartVerification)
     }
 
     @Test fun registrationAcceptsTheCustomerResponseAndNormalizesEmail() = runBlocking {
         val auth = MobileAuth(api { _, request ->
             assertEquals("customer@gmail.com", (request as RegisterRequest).email)
-            Response.success(mapOf("data" to User(1, "Customer", "customer", "customer@gmail.com", "09123456789", "customer")))
+            Response.success(mapOf("data" to User(1, "Customer", "customer@gmail.com", "09123456789", "customer")))
         })
         auth.register(registration().copy(email = " Customer@Gmail.com "))
     }
@@ -109,7 +109,7 @@ class MobileAuthTest {
         assertEquals("Could not confirm the reset request. Please try again.", failureOf { auth.requestPasswordReset("customer@gmail.com") }.message)
     }
 
-    private fun registration() = RegisterRequest("token", "Customer", "customer", "customer@gmail.com", "09123456789", "2000-09-15", "female", "Bantayan, Cebu", "SecurePass123!", "SecurePass123!")
+    private fun registration() = RegisterRequest("token", "Customer", "customer@gmail.com", "09123456789", "2000-09-15", "female", "Bantayan, Cebu", "SecurePass123!", "SecurePass123!")
 
     private fun failure(status: Int, json: String): Response<Any> = Response.error(status, json.toResponseBody("application/json".toMediaType()))
 

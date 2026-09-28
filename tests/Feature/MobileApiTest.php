@@ -23,13 +23,13 @@ class MobileApiTest extends TestCase
     public function test_only_customers_can_log_in_and_tokens_are_stored_hashed(): void
     {
         $customer = User::factory()->create([
-            'username' => 'mobile.customer', 'email' => 'mobile@gmail.com',
+            'email' => 'mobile@gmail.com',
             'password' => 'MobilePassword123!', 'role' => User::ROLE_CUSTOMER,
         ]);
         $admin = User::factory()->create(['password' => 'MobilePassword123!', 'role' => User::ROLE_ADMIN]);
 
         $response = $this->postJson('/api/v1/login', [
-            'login' => $customer->username, 'password' => 'MobilePassword123!', 'device_name' => 'Test phone',
+            'login' => 'MOBILE@gmail.com','password' => 'MobilePassword123!', 'device_name' => 'Test phone',
         ])->assertOk()->assertJsonPath('data.user.id', $customer->id);
         $plainToken = $response->json('data.token');
 
@@ -74,7 +74,7 @@ class MobileApiTest extends TestCase
             $this->postJson('/api/v1/login', $invalidCredentials)
                 ->assertUnprocessable()
                 ->assertExactJson([
-                    'message' => 'The username/email or password is incorrect.',
+                    'message' => 'The email or password is incorrect.',
                 ]);
         }
 
@@ -149,7 +149,6 @@ class MobileApiTest extends TestCase
     {
         $customer = User::factory()->create([
             'name' => 'Old Name',
-            'username' => 'old.username',
             'email' => 'verified@example.com',
             'phone' => '09171234567',
             'role' => User::ROLE_CUSTOMER,
@@ -158,14 +157,12 @@ class MobileApiTest extends TestCase
 
         $this->withToken($this->login($customer))->putJson('/api/v1/account/profile', [
             'name' => 'Updated Name',
-            'username' => 'updated.username',
             'phone' => '09181234567',
             'address' => 'Binaobao, Bantayan, Cebu, Philippines',
             'email' => 'changed@example.com',
             'role' => User::ROLE_SUPER_ADMIN,
         ])->assertOk()
             ->assertJsonPath('data.name', 'Updated Name')
-            ->assertJsonPath('data.username', 'updated.username')
             ->assertJsonPath('data.address', 'Binaobao, Bantayan, Cebu, Philippines')
             ->assertJsonPath('data.email', 'verified@example.com')
             ->assertJsonPath('data.role', User::ROLE_CUSTOMER);

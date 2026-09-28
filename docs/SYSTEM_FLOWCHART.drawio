@@ -116,7 +116,7 @@
         <mxCell id="retry" parent="1" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="A" vertex="1">
           <mxGeometry height="38" width="38" x="132" y="482" as="geometry" />
         </mxCell>
-        <mxCell id="login" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Enter username / email&#xa;and password" vertex="1">
+        <mxCell id="login" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" value="Enter email&#xa;and password" vertex="1">
           <mxGeometry height="60" width="180" x="215" y="470" as="geometry" />
         </mxCell>
         <mxCell id="forgot" parent="1" style="shape=offPageConnector;direction=south;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=16;align=center;verticalAlign=middle;spacing=5;" value="F" vertex="1">
@@ -1443,7 +1443,7 @@
         <mxCell id="start" value="Start" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=23;align=center;verticalAlign=middle;spacing=5;" vertex="1" parent="1">
           <mxGeometry x="215" y="110" width="160" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="login" value="Open app; enter&#xa;username / email and password" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" vertex="1" parent="1">
+        <mxCell id="login" value="Open app; enter&#xa;email and password" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" vertex="1" parent="1">
           <mxGeometry x="185" y="215" width="220" height="66" as="geometry" />
         </mxCell>
         <mxCell id="valid" value="Valid login and&#xa;not locked out?" style="rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontColor=#000000;fontFamily=Arial;fontSize=14;align=center;verticalAlign=middle;spacing=5;" vertex="1" parent="1">

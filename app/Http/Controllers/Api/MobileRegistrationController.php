@@ -101,7 +101,6 @@ class MobileRegistrationController extends Controller
         $validated = $request->validate([
             'registration_token' => ['required', 'string', 'size:64'],
             'name' => ['required', 'string', 'max:100', 'regex:/^\p{L}[\p{L}\p{M}]*(?: \p{L}[\p{L}\p{M}]*)*$/u'],
-            'username' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:users,username'],
             'email' => ['required', 'email', 'max:160', 'regex:/^[^@\s]+@gmail\.com$/i', 'unique:users,email'],
             'phone' => ['required', 'string', 'size:11', 'regex:/^09[0-9]{9}$/'],
             'birthday' => ['required', 'date_format:Y-m-d', 'after_or_equal:1900-01-01', 'before_or_equal:today'],
@@ -111,7 +110,6 @@ class MobileRegistrationController extends Controller
         ], [
             'name.max' => 'The full name must not be more than 100 characters.',
             'name.regex' => 'The full name may only contain letters and single spaces.',
-            'username.max' => 'The username must not be more than 30 characters.',
             'phone.size' => 'The phone number must contain exactly 11 digits.',
             'phone.regex' => 'The phone number must contain exactly 11 digits and start with 09.',
             'password.max' => 'The password must not be more than 23 characters.',
@@ -128,7 +126,6 @@ class MobileRegistrationController extends Controller
 
         $user = User::query()->create([
             'name' => $validated['name'],
-            'username' => $validated['username'],
             'email' => $email,
             'phone' => $validated['phone'],
             'birthday' => $validated['birthday'],
@@ -141,7 +138,7 @@ class MobileRegistrationController extends Controller
         Cache::forget($key);
 
         return response()->json(['data' => [
-            ...$user->only(['id', 'name', 'username', 'email', 'phone', 'sex', 'address', 'role']),
+            ...$user->only(['id', 'name', 'email', 'phone', 'sex', 'address', 'role']),
             'birthday' => $user->birthday?->format('Y-m-d'),
             'age' => $user->birthday?->age,
         ]], 201);

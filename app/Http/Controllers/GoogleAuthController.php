@@ -60,7 +60,7 @@ class GoogleAuthController extends Controller
         }
 
         if (! $user->hasRole(User::ROLE_CUSTOMER)) {
-            return $this->failed('Staff accounts must log in with their username and password.');
+            return $this->failed('Staff accounts must log in with their email and password.');
         }
 
         if ($user->google_id === null) {

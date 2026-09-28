@@ -26,7 +26,7 @@
                 <div class="field"><label for="password_confirmation">Confirm password</label><input id="password_confirmation" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>
                 <button class="button" type="submit">Create and lock accounts</button>
             </form>
-            <div class="accounts"><strong>Login usernames</strong><br><code>superadmin</code>, <code>admin</code>, <code>cashier</code>, <code>customer</code></div>
+            <div class="accounts"><strong>Login emails</strong><br>Your <code>SUPER_ADMIN_EMAIL</code>, <code>admin@gmail.com</code>, <code>kermitscashier@gmail.com</code>, <code>customer@gmail.com</code></div>
         @endif
     </section>
 </main>

@@ -108,7 +108,7 @@ class GoogleLoginTest extends TestCase
 
         $this->get(route('auth.google.callback'))
             ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['google' => 'Staff accounts must log in with their username and password.']);
+            ->assertSessionHasErrors(['google' => 'Staff accounts must log in with their email and password.']);
 
         $this->assertGuest();
     }

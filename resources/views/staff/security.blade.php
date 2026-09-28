@@ -22,7 +22,6 @@
                 {{-- Pressing Enter uses the first submit button, so it must be "create", not "Send code". --}}
                 <button class="default-submit" type="submit" tabindex="-1" aria-hidden="true">Create Admin Account</button>
                 <div class="field"><label for="name">Full name</label><input class="control" id="name" name="name" value="{{ old('name') }}" maxlength="100" required><small>Maximum 100 characters.</small></div>
-                <div class="field"><label for="username">Username</label><input class="control" id="username" name="username" value="{{ old('username') }}" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" autocomplete="off" required><small>3–30 characters: letters, numbers, dots, underscores, and hyphens.</small></div>
                 <div class="field">
                     <label for="email">Email address</label>
                     <div class="email-verify-row">
@@ -47,14 +46,13 @@
                     <article @class(['account-record', 'is-disabled' => $admin->isDisabled()])>
                         <div class="account-record-summary">
                             <span>{{ strtoupper(substr($admin->name, 0, 1)) }}</span>
-                            <div><strong>{{ $admin->name }}@if($isMe) <em>(you)</em>@endif</strong><small>{{ $admin->username ?: 'No username' }} · {{ $admin->email }}</small><small>{{ $admin->phone ?: 'No phone' }} · Created {{ $admin->created_at?->format('M d, Y') ?? '—' }}</small></div>
+                            <div><strong>{{ $admin->name }}@if($isMe) <em>(you)</em>@endif</strong><small>{{ $admin->email }}</small><small>{{ $admin->phone ?: 'No phone' }} · Created {{ $admin->created_at?->format('M d, Y') ?? '—' }}</small></div>
                             <b @class(['account-badge', 'disabled' => $admin->isDisabled()])>{{ $admin->isDisabled() ? 'Disabled' : 'Super Admin' }}</b>
                         </div>
                         <details>
                             <summary>Edit account</summary>
                             <form class="edit-admin" method="POST" action="{{ route('superadmin.admins.update', $admin) }}" data-ajax-form data-ajax-target=".admin-account" data-ajax-loading="Saving...">@csrf @method('PUT')
                                 <div class="field"><label>Full name</label><input class="control" name="name" value="{{ $admin->name }}" maxlength="100" required></div>
-                                <div class="field"><label>Username</label><input class="control" name="username" value="{{ $admin->username }}" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+"></div>
                                 <div class="field"><label>Email</label><input class="control" name="email" type="email" value="{{ $admin->email }}" required></div>
                                 <div class="field"><label>Phone</label><input class="control" name="phone" type="tel" inputmode="numeric" minlength="11" maxlength="11" pattern="09[0-9]{9}" value="{{ $admin->phone }}"></div>
                                 <div class="field"><label>New password <small>(optional)</small></label><input class="control" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div>

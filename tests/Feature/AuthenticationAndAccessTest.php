@@ -53,7 +53,7 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee('name="sex"', false)
             ->assertSee('name="address"', false)
             ->assertSee('maxlength="100"', false)
-            ->assertSee('minlength="3" maxlength="30"', false)
+            ->assertDontSee('name="username"', false)
             ->assertSee('Use my current location')
             ->assertDontSee('Prefer not to say');
     }
@@ -67,7 +67,7 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSessionMissing('registration_email_verification');
     }
 
-    public function test_customer_registration_enforces_name_and_username_length_limits(): void
+    public function test_customer_registration_enforces_the_name_length_limit(): void
     {
         $this->withSession([
             'registration_email_verification' => [
@@ -78,7 +78,6 @@ class AuthenticationAndAccessTest extends TestCase
             ],
         ])->post('/register', [
             'name' => str_repeat('A', 101),
-            'username' => str_repeat('u', 31),
             'email' => 'limits@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',
@@ -86,7 +85,7 @@ class AuthenticationAndAccessTest extends TestCase
             'address' => 'Bantayan, Cebu',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
-        ])->assertSessionHasErrors(['name', 'username']);
+        ])->assertSessionHasErrors(['name']);
 
         $this->assertDatabaseMissing('users', ['email' => 'limits@gmail.com']);
     }
@@ -102,7 +101,6 @@ class AuthenticationAndAccessTest extends TestCase
             ],
         ])->post('/register', [
             'name' => 'Customer Account',
-            'username' => 'buyer.account',
             'email' => 'buyer@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',
@@ -114,7 +112,6 @@ class AuthenticationAndAccessTest extends TestCase
         ])->assertRedirect('/shop');
 
         $this->assertDatabaseHas('users', [
-            'username' => 'buyer.account',
             'email' => 'buyer@gmail.com',
             'phone' => '09171234567',
             'birthday' => '2000-09-15 00:00:00',
@@ -124,16 +121,15 @@ class AuthenticationAndAccessTest extends TestCase
         ]);
     }
 
-    public function test_customer_can_log_in_with_username_or_email(): void
+    public function test_customer_can_log_in_with_email_in_any_case(): void
     {
-        $customer = User::factory()->create([
-            'username' => 'kim.lloyd',
+        User::factory()->create([
             'email' => 'kim@gmail.com',
             'password' => 'password123',
             'role' => User::ROLE_CUSTOMER,
         ]);
 
-        $this->post('/login', ['email' => $customer->username, 'password' => 'password123'])
+        $this->post('/login', ['email' => 'kim@gmail.com', 'password' => 'password123'])
             ->assertRedirect('/shop');
 
         $this->post('/logout');
@@ -152,7 +148,6 @@ class AuthenticationAndAccessTest extends TestCase
             ],
         ])->post('/register', [
             'name' => 'Expired Verification',
-            'username' => 'expired.verification',
             'email' => 'EXPIRED@GMAIL.COM',
             'phone' => '09171234567',
             'birthday' => '2000-09-15',
@@ -188,7 +183,6 @@ class AuthenticationAndAccessTest extends TestCase
         $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         $update = [
             'name' => 'Updated Customer',
-            'username' => 'updated.customer',
             'email' => 'updated@gmail.com',
             'phone' => '09181234567',
             'birthday' => '1995-04-12',
@@ -209,7 +203,6 @@ class AuthenticationAndAccessTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $customer->id,
             'name' => 'Updated Customer',
-            'username' => 'updated.customer',
             'email' => 'updated@gmail.com',
             'phone' => '09181234567',
             'birthday' => '1995-04-12 00:00:00',
@@ -233,7 +226,7 @@ class AuthenticationAndAccessTest extends TestCase
             ->assertSee('name="address"', false);
 
         $this->post('/logout');
-        $this->post('/login', ['email' => 'updated.customer', 'password' => 'SecurePass123!'])
+        $this->post('/login', ['email' => 'updated@gmail.com', 'password' => 'SecurePass123!'])
             ->assertRedirect('/shop');
     }
 
@@ -242,7 +235,6 @@ class AuthenticationAndAccessTest extends TestCase
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $customer = User::factory()->create([
-            'username' => 'customer.delete',
             'email' => 'delete@gmail.com',
             'phone' => '09171234567',
             'password' => 'password123',
@@ -268,7 +260,7 @@ class AuthenticationAndAccessTest extends TestCase
         $this->assertSame('Deleted Customer #'.$customer->id, $order->fresh()->customer->name);
 
         $this->post('/logout');
-        $this->post('/login', ['email' => 'customer.delete', 'password' => 'password123'])
+        $this->post('/login', ['email' => 'delete@gmail.com', 'password' => 'password123'])
             ->assertSessionHasErrors('email');
     }
 
@@ -278,7 +270,6 @@ class AuthenticationAndAccessTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $cashierData = [
             'name' => 'New Cashier',
-            'username' => 'new.cashier',
             'email' => 'cashier@gmail.com',
             'phone' => '09191234567',
             'password' => 'CashierPass123!',
@@ -293,14 +284,13 @@ class AuthenticationAndAccessTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'name' => 'New Cashier',
-            'username' => 'new.cashier',
             'email' => 'cashier@gmail.com',
             'phone' => '09191234567',
             'role' => User::ROLE_CASHIER,
         ]);
 
         $this->post('/logout');
-        $this->post('/login', ['email' => 'new.cashier', 'password' => 'CashierPass123!'])
+        $this->post('/login', ['email' => 'cashier@gmail.com', 'password' => 'CashierPass123!'])
             ->assertRedirect('/cashier');
     }
 
@@ -309,7 +299,6 @@ class AuthenticationAndAccessTest extends TestCase
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $cashier = User::factory()->create([
-            'username' => 'cashier.old',
             'email' => 'oldcashier@gmail.com',
             'phone' => '09171234567',
             'password' => 'password123',
@@ -323,7 +312,6 @@ class AuthenticationAndAccessTest extends TestCase
         ]);
         $update = [
             'name' => 'Updated Cashier',
-            'username' => 'cashier.updated',
             'email' => 'updatedcashier@gmail.com',
             'phone' => '09181234567',
             'password' => 'NewPassword123!',
@@ -338,7 +326,7 @@ class AuthenticationAndAccessTest extends TestCase
 
         $this->actingAs($admin)->put('/staff/cashiers/'.$cashier->id, $update)->assertForbidden();
         $this->actingAs($superAdmin)->put('/staff/cashiers/'.$cashier->id, $update)->assertRedirect();
-        $this->assertDatabaseHas('users', ['id' => $cashier->id, 'username' => 'cashier.updated', 'role' => User::ROLE_CASHIER]);
+        $this->assertDatabaseHas('users', ['id' => $cashier->id, 'role' => User::ROLE_CASHIER]);
         $this->assertDatabaseMissing('sessions', ['user_id' => $cashier->id]);
 
         $this->actingAs($admin)->delete('/staff/cashiers/'.$cashier->id)->assertForbidden();
@@ -426,7 +414,7 @@ class AuthenticationAndAccessTest extends TestCase
             $this->from(route('login'))->post(route('login.store'), $invalidCredentials)
                 ->assertRedirect(route('login'))
                 ->assertSessionHasErrors([
-                    'email' => 'The username/email or password is incorrect.',
+                    'email' => 'The email or password is incorrect.',
                 ])
                 ->assertSessionMissing('login_retry_after');
         }
