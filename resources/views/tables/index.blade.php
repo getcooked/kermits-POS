@@ -69,7 +69,7 @@
                                 <td>@if(filled($row['id'] ?? null))<input type="hidden" name="dining_tables[{{ $index }}][id]" value="{{ $row['id'] }}">@endif<label class="visually-hidden" for="dining_table_number_{{ $index }}">Table number</label><input class="control" id="dining_table_number_{{ $index }}" name="dining_tables[{{ $index }}][number]" type="number" min="1" max="999" step="1" value="{{ $row['number'] ?? '' }}" required data-table-number></td>
                                 <td><label class="visually-hidden" for="dining_table_seats_{{ $index }}">Seats</label><input class="control" id="dining_table_seats_{{ $index }}" name="dining_tables[{{ $index }}][seats]" type="number" min="1" max="{{ $maxSeats }}" step="1" value="{{ $row['seats'] ?? '' }}" required></td>
                                 <td><input type="hidden" name="dining_tables[{{ $index }}][active]" value="0"><label class="bookable"><input type="checkbox" name="dining_tables[{{ $index }}][active]" value="1" @checked(filter_var($row['active'] ?? false, FILTER_VALIDATE_BOOLEAN))><span class="visually-hidden">Bookable</span></label></td>
-                                <td>@if($inUse)@if(in_array((int) $row['id'], $bookedTableIds, true))<span class="table-state is-booked" title="This table has an upcoming booking or guests seated now.">Booked</span>@else<span class="table-state is-free" title="Free to book. It has past reservations, so it can't be removed; untick Bookable to stop new bookings.">Book</span>@endif @else<button class="row-remove" type="button" data-row-remove>Remove</button>@endif</td>
+                                <td>@if($inUse)@if(in_array((int) $row['id'], $bookedTableIds, true))<span class="table-state is-booked" title="This table has an upcoming booking or guests seated now.">Booked</span>@elseif($tablesById->get((int) $row['id'])?->active)<button class="table-state is-free" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can book this table. Click to make it unavailable.">Available</button>@else<button class="table-state is-off" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can't book this table. Click to make it available again.">Unavailable</button>@endif @else<button class="row-remove" type="button" data-row-remove>Remove</button>@endif</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -99,6 +99,10 @@
                 <button class="button" type="submit">Save tables</button>
             </div>
         </form>
+        {{-- The Available/Unavailable buttons sit inside the layout form, so they submit these instead. --}}
+        @foreach($diningTables as $table)
+            <form id="table_availability_{{ $table->id }}" method="POST" action="{{ route('tables.availability', $table) }}" data-ajax-form data-ajax-target=".table-management" data-ajax-loading="Saving..." hidden>@csrf @method('PATCH')</form>
+        @endforeach
     </section>
     </div>
 </div></main></div>

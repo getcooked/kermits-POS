@@ -96,6 +96,40 @@ class TableManagementController extends Controller
     }
 
     /**
+     * Switch one table between bookable and not, with the same checks as saving the whole layout.
+     */
+    public function toggleAvailability(
+        DiningTable $diningTable,
+        ReservationSchedule $schedules,
+        ReservationPricing $pricing,
+        TableLayout $layout,
+    ): RedirectResponse {
+        $available = DB::transaction(function () use ($diningTable, $schedules, $pricing, $layout): bool {
+            $schedules->lock();
+            $diningTable->refresh();
+            $available = ! $diningTable->active;
+
+            $tables = DiningTable::query()->orderBy('number')->get()
+                ->map(fn (DiningTable $table): array => [
+                    'id' => $table->id,
+                    'number' => $table->number,
+                    'seats' => $table->seats,
+                    'active' => $table->is($diningTable) ? $available : $table->active,
+                ])
+                ->all();
+            $this->ensureLayoutKeepsBookings($tables, $layout->turnoverMinutes(), $schedules, $pricing);
+
+            $diningTable->forceFill(['active' => $available])->save();
+
+            return $available;
+        });
+
+        $state = $available ? 'available for booking' : 'unavailable, so customers can no longer book it';
+
+        return redirect()->route('tables.index')->with('status', "{$diningTable->label()} is now {$state}.");
+    }
+
+    /**
      * The floor on its own, for cashiers: they can mark tables occupied or free but not change settings.
      */
     public function floor(TableFloor $floor): View

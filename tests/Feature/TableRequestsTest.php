@@ -266,13 +266,47 @@ class TableRequestsTest extends TestCase
         $this->assertTrue($this->table(8)->active);
     }
 
+    public function test_super_admin_can_switch_a_table_between_available_and_unavailable(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $tableFour = $this->table(4);
+        $tableFive = $this->table(5);
+        app(ReservationSchedule::class)->changeStatus($this->book(guests: 4, tableId: $tableFour->id), 'cancelled', $admin->id);
+        $this->book(guests: 4, tableId: $tableFive->id);
+
+        $this->actingAs($admin)->get(route('tables.index'))->assertOk()
+            ->assertSee('form="table_availability_'.$tableFour->id.'" title="Customers can book this table. Click to make it unavailable.">Available</button>', false)
+            ->assertSee('>Booked</span>', false)
+            ->assertDontSee('Has bookings');
+
+        $this->patch(route('tables.availability', $tableFour))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('tables.index'))
+            ->assertSessionHas('status', 'Table 4 is now unavailable, so customers can no longer book it.');
+        $this->assertFalse($tableFour->fresh()->active);
+        $this->get(route('tables.index'))->assertSee('>Unavailable</button>', false);
+
+        $this->actingAs($customer)->post('/book', $this->webBooking($customer, ['dining_table_id' => $tableFour->id, 'reservation_at' => '2030-01-03 18:00:00']))
+            ->assertSessionHasErrors('dining_table_id');
+
+        $this->actingAs($admin)->patch(route('tables.availability', $tableFour))->assertSessionHasNoErrors();
+        $this->assertTrue($tableFour->fresh()->active);
+
+        // A table an upcoming reservation asked for stays bookable.
+        $this->from(route('tables.index'))->patch(route('tables.availability', $tableFive))->assertSessionHasErrors('dining_tables');
+        $this->assertTrue($tableFive->fresh()->active);
+    }
+
     public function test_only_super_admin_can_change_tables(): void
     {
         foreach ([User::ROLE_ADMIN, User::ROLE_CASHIER, User::ROLE_CUSTOMER] as $role) {
             $this->actingAs(User::factory()->create(['role' => $role]))
                 ->put(route('tables.layout.update'), ['dining_tables' => $this->currentLayout(), 'turnover_minutes' => 0, 'stay_minutes' => 120])
                 ->assertForbidden();
+            $this->patch(route('tables.availability', $this->table(1)))->assertForbidden();
         }
+        $this->assertTrue($this->table(1)->active);
 
         $this->assertSame(15, app(TableLayout::class)->turnoverMinutes());
     }

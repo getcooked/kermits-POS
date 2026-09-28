@@ -167,6 +167,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/tables', [TableManagementController::class, 'index'])->name('tables.index');
         Route::put('/tables', [TableManagementController::class, 'update'])->name('tables.update');
         Route::put('/tables/layout', [TableManagementController::class, 'updateLayout'])->name('tables.layout.update');
+        Route::patch('/tables/{diningTable}/availability', [TableManagementController::class, 'toggleAvailability'])->name('tables.availability');
     });
 
     Route::middleware('role:super_admin,cashier')->group(function (): void {
