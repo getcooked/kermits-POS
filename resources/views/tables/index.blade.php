@@ -22,20 +22,18 @@
         <p class="table-help">The party sizes customers choose from when booking, and the reservation price for each.</p>
         <form method="POST" action="{{ route('tables.update') }}" data-ajax-form data-ajax-target=".table-management" data-ajax-loading="Saving..." data-rows-form data-max-rows="{{ $maxTables }}">
             @csrf @method('PUT')
-            <div class="table-list-scroll">
-                <table class="table-list">
-                    <thead><tr><th scope="col">Guest number</th><th scope="col">Price (&#8369;)</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
-                    <tbody data-rows>
-                        @foreach($optionRows as $index => $row)
-                            <tr class="editable-row">
-                                <td><label class="visually-hidden" for="table_guests_{{ $index }}">Guest number</label><input class="control" id="table_guests_{{ $index }}" name="tables[{{ $index }}][guests]" type="number" min="1" max="{{ $maxGuests }}" step="1" value="{{ $row['guests'] ?? '' }}" required></td>
-                                <td><label class="visually-hidden" for="table_fee_{{ $index }}">Price</label><input class="control" id="table_fee_{{ $index }}" name="tables[{{ $index }}][fee]" type="number" min="0" max="999999.99" step="0.01" value="{{ $row['fee'] ?? '' }}" required></td>
-                                <td><button class="row-remove" type="button" data-row-remove>Remove</button></td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+            <table class="table-list options-list">
+                <thead><tr><th scope="col">Guest number</th><th scope="col">Price (&#8369;)</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+                <tbody data-rows>
+                    @foreach($optionRows as $index => $row)
+                        <tr class="editable-row">
+                            <td><label class="visually-hidden" for="table_guests_{{ $index }}">Guest number</label><input class="control" id="table_guests_{{ $index }}" name="tables[{{ $index }}][guests]" type="number" min="1" max="{{ $maxGuests }}" step="1" value="{{ $row['guests'] ?? '' }}" required></td>
+                            <td><label class="visually-hidden" for="table_fee_{{ $index }}">Price</label><input class="control" id="table_fee_{{ $index }}" name="tables[{{ $index }}][fee]" type="number" min="0" max="999999.99" step="0.01" value="{{ $row['fee'] ?? '' }}" required></td>
+                            <td><button class="row-remove" type="button" data-row-remove>Remove</button></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
             <template data-row-template>
                 <tr class="editable-row">
                     <td><label class="visually-hidden" for="table_guests___INDEX__">Guest number</label><input class="control" id="table_guests___INDEX__" name="tables[__INDEX__][guests]" type="number" min="1" max="{{ $maxGuests }}" step="1" required></td>
@@ -73,23 +71,21 @@
         @endif
         <form method="POST" action="{{ route('tables.layout.update') }}" data-ajax-form data-ajax-target=".table-management" data-ajax-loading="Saving..." data-rows-form data-max-rows="{{ $maxDiningTables }}">
             @csrf @method('PUT')
-            <div class="table-list-scroll">
-                <table class="table-list layout-list">
-                    <thead><tr><th scope="col">Table number</th><th scope="col">Seats</th><th scope="col">Bookable</th><th scope="col">Delete</th></tr></thead>
-                    <tbody data-rows>
-                        @foreach($layoutRows as $index => $row)
-                            @php($inUse = filled($row['id'] ?? null) && ($tablesById->get((int) $row['id'])?->reservations_count ?? 0) > 0)
-                            <tr class="editable-row">
-                                <td>@if(filled($row['id'] ?? null))<input type="hidden" name="dining_tables[{{ $index }}][id]" value="{{ $row['id'] }}">@endif<label class="visually-hidden" for="dining_table_number_{{ $index }}">Table number</label><input class="control" id="dining_table_number_{{ $index }}" name="dining_tables[{{ $index }}][number]" type="number" min="1" max="999" step="1" value="{{ $row['number'] ?? '' }}" required data-table-number></td>
-                                <td><label class="visually-hidden" for="dining_table_seats_{{ $index }}">Seats</label><input class="control" id="dining_table_seats_{{ $index }}" name="dining_tables[{{ $index }}][seats]" type="number" min="1" max="{{ $maxSeats }}" step="1" value="{{ $row['seats'] ?? '' }}" required></td>
-                                @php($active = filter_var($row['active'] ?? false, FILTER_VALIDATE_BOOLEAN))
-                                <td><input type="hidden" name="dining_tables[{{ $index }}][active]" value="{{ $active ? 1 : 0 }}">@if(! filled($row['id'] ?? null))<span @class(['table-state', 'is-free' => $active, 'is-off' => ! $active])>{{ $active ? 'Available' : 'Unavailable' }}</span>@elseif(in_array((int) $row['id'], $bookedTableIds, true))<span class="table-state is-booked" title="This table has an upcoming booking or guests seated now.">Booked</span>@elseif($tablesById->get((int) $row['id'])?->active)<button class="table-state is-free" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can book this table. Click to make it unavailable.">Available</button>@else<button class="table-state is-off" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can't book this table. Click to make it available again.">Unavailable</button>@endif</td>
-                                <td><button class="row-remove" type="button" data-row-remove @if($inUse) data-locked disabled title="This table has reservations, so it can't be removed. Make it Unavailable instead." @endif>Remove</button></td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+            <table class="table-list layout-list">
+                <thead><tr><th scope="col">Table number</th><th scope="col">Seats</th><th scope="col">Bookable</th><th scope="col">Delete</th></tr></thead>
+                <tbody data-rows>
+                    @foreach($layoutRows as $index => $row)
+                        @php($inUse = filled($row['id'] ?? null) && ($tablesById->get((int) $row['id'])?->reservations_count ?? 0) > 0)
+                        <tr class="editable-row">
+                            <td>@if(filled($row['id'] ?? null))<input type="hidden" name="dining_tables[{{ $index }}][id]" value="{{ $row['id'] }}">@endif<label class="visually-hidden" for="dining_table_number_{{ $index }}">Table number</label><input class="control" id="dining_table_number_{{ $index }}" name="dining_tables[{{ $index }}][number]" type="number" min="1" max="999" step="1" value="{{ $row['number'] ?? '' }}" required data-table-number></td>
+                            <td><label class="visually-hidden" for="dining_table_seats_{{ $index }}">Seats</label><input class="control" id="dining_table_seats_{{ $index }}" name="dining_tables[{{ $index }}][seats]" type="number" min="1" max="{{ $maxSeats }}" step="1" value="{{ $row['seats'] ?? '' }}" required></td>
+                            @php($active = filter_var($row['active'] ?? false, FILTER_VALIDATE_BOOLEAN))
+                            <td><input type="hidden" name="dining_tables[{{ $index }}][active]" value="{{ $active ? 1 : 0 }}">@if(! filled($row['id'] ?? null))<span @class(['table-state', 'is-free' => $active, 'is-off' => ! $active])>{{ $active ? 'Available' : 'Unavailable' }}</span>@elseif(in_array((int) $row['id'], $bookedTableIds, true))<span class="table-state is-booked" title="This table has an upcoming booking or guests seated now.">Booked</span>@elseif($tablesById->get((int) $row['id'])?->active)<button class="table-state is-free" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can book this table. Click to make it unavailable.">Available</button>@else<button class="table-state is-off" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can't book this table. Click to make it available again.">Unavailable</button>@endif</td>
+                            <td><button class="row-remove" type="button" data-row-remove @if($inUse) data-locked disabled title="This table has reservations, so it can't be removed. Make it Unavailable instead." @endif>Remove</button></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
             <template data-row-template>
                 <tr class="editable-row">
                     <td><label class="visually-hidden" for="dining_table_number___INDEX__">Table number</label><input class="control" id="dining_table_number___INDEX__" name="dining_tables[__INDEX__][number]" type="number" min="1" max="999" step="1" required data-table-number></td>
