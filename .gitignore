@@ -27,7 +27,6 @@
 /android/keystore.properties
 *.jks
 *.keystore
-/storage/app/releases/*.apk
 Homestead.json
 Homestead.yaml
 Thumbs.db
