@@ -293,6 +293,11 @@ class ReservationsTest extends TestCase
             'phone' => '09171234567',
             'reservation_at' => now()->addDay()->setTime(12, 0),
             'guests' => 20,
+            'total_amount' => 5000,
+            'downpayment_amount' => 2500,
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+            'payment_proof_path' => 'payment-proofs/proof.jpg',
         ]);
 
         $this->actingAs($superAdmin)->patch('/reservations/'.$reservation->id.'/status', [
@@ -303,6 +308,8 @@ class ReservationsTest extends TestCase
             'id' => $reservation->id,
             'status' => 'confirmed',
             'handled_by' => $superAdmin->id,
+            'payment_status' => 'partial',
+            'amount_paid' => 2500,
         ]);
     }
 

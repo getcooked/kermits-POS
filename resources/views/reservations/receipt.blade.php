@@ -22,9 +22,9 @@
                 <div><dt>Reference</dt><dd>{{ $reservation->reference }}</dd></div>
                 <div><dt>Guest</dt><dd>{{ $reservation->customer_name }}</dd></div>
                 <div><dt>Schedule</dt><dd>{{ $reservation->reservation_at->format('M d, Y').' - '.$reservation->arrival_time }}</dd></div>
-                <div><dt>Reservation</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : $reservation->guests.' guests, exclusive venue' }}</dd></div>@if($reservation->type === 'table')<div><dt>Table</dt><dd>{{ $reservation->table_label }}</dd></div>@endif
+                <div><dt>Reservation</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : $reservation->guests.' guests, Exclusive Venue' }}</dd></div>@if($reservation->type === 'table')<div><dt>Table</dt><dd>{{ $reservation->table_label }}</dd></div>@endif
                 <div><dt>Status</dt><dd>{{ ucfirst($reservation->booking_status) }}</dd></div>
-                <div><dt>Payment</dt><dd>{{ match($reservation->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }} &middot; {{ ucfirst($reservation->payment_status) }}</dd></div>
+                <div><dt>Payment</dt><dd>{{ match($reservation->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }} &middot; {{ $reservation->payment_status_label }}</dd></div>
                 @if($reservation->payment_reference)<div><dt>Payment reference</dt><dd>{{ $reservation->payment_reference }}</dd></div>@endif
             </dl>
 
@@ -40,6 +40,10 @@
                 <span>Reservation fee <b>&#8369;{{ number_format($reservation->reservation_fee, 2) }}</b></span>
                 <span>Food total <b>&#8369;{{ number_format($reservation->food_total, 2) }}</b></span>
                 <strong>Total <b>&#8369;{{ number_format($reservation->total_amount, 2) }}</b></strong>
+                @if($reservation->type === 'exclusive')
+                    <span>Paid <b>&#8369;{{ number_format($reservation->amount_paid, 2) }}</b></span>
+                    <span>Balance on the event day <b>&#8369;{{ number_format($reservation->balance_due, 2) }}</b></span>
+                @endif
             </div>
             <p class="receipt-note">Please present this receipt when you arrive.</p>
         </article>

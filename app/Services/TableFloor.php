@@ -67,6 +67,7 @@ class TableFloor
         return [
             'tables' => $tables,
             'arrivals' => $this->arrivals(),
+            'exclusive' => $this->exclusiveToday(),
             // Occupied tables can leave booked parties with nowhere to sit.
             'crowded' => ! $this->schedules->upcomingBookingsFit($this->layout->slots(), $turnover),
         ];
@@ -91,6 +92,19 @@ class TableFloor
             ->get();
     }
 
+    /**
+     * Today's Exclusive Venue booking: the restaurant is reserved for it, so walk-ins are turned away.
+     */
+    public function exclusiveToday(): ?Reservation
+    {
+        $today = CarbonImmutable::today();
+
+        return $this->schedules->active()
+            ->where('type', 'exclusive')
+            ->whereBetween('reservation_at', [$today->format('Y-m-d H:i:s'), $today->endOfDay()->format('Y-m-d H:i:s')])
+            ->first();
+    }
+
     public function isLate(Reservation $reservation): bool
     {
         return $reservation->reservation_at->lt(now()->subMinutes(self::LATE_MINUTES));
@@ -109,6 +123,10 @@ class TableFloor
             }
             if (! $table->active) {
                 throw ValidationException::withMessages(['floor' => "{$table->label()} is unavailable. Make it available first."]);
+            }
+
+            if ($reservation === null && ($event = $this->exclusiveToday()) !== null) {
+                throw ValidationException::withMessages(['floor' => "Kermit's is reserved today for an Exclusive Venue event ({$event->reference}), so walk-in parties can't be seated."]);
             }
 
             if ($reservation !== null) {

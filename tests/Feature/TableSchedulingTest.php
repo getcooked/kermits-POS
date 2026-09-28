@@ -97,8 +97,9 @@ class TableSchedulingTest extends TestCase
         $service = app(ReservationSchedule::class);
         $this->assertFalse($service->isAvailable('2030-01-02 19:00:00', 'table', 2));
         $this->assertFalse($service->isAvailable('2030-01-02 19:00:00', 'exclusive', 20));
-        $this->assertFalse($service->isAvailable('2030-01-02 20:00:00', 'exclusive', 20), 'Cleanup time follows every booking.');
-        $this->assertTrue($service->isAvailable('2030-01-02 20:30:00', 'exclusive', 20));
+        $this->assertFalse($service->isAvailable('2030-01-02 22:00:00', 'table', 2), 'The Exclusive Venue takes the whole day.');
+        $this->assertTrue($service->isAvailable('2030-01-03 08:00:00', 'table', 2));
+        $this->assertTrue($service->isAvailable('2030-01-03', 'exclusive', 20));
         $this->expectException(ValidationException::class);
         $this->book();
     }

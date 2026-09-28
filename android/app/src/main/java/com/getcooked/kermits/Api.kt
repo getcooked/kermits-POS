@@ -50,7 +50,7 @@ data class Order(
     val paymongo_checkout_url: String? = null,
 )
 @JsonClass(generateAdapter = true)
-data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null, val table_label: String? = null, val order_id: Int? = null, val paymongo_checkout_url: String? = null)
+data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null, val table_label: String? = null, val order_id: Int? = null, val paymongo_checkout_url: String? = null, val downpayment_amount: Double? = null, val amount_paid: Double = 0.0, val balance_due: Double = 0.0)
 @JsonClass(generateAdapter = true)
 data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
@@ -63,7 +63,7 @@ data class ApiError(
     val code: String? = null,
 )
 @JsonClass(generateAdapter = true)
-data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0, val tables: List<DiningTableOption>? = null, val paymongo_enabled: Boolean = false)
+data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0, val exclusive_downpayment_percent: Int = 50,val tables: List<DiningTableOption>? = null, val paymongo_enabled: Boolean = false)
 @JsonClass(generateAdapter = true)
 data class DiningTableOption(val id: Int, val number: Int, val seats: Int)
 @JsonClass(generateAdapter = true)
@@ -129,6 +129,7 @@ interface KermitsApi {
         @Part("payment_method") payment: RequestBody, @Part("payment_reference") reference: RequestBody?,
         @Part proof: MultipartBody.Part? = null, @PartMap menuItems: Map<String, @JvmSuppressWildcards RequestBody> = emptyMap(),
         @Part("notes") notes: RequestBody? = null,
-        @Part("dining_table_id") diningTableId: RequestBody? = null
+        @Part("dining_table_id") diningTableId: RequestBody? = null,
+        @Part("payment_plan") paymentPlan: RequestBody? = null
     ): retrofit2.Response<Map<String, Reservation>>
 }

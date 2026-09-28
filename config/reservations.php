@@ -11,5 +11,10 @@ return [
     // Initial tables; after migrating, tables are managed in Table Management.
     'table_capacities' => [2, 2, 2, 4, 4, 4, 4, 12],
     'table_fees' => [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650],
+    // Default whole-day Exclusive Venue price; the super admin sets the real one in Table Management.
     'exclusive_fee' => 5000,
+    // Share of the Exclusive Venue total paid online before the day is secured.
+    'exclusive_downpayment_percent' => 50,
+    // The venue can't be reserved for the same day: tables may already be seated.
+    'exclusive_min_days_ahead' => 1,
 ];

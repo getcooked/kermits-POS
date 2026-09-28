@@ -72,7 +72,7 @@
                         <div class="activity-main">
                             <div class="activity-title">
                                 <div>
-                                    <span class="activity-kind">{{ $reservation->type === 'table' ? 'Table reservation' : 'Exclusive reservation' }}</span>
+                                    <span class="activity-kind">{{ $reservation->type === 'table' ? 'Table reservation' : 'Exclusive Venue' }}</span>
                                     <h3>{{ $reservation->reference }}</h3>
                                 </div>
                                 <span class="status {{ $reservation->booking_status }}">{{ $reservationLabel }}</span>

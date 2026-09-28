@@ -169,6 +169,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/tables', [TableManagementController::class, 'index'])->name('tables.index');
         Route::put('/tables', [TableManagementController::class, 'update'])->name('tables.update');
         Route::put('/tables/layout', [TableManagementController::class, 'updateLayout'])->name('tables.layout.update');
+        Route::put('/tables/exclusive-venue', [TableManagementController::class, 'updateExclusiveFee'])->name('tables.exclusive.update');
         Route::patch('/tables/{diningTable}/availability', [TableManagementController::class, 'toggleAvailability'])->name('tables.availability');
     });
 

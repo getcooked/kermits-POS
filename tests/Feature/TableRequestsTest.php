@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -132,7 +134,9 @@ class TableRequestsTest extends TestCase
         $this->assertSame(1, $slotAt($slots, '20:30')['tables_left']);
 
         $slots = $this->getJson('/book/availability?date=2030-01-02&type=exclusive&guests=30')->json('data');
-        $this->assertFalse($slotAt($slots, '18:00')['available'], 'An exclusive booking needs the whole venue free.');
+        $this->assertCount(1, $slots, 'The Exclusive Venue is offered as one whole-day slot.');
+        $this->assertSame('2030-01-02T23:00', $slots[0]['end']);
+        $this->assertFalse($slotAt($slots, '08:00')['available'], 'Any table booked that day keeps the venue from being reserved.');
         $this->assertNull($slotAt($slots, '08:00')['tables_left']);
     }
 
@@ -165,8 +169,11 @@ class TableRequestsTest extends TestCase
         $this->post('/book', $this->webBooking($customer, ['dining_table_id' => $tableFive->id]))
             ->assertSessionHasErrors('dining_table_id');
 
-        $this->post('/book', $this->webBooking($customer, ['type' => 'exclusive', 'guests' => 30, 'table_size' => null, 'dining_table_id' => $this->table(1)->id]))
-            ->assertSessionHasNoErrors();
+        Storage::fake('local');
+        $this->post('/book', $this->webBooking($customer, [
+            'type' => 'exclusive', 'guests' => 30, 'table_size' => null, 'dining_table_id' => $this->table(1)->id,
+            'payment_method' => 'gcash', 'payment_reference' => '1234567890123', 'payment_proof' => UploadedFile::fake()->image('proof.jpg'),
+        ]))->assertSessionHasNoErrors();
         $this->assertNull(Reservation::query()->sole()->dining_table_id);
     }
 

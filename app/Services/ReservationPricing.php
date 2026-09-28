@@ -8,6 +8,8 @@ class ReservationPricing
 {
     public const TABLES_SETTING_KEY = 'reservation_table_types';
 
+    public const EXCLUSIVE_SETTING_KEY = 'reservation_exclusive_fee';
+
     private const LEGACY_TABLE_SIZES = [1, 2, 4, 8, 12];
 
     private const DEFAULT_TABLE_FEES = [1 => 100, 2 => 150, 4 => 250, 8 => 450, 12 => 650];
@@ -51,7 +53,35 @@ class ReservationPricing
 
     public function exclusiveFee(): float
     {
-        return (float) config('reservations.exclusive_fee');
+        $saved = SystemSetting::get(self::EXCLUSIVE_SETTING_KEY);
+
+        return is_numeric($saved) ? (float) $saved : (float) config('reservations.exclusive_fee');
+    }
+
+    public function saveExclusiveFee(float $fee): void
+    {
+        SystemSetting::query()->updateOrCreate(
+            ['key' => self::EXCLUSIVE_SETTING_KEY],
+            ['value' => number_format($fee, 2, '.', '')],
+        );
+    }
+
+    public function downpaymentPercent(): int
+    {
+        return (int) config('reservations.exclusive_downpayment_percent');
+    }
+
+    /**
+     * What an Exclusive Venue booking pays online before it is confirmed:
+     * the downpayment share of the total (rounded up to the centavo), or all of it.
+     */
+    public function downpayment(float $total, string $plan): float
+    {
+        if ($plan === 'full') {
+            return round($total, 2);
+        }
+
+        return ceil(round($total * 100) * $this->downpaymentPercent() / 100) / 100;
     }
 
     /**

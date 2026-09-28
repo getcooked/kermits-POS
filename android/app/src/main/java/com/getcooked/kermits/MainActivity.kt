@@ -201,6 +201,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var diningTables by mutableStateOf<List<DiningTableOption>>(emptyList()); private set
     val tableSizes: List<String> get() =tableFees.keys.filter { it.toIntOrNull() != null }.sortedBy { it.toInt() }.ifEmpty { listOf("1", "2", "4", "8", "12") }
     var exclusiveFee by mutableDoubleStateOf(0.0); private set
+    var exclusiveDownpaymentPercent by mutableIntStateOf(50); private set
     var cart by mutableStateOf<Map<Int, Int>>(emptyMap()); private set
     var readOrderNotificationKeys by mutableStateOf<Set<String>>(emptySet()); private set
     var busy by mutableStateOf(false); private set
@@ -372,6 +373,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         payMongoEnabled = catalog.paymongo_enabled
         tableFees = catalog.table_fees
         exclusiveFee = catalog.exclusive_fee
+        exclusiveDownpaymentPercent = catalog.exclusive_downpayment_percent
         diningTables = catalog.tables.orEmpty()
         ordersRequest.await()?.let { orders = it }
         reservationsRequest.await()?.let { reservations = it }
@@ -655,7 +657,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             busy = false
         }
     }
-    fun placeReservation(context: Context, type: String, phone: String, at: String, size: String, guests: String, notes: String, foodRequest: String, menuItems: Map<Int, Int>, payment: String, reference: String, proofUri: Uri?, diningTableId: Int? = null, done: (Boolean) -> Unit) = viewModelScope.launch {
+    fun placeReservation(context: Context, type: String, phone: String, at: String, size: String, guests: String, notes: String, foodRequest: String, menuItems: Map<Int, Int>, payment: String, reference: String, proofUri: Uri?, diningTableId: Int? = null, paymentPlan: String = "downpayment", done: (Boolean) -> Unit) = viewModelScope.launch {
         busy = true
         error = null
         try {
@@ -672,6 +674,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 menuItems.mapKeys { (productId, _) -> "menu_items[$productId]" }.mapValues { (_, quantity) -> quantity.toString().formPart() },
                 notes.takeIf { it.isNotBlank() }?.formPart(),
                 diningTableId = if (type == "table") diningTableId?.toString()?.formPart() else null,
+                paymentPlan = if (type == "exclusive") paymentPlan.formPart() else null,
             )
             if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "Reservation details are invalid"; done(false); return@launch }
             val created = response.body()?.get("data")
@@ -2084,7 +2087,7 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
                     )
                 }
                 items(reservations, key = { "reservation-${it.id}" }) { reservation ->
-                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservationScheduleLabel(reservation), "PARTY" to if (reservation.type == "table") "${reservation.table_size} guests" else "${reservation.guests} guests · Exclusive venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
+                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservationScheduleLabel(reservation), "PARTY" to if (reservation.type == "table") "${reservation.table_size} guests" else "${reservation.guests} guests · Exclusive Venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
                 }
             }
         } else {
@@ -2443,18 +2446,30 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
     val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
     val reservationFee = if (type == "table") vm.tableFees[size] ?: 0.0 else vm.exclusiveFee
-    val canPay = payment == "cash" || (payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && reference.length == 13 && proofUri != null)
+    var paymentPlan by remember { mutableStateOf("downpayment") }
+    val exclusive = type == "exclusive"
+    val bookingTotal = reservationFee + selectedFoodTotal
+    // Same rounding as the server: the downpayment share rounded up to the centavo.
+    val payNow = if (paymentPlan == "full") bookingTotal else kotlin.math.ceil(kotlin.math.round(bookingTotal * 100) * vm.exclusiveDownpaymentPercent / 100.0) / 100.0
+    // The Exclusive Venue is only reserved once part of it is paid online.
+    LaunchedEffect(exclusive) { if (exclusive && payment == "cash") payment = if (vm.payMongoEnabled) "paymongo" else "gcash" }
+    val canPay = (payment == "cash" && !exclusive) ||(payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && reference.length == 13 && proofUri != null)
     Text("BOOK A RESERVATION", color = Color(0xFF777F00), fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.ExtraBold)
     Text("Plan your visit", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 6.dp))
     Text("Complete the details below. We will confirm your request after review.", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
-    Row(Modifier.horizontalScroll(rememberScrollState())) { FilterChip(selected = type == "table", onClick = { type = "table" }, label = { Text("Table") }, modifier = Modifier.padding(end = 8.dp)); FilterChip(selected = type == "exclusive", onClick = { type = "exclusive" }, label = { Text("Exclusive venue") }) }
+    Row(Modifier.horizontalScroll(rememberScrollState())) { FilterChip(selected = type == "table", onClick = { type = "table" }, label = { Text("Table") }, modifier = Modifier.padding(end = 8.dp)); FilterChip(selected = type == "exclusive", onClick = { type = "exclusive" }, label = { Text("Exclusive Venue · whole day") }) }
     Spacer(Modifier.height(10.dp)); OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
-    DateTimePickerField(date, "Choose your schedule", "Select date and time", "Open 8 AM-11 PM (Philippine time). Last arrival: 10 PM.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; ReservationSlotChoices(vm, date, type, (if (type == "table") size else guests).toIntOrNull() ?: 1, tableId = if (type == "table") diningTableId else null) { date = it }; Spacer(Modifier.height(10.dp))
+    DateTimePickerField(date, "Choose your schedule", if (exclusive) "Select the date" else "Select date and time", if (exclusive) "Kermit's is yours from 8 AM to 11 PM (Philippine time). Book at least 1 day ahead." else "Open 8 AM-11 PM (Philippine time). Last arrival: 10 PM.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; ReservationSlotChoices(vm, date, type, (if (type == "table") size else guests).toIntOrNull() ?: 1, tableId = if (type == "table") diningTableId else null) { date = it }; Spacer(Modifier.height(10.dp))
     if (type == "table") {
         Text("Party size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row(Modifier.horizontalScroll(rememberScrollState())) { vm.tableSizes.forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text("Up to $value guests · ${money(vm.tableFees[value] ?: 0.0)}") }, modifier = Modifier.padding(end = 6.dp)) } }
         TableChoice(vm, size.toIntOrNull() ?: 1, diningTableId) { diningTableId = it }
     } else {
         OutlinedTextField(guests, { guests = it.filter(Char::isDigit).take(3) }, label = { Text("Number of guests") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+        Text("Pay at least ${vm.exclusiveDownpaymentPercent}% online now to secure the date. The balance is paid on the event day.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState())) {
+            FilterChip(selected = paymentPlan == "downpayment", onClick = { paymentPlan = "downpayment" }, label = { Text("${vm.exclusiveDownpaymentPercent}% downpayment") }, modifier = Modifier.padding(end = 6.dp))
+            FilterChip(selected = paymentPlan == "full", onClick = { paymentPlan = "full" }, label = { Text("Pay in full") })
+        }
     }
     Spacer(Modifier.height(12.dp)); Text("Food request", fontWeight = FontWeight.Bold); Text("Optional pre-order items", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     vm.products.take(8).forEach { product ->
@@ -2468,8 +2483,12 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     }
     OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-    Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(reservationFee + selectedFoodTotal), fontWeight = FontWeight.Bold) }
-    Spacer(Modifier.height(8.dp)); Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }); if (vm.payMongoEnabled) { Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "paymongo", onClick = { payment = "paymongo" }, label = { Text("PayMongo") }) } }
+    Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(bookingTotal), fontWeight = FontWeight.Bold) }
+    if (exclusive) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Pay now"); Text(money(payNow), fontWeight = FontWeight.Bold) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Balance on the event day"); Text(money(bookingTotal - payNow)) }
+    }
+    Spacer(Modifier.height(8.dp)); Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); if (!exclusive) { FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)) }; FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }); if (vm.payMongoEnabled) { Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "paymongo", onClick = { payment = "paymongo" }, label = { Text("PayMongo") }) } }
     if (payment == "paymongo") PayMongoNote()
     if (payment == "gcash") {
         vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
@@ -2484,7 +2503,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     Spacer(Modifier.height(16.dp))
     Button(
         onClick = {
-            vm.placeReservation(context, type, phone, date, size, guests, notes, foodRequest, menuItems, payment, reference, proofUri, diningTableId = diningTableId) { ok ->
+            vm.placeReservation(context, type, phone, date, size, guests, notes, foodRequest, menuItems, payment, reference, proofUri, diningTableId = diningTableId, paymentPlan = paymentPlan) { ok ->
                 if (ok) {
                     menuItems = emptyMap()
                     reference = ""
@@ -2539,7 +2558,9 @@ private fun CartAmount(amount: Double) {
     ) { value -> Text(value, fontSize = 19.sp, fontWeight = FontWeight.Black) }
 }
 // Customers book an arrival time only; staff free the table when they leave.
-private fun reservationScheduleLabel(reservation: Reservation): String = receiptDate(reservation.reservation_at)
+// The Exclusive Venue takes the whole day.
+private fun reservationScheduleLabel(reservation: Reservation): String =
+    if (reservation.type == "exclusive") "${reservationHistoryDay(reservation.reservation_at)} · whole day" else receiptDate(reservation.reservation_at)
 
 @Composable
 private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String, guests: Int, tableId: Int? = null, onSelect: (String) -> Unit) {
@@ -2551,7 +2572,11 @@ private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String,
             message = "Checking availability..."
             try {
                 slots = vm.reservationSlots(date.take(10), type, guests, tableId)
+                // The Exclusive Venue is one whole-day slot, so there is nothing to choose.
+                if (type == "exclusive") slots.firstOrNull { it.available }?.let { onSelect(it.start.replace('T', ' ')) }
                 message = when {
+                    type == "exclusive" && slots.any { it.available } -> "Kermit's is free for the whole day on this date."
+                    type == "exclusive" -> "Kermit's is already booked on this date, or it is too soon to reserve it. Choose another date."
                     slots.any { it.available } -> "Available times; checked again at submission."
                     tableId != null -> "That table is fully booked on this date. Choose another table, any table, or another date."
                     else -> "No availability. Please choose another date."

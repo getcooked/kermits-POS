@@ -40,6 +40,8 @@ class TableManagementController extends Controller
         return view('tables.index', [
             'bookedTableIds' => $bookedTableIds,
             'tableFees' => $pricing->tableFees(),
+            'exclusiveFee' => $pricing->exclusiveFee(),
+            'downpaymentPercent' => $pricing->downpaymentPercent(),
             'maxGuests' => $pricing->maxGuests(),
             'maxTables' => UpdateTableManagementRequest::MAX_TABLES,
             'diningTables' => DiningTable::query()->withCount('reservations')->orderBy('number')->get(),
@@ -60,6 +62,21 @@ class TableManagementController extends Controller
         $pricing->saveTableFees($request->tableFees());
 
         return redirect()->route('tables.index')->with('status', 'Table options updated successfully.');
+    }
+
+    public function updateExclusiveFee(Request $request, ReservationPricing $pricing): RedirectResponse
+    {
+        $validated = $request->validate([
+            'exclusive_fee' => ['required', 'numeric', 'decimal:0,2', 'min:1', 'max:999999.99'],
+        ], [
+            'exclusive_fee.required' => 'Enter the Exclusive Venue price.',
+            'exclusive_fee.min' => 'The Exclusive Venue price must be at least ₱1.',
+            'exclusive_fee.max' => 'The Exclusive Venue price cannot exceed ₱999,999.99.',
+            'exclusive_fee.decimal' => 'The Exclusive Venue price can have at most 2 decimal places.',
+        ]);
+        $pricing->saveExclusiveFee((float) $validated['exclusive_fee']);
+
+        return redirect()->route('tables.index')->with('status', 'Exclusive Venue price updated successfully.');
     }
 
     public function updateLayout(

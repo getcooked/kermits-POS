@@ -103,6 +103,42 @@ class ReservationSchedule
         return $start->addMinutes($this->stayMinutes())->min($closing)->format('Y-m-d H:i:s');
     }
 
+    /**
+     * The period a new booking holds: the arrival plus the estimated stay, or,
+     * for the Exclusive Venue, the whole opening day of the chosen date.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public function window(string|DateTimeInterface $at, string $type = 'table'): array
+    {
+        if ($type !== 'exclusive') {
+            return [$this->normalize($at), $this->endAt($at)];
+        }
+        $day = CarbonImmutable::parse($this->normalize($at));
+
+        return [
+            $day->setTimeFromTimeString(config('reservations.opening_time'))->format('Y-m-d H:i:s'),
+            $day->setTimeFromTimeString(config('reservations.closing_time'))->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    /**
+     * Tables may already be seated today, so the venue is booked some days ahead.
+     */
+    public function exclusiveDayBookable(string|DateTimeInterface $at): bool
+    {
+        $day = CarbonImmutable::parse($this->normalize($at))->startOfDay();
+
+        return $day->gte(CarbonImmutable::today()->addDays((int) config('reservations.exclusive_min_days_ahead')));
+    }
+
+    public function exclusiveLeadMessage(): string
+    {
+        $days = (int) config('reservations.exclusive_min_days_ahead');
+
+        return 'Book the '.Reservation::EXCLUSIVE_LABEL.' at least '.$days.' '.str('day')->plural($days).' ahead. Please choose a later date.';
+    }
+
     public function active(): Builder
     {
         return Reservation::query()->where(function (Builder $query) {
@@ -336,6 +372,9 @@ class ReservationSchedule
     public function availabilityForDate(string|DateTimeInterface $date, string $type = 'table', int $guests = 1, ?int $tableId = null): array
     {
         $date = CarbonImmutable::parse($date, config('app.timezone'))->setTimezone(config('app.timezone'));
+        if ($type === 'exclusive') {
+            return [$this->wholeDaySlot($date)];
+        }
         $start = $date->setTimeFromTimeString(config('reservations.opening_time'));
         $last = $date->setTimeFromTimeString(config('reservations.last_start_time'));
         $dayEnd = $date->setTimeFromTimeString(config('reservations.closing_time'));
@@ -390,29 +429,48 @@ class ReservationSchedule
         return $slots;
     }
 
+    /**
+     * The Exclusive Venue is offered as one slot covering the whole opening day.
+     *
+     * @return array{start: string, end: string, label: string, available: bool, tables_left: null}
+     */
+    private function wholeDaySlot(CarbonImmutable $date): array
+    {
+        [$start, $end] = $this->window($date, 'exclusive');
+        $opens = CarbonImmutable::parse($start);
+        $closes = CarbonImmutable::parse($end);
+
+        return [
+            'start' => $opens->format('Y-m-d\\TH:i'),
+            'end' => $closes->format('Y-m-d\\TH:i'),
+            'label' => 'Whole day · '.$opens->format('g:i A').'–'.$closes->format('g:i A'),
+            'available' => $this->exclusiveDayBookable($date) && $this->venueFree($start, $end),
+            'tables_left' => null,
+        ];
+    }
+
     public function isAvailable(string|DateTimeInterface $at, string $type = 'table', int $guests = 1, ?int $tableId = null): bool
     {
+        if ($type === 'exclusive') {
+            return $this->exclusiveDayBookable($at) && $this->venueFree(...$this->window($at, 'exclusive'));
+        }
         if (! $this->withinHours($at)) {
             return false;
         }
-        $start = $this->normalize($at);
-        $end = $this->endAt($at);
+        [$start, $end] = $this->window($at);
 
-        if ($type === 'table' && $this->hasLegacyUniqueSchedule()
-            && $this->active()->where('reservation_at', $start)->exists()) {
+        if ($this->hasLegacyUniqueSchedule() && $this->active()->where('reservation_at', $start)->exists()) {
             return false;
         }
 
-        return $type === 'exclusive'
-            ? $this->venueFree($start, $end)
-            : $this->hasCapacity($start, $end, $guests, tableId: $tableId);
+        return $this->hasCapacity($start, $end, $guests, tableId: $tableId);
     }
 
-    public function customerHasOverlap(int $userId, string|DateTimeInterface $at, ?int $ignore = null): bool
+    public function customerHasOverlap(int $userId, string|DateTimeInterface $at, ?int $ignore = null, ?string $end = null): bool
     {
         $start = $this->normalize($at);
 
-        return $this->conflicts($start, $this->endAt($start), $ignore, includeSeated: true)->where('user_id', $userId)->exists();
+        return $this->conflicts($start, $end ?? $this->endAt($start), $ignore, includeSeated: true)->where('user_id', $userId)->exists();
     }
 
     public function lock(): void
@@ -440,11 +498,13 @@ class ReservationSchedule
         return DB::transaction(function () use ($attributes) {
             $this->lock();
             $at = $attributes['reservation_at'];
-            if (! $this->withinHours($at) || CarbonImmutable::parse($this->normalize($at))->lte(now())) {
+            if ($attributes['type'] === 'exclusive' && ! $this->exclusiveDayBookable($at)) {
+                throw ValidationException::withMessages(['reservation_at' => $this->exclusiveLeadMessage()]);
+            }
+            [$start, $end] = $this->window($at, $attributes['type']);
+            if (! $this->withinHours($start) || CarbonImmutable::parse($start)->lte(now())) {
                 throw ValidationException::withMessages(['reservation_at' => self::HOURS_MESSAGE.' Please choose a future time.']);
             }
-            $start = $this->normalize($at);
-            $end = $this->endAt($at);
             $guests = (int) ($attributes['guests'] ?? $attributes['table_size']);
             $tableId = $attributes['type'] === 'table' && filled($attributes['dining_table_id'] ?? null)
                 ? (int) $attributes['dining_table_id']
@@ -454,7 +514,7 @@ class ReservationSchedule
                 $attributes['dining_table_id'] = $tableId;
             }
 
-            if (filled($attributes['user_id'] ?? null) && $this->customerHasOverlap((int) $attributes['user_id'], $start)) {
+            if (filled($attributes['user_id'] ?? null) && $this->customerHasOverlap((int) $attributes['user_id'], $start, end: $end)) {
                 throw ValidationException::withMessages(['reservation_at' => 'You already have a reservation during this time. Choose another time or cancel your other reservation first.']);
             }
             if ($attributes['type'] === 'table' && $this->hasLegacyUniqueSchedule()
@@ -517,7 +577,7 @@ class ReservationSchedule
                     throw ValidationException::withMessages(['status' => 'A past reservation cannot be confirmed.']);
                 }
                 $start = $this->normalize($reservation->reservation_at);
-                $end = $reservation->reservation_end_at?->format('Y-m-d H:i:s') ?? $this->endAt($start);
+                $end = $reservation->reservation_end_at?->format('Y-m-d H:i:s') ?? $this->window($start, $reservation->type)[1];
                 $tableId = $this->hasDiningTableColumn() && $reservation->dining_table_id ? (int) $reservation->dining_table_id : null;
                 if (($reservation->type === 'table' && ! $this->hasCapacity($start, $end, $reservation->guests, $reservation->id, $tableId))
                     || ($reservation->type === 'exclusive' && ! $this->venueFree($start, $end, $reservation->id))) {
@@ -528,12 +588,43 @@ class ReservationSchedule
                 }
             }
             $updates = ['status' => $status, 'handled_by' => $actor];
+            if ($reservation->type === 'exclusive') {
+                $updates = [...$updates, ...$this->exclusivePayment($reservation, $status)];
+            }
             if ($this->hasHoldExpiresAt()) {
                 $updates['hold_expires_at'] = null;
             }
             $reservation->fill($updates)->save();
             $reservation->statusHistories()->create(['from_status' => $previous, 'to_status' => $status, 'changed_by' => $actor]);
         }, attempts: 3);
+    }
+
+    /**
+     * The Exclusive Venue is only reserved once its downpayment is in. PayMongo
+     * records it automatically; for GCash, approving the booking is staff
+     * verifying the proof. The balance is collected on the event day.
+     *
+     * @return array<string, mixed>
+     */
+    private function exclusivePayment(Reservation $reservation, string $status): array
+    {
+        $received = in_array($reservation->payment_status, ['partial', 'paid'], true);
+        $due = (float) ($reservation->downpayment_amount ?? $reservation->total_amount);
+
+        if ($status === 'completed') {
+            return ['payment_status' => 'paid', 'amount_paid' => $reservation->total_amount];
+        }
+        if ($status !== 'confirmed' || $received) {
+            return [];
+        }
+        if ($reservation->payment_method !== 'gcash' || ! $reservation->payment_proof_path || ! $reservation->payment_reference) {
+            throw ValidationException::withMessages(['status' => 'The '.Reservation::EXCLUSIVE_LABEL.' downpayment of ₱'.number_format($due, 2).' has not been received yet. The venue is only reserved once it is paid.']);
+        }
+
+        return [
+            'payment_status' => $due >= (float) $reservation->total_amount ? 'paid' : 'partial',
+            'amount_paid' => $due,
+        ];
     }
 
     public function expireHolds(): int

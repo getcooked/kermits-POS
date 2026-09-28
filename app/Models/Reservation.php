@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Reservation extends Model
 {
+    public const EXCLUSIVE_LABEL = 'Exclusive Venue';
+
     protected $fillable = [
         'user_id',
         'order_id',
@@ -25,6 +27,8 @@ class Reservation extends Model
         'reservation_fee',
         'food_total',
         'total_amount',
+        'downpayment_amount',
+        'amount_paid',
         'payment_method',
         'payment_reference',
         'payment_status',
@@ -47,6 +51,8 @@ class Reservation extends Model
             'reservation_fee' => 'decimal:2',
             'food_total' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'downpayment_amount' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
         ];
     }
 
@@ -66,7 +72,7 @@ class Reservation extends Model
     public function getTableLabelAttribute(): string
     {
         if ($this->type !== 'table') {
-            return 'Exclusive venue';
+            return self::EXCLUSIVE_LABEL;
         }
 
         return $this->dining_table_id && $this->diningTable
@@ -89,12 +95,31 @@ class Reservation extends Model
         return $this->created_at->copy()->addMinutes(config('reservations.hold_minutes'))->lte(now()) ? 'expired' : 'pending';
     }
 
+    public function getTypeLabelAttribute(): string
+    {
+        return $this->type === 'exclusive' ? self::EXCLUSIVE_LABEL : 'Table reservation';
+    }
+
     /**
      * Customers book an arrival time only; staff free the table when they leave.
+     * The Exclusive Venue takes the restaurant for the whole day.
      */
     public function getArrivalTimeAttribute(): string
     {
-        return $this->reservation_at->format('h:i A');
+        return $this->type === 'exclusive' ? 'Whole day' : $this->reservation_at->format('h:i A');
+    }
+
+    /**
+     * Still owed on an Exclusive Venue booking after its downpayment, collected on the event day.
+     */
+    public function getBalanceDueAttribute(): float
+    {
+        return max(0, round((float) $this->total_amount - (float) $this->amount_paid, 2));
+    }
+
+    public function getPaymentStatusLabelAttribute(): string
+    {
+        return $this->payment_status === 'partial' ? 'Downpayment paid' : ucfirst((string) $this->payment_status);
     }
 
     public function user(): BelongsTo

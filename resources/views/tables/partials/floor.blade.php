@@ -7,6 +7,9 @@
             </div>
             <a class="row-add" href="{{ url()->current() }}">Refresh</a>
         </div>
+        @if($floor['exclusive'] ?? null)
+            <div class="floor-alert" role="status"><strong>Exclusive Venue today</strong> · {{ $floor['exclusive']->reference }} · {{ $floor['exclusive']->customer_name }} · {{ $floor['exclusive']->guests }} guests. Kermit's is reserved for this event, so walk-in parties can't be seated.</div>
+        @endif
         @if($floor['crowded'])
             <div class="floor-alert" role="status">Upcoming reservations may not all have a free table while these tables are occupied. Free tables whose guests have left, or seat arriving guests elsewhere.</div>
         @endif

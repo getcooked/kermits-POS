@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
-use App\Rules\ReservationHours;
+use App\Http\Requests\StoreReservationRequest;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
@@ -36,22 +36,29 @@ class MobileReservationController extends Controller
             'type' => ['required', 'in:table,exclusive'],
             'table_size' => ['nullable', 'required_if:type,table', 'integer', Rule::in($pricing->tableSizes())],
             'dining_table_id' => ['exclude_unless:type,table', ...$tables->requestRules()],
-            'phone' => ['required', 'regex:/^09\d{9}$/'], 'reservation_at' => ['required', 'bail', 'date', 'after:now', new ReservationHours],
+            'phone' => ['required', 'regex:/^09\d{9}$/'], 'reservation_at' => StoreReservationRequest::scheduleRules($request->input('type')),
             'guests' => ['nullable', 'required_if:type,exclusive', 'integer', 'min:1', 'max:300'],
             'food_request' => ['nullable', 'string', 'max:2000'], 'menu_items' => ['nullable', 'array'],
             'menu_items.*' => ['nullable', 'integer', 'min:0', 'max:22'], 'notes' => ['nullable', 'string', 'max:2000'],
-            'payment_method' => ['required', 'in:cash,gcash,paymongo'],
+            'payment_method' => StoreReservationRequest::paymentMethodRules($request->input('type')),
+            'payment_plan' => ['exclude_unless:type,exclusive', 'nullable', 'in:downpayment,full'],
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-        ]);
+        ], StoreReservationRequest::paymentMethodMessages());
         if ($validated['payment_method'] === 'paymongo' && ! PayMongoCheckout::enabled()) {
             throw ValidationException::withMessages(['payment_method' => 'PayMongo checkout is not available.']);
         }
+        $exclusive = $validated['type'] === 'exclusive';
+        if ($exclusive && ! $schedules->exclusiveDayBookable($validated['reservation_at'])) {
+            throw ValidationException::withMessages(['reservation_at' => $schedules->exclusiveLeadMessage()]);
+        }
         $tableId = isset($validated['dining_table_id']) ? (int) $validated['dining_table_id'] : null;
         if (! $schedules->isAvailable($validated['reservation_at'], $validated['type'], (int) ($validated['table_size'] ?? $validated['guests'] ?? 1), $tableId)) {
-            throw ValidationException::withMessages($tableId !== null
-                ? ['dining_table_id' => 'The table you chose is not free at this time. Choose another time, another table, or any available table.']
-                : ['reservation_at' => 'This reservation time is no longer available. Please choose another schedule.']);
+            throw ValidationException::withMessages(match (true) {
+                $tableId !== null => ['dining_table_id' => 'The table you chose is not free at this time. Choose another time, another table, or any available table.'],
+                $exclusive => ['reservation_at' => 'Kermit\'s is already booked on this day. Please choose another date for the Exclusive Venue.'],
+                default => ['reservation_at' => 'This reservation time is no longer available. Please choose another schedule.'],
+            });
         }
         $proofPath = $request->hasFile('payment_proof') ? $request->file('payment_proof')->store('payment-proofs', 'local') : null;
 
@@ -62,7 +69,7 @@ class MobileReservationController extends Controller
                     ? $pricing->tableFee((int) $validated['table_size'])
                     : $pricing->exclusiveFee();
                 $reservation = $schedules->reserve([
-                    ...collect($validated)->except(['menu_items', 'payment_proof'])->all(),
+                    ...collect($validated)->except(['menu_items', 'payment_proof', 'payment_plan'])->all(),
                     'user_id' => $request->user()->id, 'customer_name' => $request->user()->name,
                     'email' => $request->user()->email, 'reference' => $this->newReference(), 'status' => 'pending',
                     'reservation_at' => $schedules->normalize($validated['reservation_at']),
@@ -82,7 +89,10 @@ class MobileReservationController extends Controller
                 })->values();
                 $reservation->items()->createMany($items->all());
                 $foodTotal = (float) $items->sum('subtotal');
-                $reservation->update(['food_total' => $foodTotal, 'total_amount' => $fee + $foodTotal]);
+                $reservation->update([
+                    'food_total' => $foodTotal, 'total_amount' => $fee + $foodTotal,
+                    'downpayment_amount' => $validated['type'] === 'exclusive' ? $pricing->downpayment($fee + $foodTotal, $validated['payment_plan'] ?? 'downpayment') : null,
+                ]);
                 $reservation->statusHistories()->create(['from_status' => null, 'to_status' => 'pending', 'changed_by' => $request->user()->id]);
 
                 if ($validated['payment_method'] === 'paymongo') {
@@ -131,6 +141,9 @@ class MobileReservationController extends Controller
             'hold_expires_at' => $reservation->hold_expires_at?->toIso8601String(), 'phone' => $reservation->phone,
             'reservation_fee' => (float) $reservation->reservation_fee, 'food_total' => (float) $reservation->food_total,
             'total_amount' => (float) $reservation->total_amount, 'payment_method' => $reservation->payment_method,
+            'type_label' => $reservation->type_label, 'arrival_time' => $reservation->arrival_time,
+            'downpayment_amount' => $reservation->downpayment_amount !== null ? (float) $reservation->downpayment_amount : null,
+            'amount_paid' => (float) $reservation->amount_paid, 'balance_due' => $reservation->balance_due,
             'payment_status' => $reservation->payment_status, 'payment_reference' => $reservation->payment_reference,
             'food_request' => $reservation->food_request, 'notes' => $reservation->notes, 'status' => $reservation->booking_status,
             'order_id' => $reservation->order_id,

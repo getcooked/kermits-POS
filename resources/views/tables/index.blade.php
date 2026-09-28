@@ -52,6 +52,20 @@
     </section>
 
     <section class="welcome">
+        <h2>Exclusive Venue</h2>
+        <p class="table-help">Customers reserve all of Kermit's for a whole day ({{ \Carbon\Carbon::parse(config('reservations.opening_time'))->format('g:i A') }}–{{ \Carbon\Carbon::parse(config('reservations.closing_time'))->format('g:i A') }}). They pay at least {{ $downpaymentPercent }}% of the total online (GCash or PayMongo) before you can approve it; the balance is collected on the event day.</p>
+        <form method="POST" action="{{ route('tables.exclusive.update') }}" data-ajax-form data-ajax-target=".table-management" data-ajax-loading="Saving...">
+            @csrf @method('PUT')
+            <label for="exclusive_fee">Whole-day price (&#8369;)</label>
+            <input class="control" id="exclusive_fee" name="exclusive_fee" type="number" min="1" max="999999.99" step="0.01" value="{{ old('exclusive_fee', number_format($exclusiveFee, 2, '.', '')) }}" required>
+            <p class="table-help">Food requests are added to this price. Changes apply to new bookings only.</p>
+            <div class="table-actions">
+                <button class="button" type="submit">Save Exclusive Venue price</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="welcome">
         <h2>Tables in the restaurant</h2>
         <p class="table-help">Each numbered table and how many people it seats. Customers are seated at the smallest free table that fits, or at the table they request.</p>
         @if($seatSummary->isNotEmpty())

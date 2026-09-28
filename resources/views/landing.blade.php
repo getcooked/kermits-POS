@@ -974,8 +974,8 @@
                                    <p>Choose menu items you would like prepared for your reservation.</p>
                             </article>
                             <article class="booking-option"><span>&#10024;</span>
-                                   <h3>Exclusive reservation</h3>
-                                   <p>Plan private celebrations and full-venue gatherings.</p>
+                                   <h3>Exclusive Venue</h3>
+                                   <p>Reserve all of Kermit's for a whole day of private celebrations and gatherings.</p>
                             </article>
                      </div><a class="book-button" href="{{ route('reservations.create') }}">Start your reservation</a>
               </section>

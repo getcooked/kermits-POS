@@ -93,4 +93,18 @@ class Order extends Model
     {
         return (float) $this->total + (float) ($this->reservation?->total_amount ?? 0);
     }
+
+    /**
+     * What online checkout charges now: an Exclusive Venue booking pays its
+     * downpayment first and the balance on the event day.
+     */
+    public function checkoutAmount(): float
+    {
+        $reservation = $this->reservation;
+        if ($reservation?->type === 'exclusive' && $reservation->downpayment_amount !== null) {
+            return (float) $this->total + (float) $reservation->downpayment_amount;
+        }
+
+        return $this->totalDue();
+    }
 }

@@ -31,6 +31,8 @@ class ReservationController extends Controller
             'tableFees' => $pricing->tableFees(),
             'diningTables' => $tables->activeTables()->sortBy('number')->values(),
             'exclusiveFee' => $pricing->exclusiveFee(),
+            'downpaymentPercent' => $pricing->downpaymentPercent(),
+            'exclusiveMinDate' => now()->addDays((int) config('reservations.exclusive_min_days_ahead'))->toDateString(),
             'gcashQrPath' => SystemSetting::get('gcash_qr_path'),
             'paymongoEnabled' => PayMongoCheckout::enabled(),
         ]);
@@ -49,7 +51,7 @@ class ReservationController extends Controller
                     ? $pricing->tableFee((int) $request->validated('table_size'))
                     : $pricing->exclusiveFee();
                 $reservation = $schedules->reserve([
-                    ...$request->safe()->except(['menu_items', 'payment_proof']),
+                    ...$request->safe()->except(['menu_items', 'payment_proof', 'payment_plan']),
                     'user_id' => $request->user()->id,
                     'customer_name' => $request->user()->name,
                     'email' => $request->user()->email,
@@ -85,7 +87,12 @@ class ReservationController extends Controller
                     $reservation->items()->createMany($items->all());
                 }
 
-                $reservation->update(['food_total' => $foodTotal, 'total_amount' => $reservationFee + $foodTotal]);
+                $total = $reservationFee + $foodTotal;
+                $reservation->update([
+                    'food_total' => $foodTotal,
+                    'total_amount' => $total,
+                    'downpayment_amount' => $request->validated('type') === 'exclusive' ? $pricing->downpayment($total, $request->paymentPlan()) : null,
+                ]);
 
                 $reservation->statusHistories()->create([
                     'from_status' => null,

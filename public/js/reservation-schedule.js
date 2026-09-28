@@ -75,14 +75,19 @@
                     if (!slot.available) continue;
 
                     const option = new Option(slotLabel(slot, table), slot.start);
-                    option.selected = slot.start === normalizedValue();
+                    // The Exclusive Venue is one whole-day slot, so there is nothing to choose.
+                    option.selected = slot.start === normalizedValue() || type === 'exclusive';
                     select.add(option);
                     available++;
                 }
 
-                if (!select.value) input.value = '';
-                if (available) {
+                input.value = select.value;
+                if (available && type === 'exclusive') {
+                    message.textContent = 'Kermit\'s is free for the whole day on this date.';
+                } else if (available) {
                     message.textContent = 'Choose one of the available times above.';
+                } else if (type === 'exclusive') {
+                    message.textContent = 'Kermit\'s is already booked on this date, or it is too soon to reserve it. Please choose another date.';
                 } else if (table) {
                     message.textContent = 'The table you chose is fully booked on this date. Choose another table, any available table, or another date.';
                 } else {

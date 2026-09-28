@@ -44,9 +44,14 @@ class PayMongoCheckout
                 'currency' => 'PHP',
                 'quantity' => (int) $item->quantity,
             ])->all();
+            $exclusive = $locked->reservation->type === 'exclusive' && $locked->reservation->downpayment_amount !== null;
             $lineItems[] = [
-                'name' => 'Table reservation',
-                'amount' => (int) round((float) $locked->reservation->total_amount * 100),
+                'name' => match (true) {
+                    ! $exclusive => 'Table reservation',
+                    (float) $locked->reservation->downpayment_amount < (float) $locked->reservation->total_amount => 'Exclusive Venue downpayment',
+                    default => 'Exclusive Venue',
+                },
+                'amount' => (int) round(($exclusive ? (float) $locked->reservation->downpayment_amount : (float) $locked->reservation->total_amount) * 100),
                 'currency' => 'PHP',
                 'quantity' => 1,
             ];

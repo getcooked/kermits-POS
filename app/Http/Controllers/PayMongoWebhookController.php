@@ -73,7 +73,7 @@ class PayMongoWebhookController extends Controller
                 return response()->json(['error' => 'Order mismatch'], 422);
             }
 
-            $due = (int) round($order->totalDue() * 100);
+            $due = (int) round($order->checkoutAmount() * 100);
             $payments = data_get($payload, 'data.data.attributes.payments', []);
             $paid = collect(is_array($payments) ? $payments : [])->first(fn ($payment): bool => data_get($payment, 'attributes.status') === 'paid'
                 && data_get($payment, 'attributes.currency') === 'PHP'
@@ -89,6 +89,13 @@ class PayMongoWebhookController extends Controller
                 'payment_reference' => data_get($paid, 'id'),
             ]);
             $updates = ['payment_status' => 'paid'];
+            $reservation = $order->reservation;
+            if ($reservation->type === 'exclusive' && $reservation->downpayment_amount !== null) {
+                $updates = [
+                    'payment_status' => (float) $reservation->downpayment_amount < (float) $reservation->total_amount ? 'partial' : 'paid',
+                    'amount_paid' => $reservation->downpayment_amount,
+                ];
+            }
             if (Schema::hasColumn('reservations', 'hold_expires_at')) {
                 $updates['hold_expires_at'] = null;
             }

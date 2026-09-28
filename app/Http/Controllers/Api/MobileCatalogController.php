@@ -30,6 +30,7 @@ class MobileCatalogController extends Controller
             'paymongo_enabled' => PayMongoCheckout::enabled(),
             'table_fees' => $pricing->tableFees(),
             'exclusive_fee' => $pricing->exclusiveFee(),
+            'exclusive_downpayment_percent' => $pricing->downpaymentPercent(),
             'tables' => $tables->activeTables()
                 ->sortBy('number')
                 ->map(fn (DiningTable $table): array => ['id' => $table->id, 'number' => $table->number, 'seats' => $table->seats])

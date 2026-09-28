@@ -63,7 +63,7 @@
                         <div><dt>Name</dt><dd>{{ $reservation->customer_name }}</dd></div>
                         <div><dt>Email</dt><dd>{{ $reservation->email }}</dd></div>
                         <div><dt>Phone</dt><dd>{{ $reservation->phone }}</dd></div>
-                        <div><dt>Reservation type</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : 'Exclusive venue' }}</dd></div>@if($reservation->type === 'table')<div><dt>Table</dt><dd>{{ $reservation->table_label }}</dd></div>@endif
+                        <div><dt>Reservation type</dt><dd>{{ $reservation->type === 'table' ? $reservation->table_size.'-seater table' : 'Exclusive Venue · whole day' }}</dd></div>@if($reservation->type === 'table')<div><dt>Table</dt><dd>{{ $reservation->table_label }}</dd></div>@endif
                     </dl>
                 </section>
 
@@ -73,7 +73,11 @@
                     </div>
                     <dl class="clean-detail-list">
                         <div><dt>Method</dt><dd>{{ match($reservation->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}</dd></div>
-                        <div><dt>Status</dt><dd>{{ ucfirst($reservation->payment_status) }}</dd></div>
+                        <div><dt>Status</dt><dd>{{ $reservation->payment_status_label }}</dd></div>
+                        @if($reservation->type === 'exclusive' && $reservation->downpayment_amount !== null)
+                            <div><dt>{{ (float) $reservation->downpayment_amount < (float) $reservation->total_amount ? 'Downpayment due' : 'Paid in full' }}</dt><dd>&#8369;{{ number_format($reservation->downpayment_amount, 2) }}</dd></div>
+                            <div><dt>Balance on the event day</dt><dd>&#8369;{{ number_format($reservation->balance_due, 2) }}</dd></div>
+                        @endif
                         <div class="wide-detail"><dt>Reference code</dt><dd>{{ $reservation->payment_reference ?: 'Not provided' }}</dd></div>
                     </dl>
                 </section>
@@ -109,6 +113,10 @@
                         <span>Reservation fee <b>&#8369;{{ number_format($reservation->reservation_fee, 2) }}</b></span>
                         <span>Food total <b>&#8369;{{ number_format($reservation->food_total, 2) }}</b></span>
                         <strong>Total <b>&#8369;{{ number_format($reservation->total_amount, 2) }}</b></strong>
+                        @if($reservation->type === 'exclusive')
+                            <span>Paid <b>&#8369;{{ number_format($reservation->amount_paid, 2) }}</b></span>
+                            <span>Balance <b>&#8369;{{ number_format($reservation->balance_due, 2) }}</b></span>
+                        @endif
                     </div>
                 </section>
             </div>
