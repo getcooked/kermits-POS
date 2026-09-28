@@ -20,9 +20,25 @@ use Illuminate\View\View;
 
 class TableManagementController extends Controller
 {
-    public function index(ReservationPricing $pricing, TableLayout $layout, TableFloor $floor): View
+    public function index(ReservationPricing $pricing, TableLayout $layout, TableFloor $floor, ReservationSchedule $schedules): View
     {
+        // Tables with a live booking (not yet seated, not past the late window) or guests sitting at them now.
+        $bookedTableIds = $layout->hasFloorStatus()
+            ? $schedules->active()
+                ->where('type', 'table')
+                ->whereNotNull('dining_table_id')
+                ->whereNull('seated_at')
+                ->where('reservation_at', '>=', now()->subMinutes(TableFloor::LATE_MINUTES))
+                ->distinct()
+                ->pluck('dining_table_id')
+                ->merge(DiningTable::query()->whereNotNull('occupied_at')->pluck('id'))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->all()
+            : [];
+
         return view('tables.index', [
+            'bookedTableIds' => $bookedTableIds,
             'tableFees' => $pricing->tableFees(),
             'maxGuests' => $pricing->maxGuests(),
             'maxTables' => UpdateTableManagementRequest::MAX_TABLES,
