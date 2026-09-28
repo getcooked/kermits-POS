@@ -278,7 +278,13 @@ class TableRequestsTest extends TestCase
         $this->actingAs($admin)->get(route('tables.index'))->assertOk()
             ->assertSee('form="table_availability_'.$tableFour->id.'" title="Customers can book this table. Click to make it unavailable.">Available</button>', false)
             ->assertSee('>Booked</span>', false)
-            ->assertDontSee('Has bookings');
+            ->assertDontSee('Has bookings')
+            // Unused tables get the same toggle and can be removed; tables with reservations can't.
+            ->assertSee('form="table_availability_'.$this->table(1)->id.'"', false)
+            ->assertDontSee('type="checkbox"', false)
+            ->assertSee('<th scope="col">Delete</th>', false)
+            ->assertSee('<button class="row-remove" type="button" data-row-remove >Remove</button>', false)
+            ->assertSee('data-row-remove  data-locked disabled', false);
 
         $this->patch(route('tables.availability', $tableFour))
             ->assertSessionHasNoErrors()

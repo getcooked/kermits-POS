@@ -173,7 +173,7 @@ class TableManagementController extends Controller
         foreach ($existing as $table) {
             if (! $submitted->has($table->id) && $table->reservations_count > 0) {
                 throw ValidationException::withMessages([
-                    'dining_tables' => "Table {$table->number} has reservations, so it can't be removed. Untick “Bookable” to stop new bookings instead.",
+                    'dining_tables' => "Table {$table->number} has reservations, so it can't be removed. Make it Unavailable to stop new bookings instead.",
                 ]);
             }
         }

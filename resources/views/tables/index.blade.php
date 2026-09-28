@@ -61,15 +61,16 @@
             @csrf @method('PUT')
             <div class="table-list-scroll">
                 <table class="table-list layout-list">
-                    <thead><tr><th scope="col">Table number</th><th scope="col">Seats</th><th scope="col">Bookable</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+                    <thead><tr><th scope="col">Table number</th><th scope="col">Seats</th><th scope="col">Bookable</th><th scope="col">Delete</th></tr></thead>
                     <tbody data-rows>
                         @foreach($layoutRows as $index => $row)
                             @php($inUse = filled($row['id'] ?? null) && ($tablesById->get((int) $row['id'])?->reservations_count ?? 0) > 0)
                             <tr class="editable-row">
                                 <td>@if(filled($row['id'] ?? null))<input type="hidden" name="dining_tables[{{ $index }}][id]" value="{{ $row['id'] }}">@endif<label class="visually-hidden" for="dining_table_number_{{ $index }}">Table number</label><input class="control" id="dining_table_number_{{ $index }}" name="dining_tables[{{ $index }}][number]" type="number" min="1" max="999" step="1" value="{{ $row['number'] ?? '' }}" required data-table-number></td>
                                 <td><label class="visually-hidden" for="dining_table_seats_{{ $index }}">Seats</label><input class="control" id="dining_table_seats_{{ $index }}" name="dining_tables[{{ $index }}][seats]" type="number" min="1" max="{{ $maxSeats }}" step="1" value="{{ $row['seats'] ?? '' }}" required></td>
-                                <td><input type="hidden" name="dining_tables[{{ $index }}][active]" value="0"><label class="bookable"><input type="checkbox" name="dining_tables[{{ $index }}][active]" value="1" @checked(filter_var($row['active'] ?? false, FILTER_VALIDATE_BOOLEAN))><span class="visually-hidden">Bookable</span></label></td>
-                                <td>@if($inUse)@if(in_array((int) $row['id'], $bookedTableIds, true))<span class="table-state is-booked" title="This table has an upcoming booking or guests seated now.">Booked</span>@elseif($tablesById->get((int) $row['id'])?->active)<button class="table-state is-free" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can book this table. Click to make it unavailable.">Available</button>@else<button class="table-state is-off" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can't book this table. Click to make it available again.">Unavailable</button>@endif @else<button class="row-remove" type="button" data-row-remove>Remove</button>@endif</td>
+                                @php($active = filter_var($row['active'] ?? false, FILTER_VALIDATE_BOOLEAN))
+                                <td><input type="hidden" name="dining_tables[{{ $index }}][active]" value="{{ $active ? 1 : 0 }}">@if(! filled($row['id'] ?? null))<span @class(['table-state', 'is-free' => $active, 'is-off' => ! $active])>{{ $active ? 'Available' : 'Unavailable' }}</span>@elseif(in_array((int) $row['id'], $bookedTableIds, true))<span class="table-state is-booked" title="This table has an upcoming booking or guests seated now.">Booked</span>@elseif($tablesById->get((int) $row['id'])?->active)<button class="table-state is-free" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can book this table. Click to make it unavailable.">Available</button>@else<button class="table-state is-off" type="submit" form="table_availability_{{ $row['id'] }}" title="Customers can't book this table. Click to make it available again.">Unavailable</button>@endif</td>
+                                <td><button class="row-remove" type="button" data-row-remove @if($inUse) data-locked disabled title="This table has reservations, so it can't be removed. Make it Unavailable instead." @endif>Remove</button></td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -79,7 +80,7 @@
                 <tr class="editable-row">
                     <td><label class="visually-hidden" for="dining_table_number___INDEX__">Table number</label><input class="control" id="dining_table_number___INDEX__" name="dining_tables[__INDEX__][number]" type="number" min="1" max="999" step="1" required data-table-number></td>
                     <td><label class="visually-hidden" for="dining_table_seats___INDEX__">Seats</label><input class="control" id="dining_table_seats___INDEX__" name="dining_tables[__INDEX__][seats]" type="number" min="1" max="{{ $maxSeats }}" step="1" value="4" required></td>
-                    <td><input type="hidden" name="dining_tables[__INDEX__][active]" value="0"><label class="bookable"><input type="checkbox" name="dining_tables[__INDEX__][active]" value="1" checked><span class="visually-hidden">Bookable</span></label></td>
+                    <td><input type="hidden" name="dining_tables[__INDEX__][active]" value="1"><span class="table-state is-free">Available</span></td>
                     <td><button class="row-remove" type="button" data-row-remove>Remove</button></td>
                 </tr>
             </template>
@@ -93,7 +94,7 @@
                 <input class="control" id="turnover_minutes" name="turnover_minutes" type="number" min="0" max="{{ $maxTurnoverMinutes }}" step="5" value="{{ old('turnover_minutes', $turnoverMinutes) }}" required>
                 <small>A table stays free for this long after it is marked free (or after a booking's estimated stay) so staff can clear and reset it. Use 0 for back-to-back bookings.</small>
             </div>
-            <p class="table-help">Tables with reservations can't be removed; untick Bookable to stop new bookings instead. Changes that would leave an upcoming reservation without a table are refused.</p>
+            <p class="table-help">Click Available or Unavailable to switch whether customers can book a table; new tables are available once saved. Tables with reservations can't be removed; make them Unavailable instead. Changes that would leave an upcoming reservation without a table are refused.</p>
             <div class="table-actions">
                 <button class="row-add" type="button" data-row-add>+ Add table</button>
                 <button class="button" type="submit">Save tables</button>
@@ -119,7 +120,7 @@
         const max = Number(form.dataset.maxRows || 20);
         rows.forEach(row => {
             const remove = row.querySelector('[data-row-remove]');
-            if (remove) remove.disabled = rows.length <= 1;
+            if (remove) remove.disabled = remove.hasAttribute('data-locked') || rows.length <= 1;
         });
         form.querySelector('[data-row-add]').disabled = rows.length >= max;
     };
