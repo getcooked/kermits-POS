@@ -348,8 +348,11 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             } else {
                 error = "Could not load the latest menu."
             }
-        } catch (_: Exception) {
+        } catch (_: IOException) {
             error = "Could not load the latest menu. Check your internet connection."
+        } catch (_: Exception) {
+            // Parsing/adapter failures are app bugs, not connectivity problems.
+            error = "Could not load the latest menu."
         } finally {
             busy = false
         }

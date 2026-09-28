@@ -63,6 +63,7 @@ data class ApiError(
 )
 @JsonClass(generateAdapter = true)
 data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0, val tables: List<DiningTableOption>? = null)
+@JsonClass(generateAdapter = true)
 data class DiningTableOption(val id: Int, val number: Int, val seats: Int)
 @JsonClass(generateAdapter = true)
 data class CatalogResponse(val data: CatalogData)
