@@ -902,30 +902,6 @@
                      }
               }
 
-              .app-download {
-                     min-height: 40px;
-                     display: inline-flex;
-                     align-items: center;
-                     padding: 9px 13px;
-                     border: 1px solid #cfd3c7;
-                     border-radius: 10px;
-                     font-size: 14px;
-                     font-weight: 700;
-                     white-space: nowrap
-              }
-
-              .app-download.disabled {
-                     color: #777b72;
-                     background: #eceee6;
-                     cursor: default
-              }
-
-              @media(max-width:900px) {
-                     .app-download {
-                            display: none
-                     }
-              }
-
               .hero-actions .app-hero-action {
                      min-height: 48px;
                      display: inline-flex;
@@ -954,7 +930,7 @@
 
 <body>
        <nav class="site-nav"><a class="site-brand" href="{{ route('home') }}"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT'S</strong></a>
-              <div class="nav-links"><a href="#menu">Menu</a><a href="#story">Our story</a>@if($appDownloadAvailable)<a class="app-download" href="{{ $appDownloadUrl }}" download>Download app</a>@else<span class="app-download disabled" title="The Android app will be available soon">App coming soon</span>@endif<a class="staff" href="{{ route('login') }}">Log in</a><a class="book-button" href="{{ route('shop') }}">Order now</a></div>
+              <div class="nav-links"><a href="#menu">Menu</a><a href="#story">Our story</a><a class="staff" href="{{ route('login') }}">Log in</a><a class="book-button" href="{{ route('shop') }}">Order now</a></div>
        </nav>
        <main>
               <section class="hero">
