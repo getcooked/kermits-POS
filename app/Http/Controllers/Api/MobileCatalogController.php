@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DiningTable;
 use App\Models\Product;
 use App\Models\SystemSetting;
+use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\TableLayout;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,7 @@ class MobileCatalogController extends Controller
         return response()->json(['data' => [
             'products' => $products,
             'gcash_qr_url' => $qrPath ? route('public.media', ['path' => $qrPath]) : null,
+            'paymongo_enabled' => PayMongoCheckout::enabled(),
             'table_fees' => $pricing->tableFees(),
             'exclusive_fee' => $pricing->exclusiveFee(),
             'tables' => $tables->activeTables()

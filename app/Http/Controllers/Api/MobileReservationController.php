@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Rules\ReservationHours;
+use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
@@ -22,7 +24,7 @@ class MobileReservationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $items = Reservation::query()->with('items.product')->whereBelongsTo($request->user())
+        $items = Reservation::query()->with(['items.product', 'order'])->whereBelongsTo($request->user())
             ->latest('reservation_at')->get()->map(fn (Reservation $reservation): array => $this->data($reservation));
 
         return response()->json(['data' => $items]);
@@ -38,10 +40,13 @@ class MobileReservationController extends Controller
             'guests' => ['nullable', 'required_if:type,exclusive', 'integer', 'min:1', 'max:300'],
             'food_request' => ['nullable', 'string', 'max:2000'], 'menu_items' => ['nullable', 'array'],
             'menu_items.*' => ['nullable', 'integer', 'min:0', 'max:22'], 'notes' => ['nullable', 'string', 'max:2000'],
-            'payment_method' => ['required', 'in:cash,gcash'],
+            'payment_method' => ['required', 'in:cash,gcash,paymongo'],
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
+        if ($validated['payment_method'] === 'paymongo' && ! PayMongoCheckout::enabled()) {
+            throw ValidationException::withMessages(['payment_method' => 'PayMongo checkout is not available.']);
+        }
         $tableId = isset($validated['dining_table_id']) ? (int) $validated['dining_table_id'] : null;
         if (! $schedules->isAvailable($validated['reservation_at'], $validated['type'], (int) ($validated['table_size'] ?? $validated['guests'] ?? 1), $tableId)) {
             throw ValidationException::withMessages($tableId !== null
@@ -80,6 +85,17 @@ class MobileReservationController extends Controller
                 $reservation->update(['food_total' => $foodTotal, 'total_amount' => $fee + $foodTotal]);
                 $reservation->statusHistories()->create(['from_status' => null, 'to_status' => 'pending', 'changed_by' => $request->user()->id]);
 
+                if ($validated['payment_method'] === 'paymongo') {
+                    $order = Order::query()->create([
+                        'user_id' => $request->user()->id,
+                        'customer_id' => $request->user()->id,
+                        'total' => 0,
+                        'payment_method' => 'paymongo',
+                        'payment_status' => 'pending',
+                    ]);
+                    $reservation->update(['order_id' => $order->id]);
+                }
+
                 return $reservation->load('items.product');
             });
         } catch (Throwable $exception) {
@@ -89,6 +105,11 @@ class MobileReservationController extends Controller
             throw $exception;
         }
 
+        if ($reservation->order) {
+            MobileOrderController::startPayMongoCheckout($reservation->order);
+            $reservation->unsetRelation('order');
+        }
+
         return response()->json(['data' => $this->data($reservation)], 201);
     }
 
@@ -96,7 +117,7 @@ class MobileReservationController extends Controller
     {
         abort_unless($reservation->user_id === $request->user()->id, 403);
 
-        return response()->json(['data' => $this->data($reservation->load('items.product'))]);
+        return response()->json(['data' => $this->data($reservation->load(['items.product', 'order']))]);
     }
 
     private function data(Reservation $reservation): array
@@ -112,6 +133,10 @@ class MobileReservationController extends Controller
             'total_amount' => (float) $reservation->total_amount, 'payment_method' => $reservation->payment_method,
             'payment_status' => $reservation->payment_status, 'payment_reference' => $reservation->payment_reference,
             'food_request' => $reservation->food_request, 'notes' => $reservation->notes, 'status' => $reservation->booking_status,
+            'order_id' => $reservation->order_id,
+            'paymongo_checkout_url' => $reservation->payment_method === 'paymongo' && $reservation->order?->payment_status === 'pending'
+                ? $reservation->order->paymongo_checkout_url
+                : null,
             'items' => $reservation->items->map(fn ($item): array => [
                 'product_id' => $item->product_id, 'name' => $item->product?->name ?? 'Product', 'quantity' => $item->quantity,
                 'unit_price' => (float) $item->unit_price, 'subtotal' => (float) $item->subtotal,

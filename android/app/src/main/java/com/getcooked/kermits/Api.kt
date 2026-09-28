@@ -47,9 +47,10 @@ data class Order(
     val created_at: String?,
     val reservation: Reservation?,
     val items: List<OrderItem> = emptyList(),
+    val paymongo_checkout_url: String? = null,
 )
 @JsonClass(generateAdapter = true)
-data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null, val table_label: String? = null)
+data class Reservation(val id: Int, val reference: String, val type: String, val table_size: Int?, val guests: Int?, val reservation_at: String, val phone: String?, val reservation_fee: Double, val food_total: Double, val total_amount: Double, val payment_method: String, val payment_status: String, val payment_reference: String?, val status: String, val notes: String?, val items: List<OrderItem> = emptyList(), val reservation_end_at: String? = null, val hold_expires_at: String? = null, val table_label: String? = null, val order_id: Int? = null, val paymongo_checkout_url: String? = null)
 @JsonClass(generateAdapter = true)
 data class LoginData(val token: String, val user: User)
 @JsonClass(generateAdapter = true)
@@ -62,11 +63,13 @@ data class ApiError(
     val code: String? = null,
 )
 @JsonClass(generateAdapter = true)
-data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0, val tables: List<DiningTableOption>? = null)
+data class CatalogData(val products: List<Product>, val gcash_qr_url: String?, val table_fees: Map<String, Double> = emptyMap(), val exclusive_fee: Double = 0.0, val tables: List<DiningTableOption>? = null, val paymongo_enabled: Boolean = false)
 @JsonClass(generateAdapter = true)
 data class DiningTableOption(val id: Int, val number: Int, val seats: Int)
 @JsonClass(generateAdapter = true)
 data class CatalogResponse(val data: CatalogData)
+@JsonClass(generateAdapter = true)
+data class PayMongoCheckoutData(val checkout_url: String)
 @JsonClass(generateAdapter = true)
 data class ListOrdersResponse(val data: List<Order>)
 @JsonClass(generateAdapter = true)
@@ -113,6 +116,7 @@ interface KermitsApi {
     @GET("products") suspend fun products(): CatalogResponse
     @GET("orders") suspend fun orders(): ListOrdersResponse
     @GET("orders/{order}") suspend fun order(@Path("order") id: Int): Response<Map<String, Order>>
+    @POST("orders/{order}/paymongo") suspend fun payMongoCheckout(@Path("order") id: Int): Response<Map<String, PayMongoCheckoutData>>
     @Multipart
     @POST("orders") suspend fun createOrder(@PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>, @Part proof: MultipartBody.Part? = null): retrofit2.Response<Map<String, Order>>
     @GET("reservations") suspend fun reservations(): ListReservationsResponse

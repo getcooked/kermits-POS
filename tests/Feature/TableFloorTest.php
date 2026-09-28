@@ -117,6 +117,21 @@ class TableFloorTest extends TestCase
             ->assertSessionHasErrors(['floor' => 'Table 1 is already free.']);
     }
 
+    public function test_unavailable_tables_cannot_be_marked_occupied(): void
+    {
+        $this->travelTo(now()->setTime(12, 0));
+        $tableOne = $this->table(1);
+        $tableOne->update(['active' => false]);
+
+        $this->actingAs($this->admin)->post(route('tables.seat', $tableOne))
+            ->assertSessionHasErrors(['floor' => 'Table 1 is unavailable. Make it available first.']);
+        $this->assertFalse($tableOne->fresh()->isOccupied());
+
+        $this->actingAs($this->admin)->get(route('tables.index'))
+            ->assertOk()
+            ->assertDontSee('action="'.route('tables.seat', $tableOne).'"', false);
+    }
+
     public function test_customers_only_see_arrival_times_and_staff_set_the_estimated_stay(): void
     {
         $slots = $this->schedule()->availabilityForDate('2030-01-02');

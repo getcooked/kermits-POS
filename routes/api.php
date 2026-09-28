@@ -35,6 +35,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/orders', [MobileOrderController::class, 'index']);
         Route::post('/orders', [MobileOrderController::class, 'store'])->middleware('throttle:10,1');
         Route::get('/orders/{order}', [MobileOrderController::class, 'show']);
+        Route::post('/orders/{order}/paymongo', [MobileOrderController::class, 'payMongo'])->middleware('throttle:10,1');
         Route::get('/reservations', [MobileReservationController::class, 'index']);
         Route::get('/reservation-availability', ReservationAvailabilityController::class);
         Route::post('/reservations', [MobileReservationController::class, 'store'])->middleware('throttle:10,1');

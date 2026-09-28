@@ -18,13 +18,13 @@ class PayMongoCheckout
             && config('services.paymongo.payment_methods') !== [];
     }
 
-    public function urlFor(Order $order): string
+    public function urlFor(Order $order, ?string $returnUrl = null): string
     {
         if (! self::enabled()) {
             throw new RuntimeException('PayMongo is not configured.');
         }
 
-        return DB::transaction(function () use ($order): string {
+        return DB::transaction(function () use ($order, $returnUrl): string {
             $locked = Order::query()->with(['items.product', 'reservation'])
                 ->lockForUpdate()->findOrFail($order->id);
 
@@ -58,8 +58,8 @@ class PayMongoCheckout
                     'data' => ['attributes' => [
                         'line_items' => $lineItems,
                         'payment_method_types' => array_values(config('services.paymongo.payment_methods')),
-                        'success_url' => route('shop.orders.show', $locked),
-                        'cancel_url' => route('shop.orders.show', $locked),
+                        'success_url' => $returnUrl ?? route('shop.orders.show', $locked),
+                        'cancel_url' => $returnUrl ?? route('shop.orders.show', $locked),
                         'reference_number' => $locked->reservation->reference,
                     ]],
                 ]);

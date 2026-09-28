@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Reservation;
 use App\Rules\ReservationHours;
 use App\Services\OrderService;
+use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
@@ -34,7 +35,7 @@ class MobileOrderController extends Controller
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', 'distinct'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999'],
-            'payment_method' => ['required', 'in:cash,gcash'],
+            'payment_method' => ['required', 'in:cash,gcash,paymongo'],
             'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'table_size' => ['nullable', 'required_with:phone,reservation_at', 'integer', Rule::in($pricing->tableSizes())],
@@ -46,9 +47,14 @@ class MobileOrderController extends Controller
         $quantities = collect($validated['items'])->mapWithKeys(fn (array $item): array => [(int) $item['product_id'] => (int) $item['quantity']])->all();
         $needsReservation = isset($validated['table_size'], $validated['phone'], $validated['reservation_at']);
         $tableId = isset($validated['dining_table_id']) ? (int) $validated['dining_table_id'] : null;
-        if ($validated['payment_method'] === 'gcash' && ! $needsReservation) {
+        if ($validated['payment_method'] === 'paymongo' && ! PayMongoCheckout::enabled()) {
+            throw ValidationException::withMessages(['payment_method' => 'PayMongo checkout is not available.']);
+        }
+        if (in_array($validated['payment_method'], ['gcash', 'paymongo'], true) && ! $needsReservation) {
             throw ValidationException::withMessages([
-                'table_size' => 'Add table reservation details before submitting a GCash checkout.',
+                'table_size' => $validated['payment_method'] === 'gcash'
+                    ? 'Add table reservation details before submitting a GCash checkout.'
+                    : 'Add table reservation details before paying with PayMongo.',
             ]);
         }
         if ($needsReservation &&! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'], $tableId)) {
@@ -113,6 +119,11 @@ class MobileOrderController extends Controller
             throw $exception;
         }
 
+        if ($order->payment_method === 'paymongo') {
+            self::startPayMongoCheckout($order);
+            $order->refresh()->load(['items.product', 'reservation']);
+        }
+
         return response()->json(['data' => $this->data($order)], 201);
     }
 
@@ -123,6 +134,38 @@ class MobileOrderController extends Controller
         return response()->json(['data' => $this->data($order->load(['items.product', 'reservation']))]);
     }
 
+    public function payMongo(Request $request, Order $order, PayMongoCheckout $checkout): JsonResponse
+    {
+        abort_unless($order->customer_id === $request->user()->id, 403);
+
+        try {
+            $url = $checkout->urlFor($order, self::payMongoReturnUrl($order));
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json(['message' => 'PayMongo checkout is unavailable right now. Please try again.'], 503);
+        }
+
+        return response()->json(['data' => ['checkout_url' => $url]]);
+    }
+
+    /** Starts checkout right after submission; the customer can retry from the receipt if PayMongo is unreachable. */
+    public static function startPayMongoCheckout(Order $order): void
+    {
+        try {
+            app(PayMongoCheckout::class)->urlFor($order, self::payMongoReturnUrl($order));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    private static function payMongoReturnUrl(Order $order): string
+    {
+        return route('mobile.paymongo.return', ['order' => $order->id]);
+    }
+
     private function data(Order $order): array
     {
         return [
@@ -131,6 +174,9 @@ class MobileOrderController extends Controller
             'cash_received' => $order->cash_received !== null ? (float) $order->cash_received : null,
             'change_due' => $order->change_due !== null ? (float) $order->change_due : null,
             'total_due' => $order->totalDue(),
+            'paymongo_checkout_url' => $order->payment_method === 'paymongo' && $order->payment_status === 'pending'
+                ? $order->paymongo_checkout_url
+                : null,
             'created_at' => $order->created_at?->toIso8601String(),
             'reservation' => $order->reservation ? [
                 'id' => $order->reservation->id, 'reference' => $order->reservation->reference,

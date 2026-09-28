@@ -51,6 +51,7 @@ The task copies `app/build/outputs/apk/download/app-download.apk` to `storage/ap
 - Immediate submission confirmation popup for mobile orders and reservations
 - Cash and GCash order receipts available after checkout and from purchase history
 - Cash or GCash order submission
+- PayMongo online checkout for orders and reservations (shown only when PayMongo is enabled on the server), opened in the browser with a return link back to the app and a retry button on pending receipts
 - Order history and reservation history
 - Push notifications for reservation status, payment, schedule, detail, and linked-order updates
 - HTTPS-only release default, shrinking, resource optimization, and debug-only HTTP logging

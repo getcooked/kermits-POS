@@ -28,11 +28,13 @@
                             @csrf
                             <button class="button" type="submit">Mark free</button>
                         </form>
+                    @elseif(! $table->active)
+                        <p class="floor-status off">Unavailable</p>
+                        <p class="floor-meta">Can't be booked or seated until it's made available again.</p>
                     @else
                         <p class="floor-status free">Free</p>
                         @if($card['cleaning_until'])<p class="floor-meta">Cleanup until {{ $card['cleaning_until']->format('g:i A') }}</p>@endif
                         @if($card['next'])<p class="floor-meta">Booked for {{ $card['next']->reservation_at->format('g:i A') }} ({{ $card['next']->reference }})</p>@endif
-                        @if(! $table->active)<p class="floor-meta">Not bookable online</p>@endif
                         @php($fits = $floor['arrivals']->filter(fn ($arrival) => $arrival->guests <= $table->seats))
                         <form method="POST" action="{{ route('tables.seat', $table) }}" data-ajax-form data-ajax-target=".table-management" data-ajax-loading="Saving...">
                             @csrf

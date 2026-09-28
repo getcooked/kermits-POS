@@ -107,6 +107,9 @@ class TableFloor
             if ($table->isOccupied()) {
                 throw ValidationException::withMessages(['floor' => "{$table->label()} is already occupied. Mark it free first."]);
             }
+            if (! $table->active) {
+                throw ValidationException::withMessages(['floor' => "{$table->label()} is unavailable. Make it available first."]);
+            }
 
             if ($reservation !== null) {
                 $reservation->refresh();

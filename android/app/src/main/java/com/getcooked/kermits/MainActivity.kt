@@ -99,6 +99,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewModelScope
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.async
@@ -167,10 +168,12 @@ private fun Intent?.reservationUpdateId(): Int? = this
     ?.getIntExtra("reservation_id", -1)
     ?.takeIf { it > 0 }
 
-private fun Intent?.orderUpdateId(): Int? = this
-    ?.takeIf { it.action == "com.getcooked.kermits.OPEN_ORDER_UPDATE" }
-    ?.getIntExtra("order_id", -1)
-    ?.takeIf { it > 0 }
+private fun Intent?.orderUpdateId(): Int? = when {
+    this?.action == "com.getcooked.kermits.OPEN_ORDER_UPDATE" -> getIntExtra("order_id", -1)
+    this?.action == Intent.ACTION_VIEW && data?.scheme == "kermits" && data?.host == "paymongo-return" ->
+        data?.getQueryParameter("order")?.toIntOrNull()
+    else -> null
+}?.takeIf { it > 0 }
 
 private val BRAND_LOGO_URL = BuildConfig.API_BASE_URL.substringBefore("/api/").trimEnd('/') + "/kermits-logo.jpg"
 private val MOBILE_RECAPTCHA_URL = BuildConfig.API_BASE_URL.substringBefore("/api/").trimEnd('/') + "/mobile/recaptcha"
@@ -192,6 +195,8 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var orders by mutableStateOf<List<Order>>(emptyList()); private set
     var reservations by mutableStateOf<List<Reservation>>(emptyList()); private set
     var gcashQrUrl by mutableStateOf<String?>(null); private set
+    var payMongoEnabled by mutableStateOf(false); private set
+    var pendingPayMongoOrderId by mutableStateOf<Int?>(null); private set
     var tableFees by mutableStateOf<Map<String, Double>>(emptyMap()); private set
     var diningTables by mutableStateOf<List<DiningTableOption>>(emptyList()); private set
     val tableSizes: List<String> get() =tableFees.keys.filter { it.toIntOrNull() != null }.sortedBy { it.toInt() }.ifEmpty { listOf("1", "2", "4", "8", "12") }
@@ -364,6 +369,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         val catalog = catalogRequest.await()
         products = catalog.products
         gcashQrUrl = catalog.gcash_qr_url
+        payMongoEnabled = catalog.paymongo_enabled
         tableFees = catalog.table_fees
         exclusiveFee = catalog.exclusive_fee
         diningTables = catalog.tables.orEmpty()
@@ -545,6 +551,55 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             busy = false
         }
     }
+    fun openPayMongo(context: Context, orderId: Int, knownCheckoutUrl: String? = null) = viewModelScope.launch {
+        error = null
+        val checkoutUrl = knownCheckoutUrl ?: run {
+            busy = true
+            try {
+                val response = api.payMongoCheckout(orderId)
+                if (!response.isSuccessful) {
+                    error = apiError(response.errorBody()?.string()) ?: "PayMongo checkout is unavailable right now. Please try again."
+                    return@launch
+                }
+                response.body()?.get("data")?.checkout_url
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                error = "Unable to reach Kermit's. Check your internet connection."
+                return@launch
+            } finally {
+                busy = false
+            }
+        }
+        val uri = checkoutUrl?.let(Uri::parse)
+        if (uri == null || uri.scheme != "https" || uri.host != "checkout.paymongo.com") {
+            error = "PayMongo checkout is unavailable right now. Please try again."
+            return@launch
+        }
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+            pendingPayMongoOrderId = orderId
+        } catch (_: android.content.ActivityNotFoundException) {
+            error = "Install or enable a web browser to pay with PayMongo."
+        }
+    }
+    /** PayMongo confirms by webhook, which can land a few seconds after the customer is sent back to the app. */
+    fun refreshPayMongoOrder(done: (Order) -> Unit) {
+        val orderId = pendingPayMongoOrderId ?: return
+        pendingPayMongoOrderId = null
+        viewModelScope.launch {
+            repeat(4) { attempt ->
+                if (attempt > 0) delay(3_000)
+                val order = runCatching { api.order(orderId).body()?.get("data") }.getOrNull() ?: return@repeat
+                orders = listOf(order) + orders.filterNot { it.id == order.id }
+                done(order)
+                if (order.payment_status != "pending") {
+                    runCatching { api.reservations().data }.getOrNull()?.let { reservations = it }
+                    return@launch
+                }
+            }
+        }
+    }
     fun loadReservation(id: Int, done: (Reservation?) -> Unit) = viewModelScope.launch { busy = true; try { done(api.reservation(id).body()?.get("data")) } catch (_: Exception) { error = "Could not load this reservation"; done(null) } finally { busy = false } }
     fun add(product: Product) { val count = (cart[product.id] ?: 0) + 1; if (count <= product.stock) cart = cart + (product.id to count) }
     fun remove(product: Product) { val count = (cart[product.id] ?: 0) - 1; cart = if (count > 0) cart + (product.id to count) else cart - product.id }
@@ -619,8 +674,10 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 diningTableId = if (type == "table") diningTableId?.toString()?.formPart() else null,
             )
             if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "Reservation details are invalid"; done(false); return@launch }
+            val created = response.body()?.get("data")
             reservations = api.reservations().data
             done(true)
+            if (payment == "paymongo") created?.order_id?.let { openPayMongo(context, it, created.paymongo_checkout_url) }
         } catch (_: Exception) { error = "Unable to reach Kermit's. Check your internet connection."; done(false) } finally { busy = false }
     }
     companion object {
@@ -709,6 +766,14 @@ fun KermitsApp(
             onOrderUpdateConsumed()
         }
     }
+    LifecycleResumeEffect(vm.pendingPayMongoOrderId) {
+        if (vm.pendingPayMongoOrderId != null) {
+            vm.refreshPayMongoOrder { order ->
+                if (selectedOrder == null || selectedOrder?.id == order.id) selectedOrder = order
+            }
+        }
+        onPauseOrDispose { }
+    }
     vm.recaptchaUrl?.let { url ->
         MobileRecaptchaDialog(
             url = url,
@@ -766,6 +831,7 @@ fun KermitsApp(
                         onOrderSubmitted = { order ->
                             selectedOrderWasJustSubmitted = true
                             selectedOrder = order
+                            if (order.payment_method == "paymongo") vm.openPayMongo(context, order.id, order.paymongo_checkout_url)
                         },
                         onNotificationOrder = { id ->
                             selectedOrderWasJustSubmitted = false
@@ -787,13 +853,14 @@ fun KermitsApp(
             order = order,
             customerName = vm.user?.name.orEmpty(),
             wasJustSubmitted = selectedOrderWasJustSubmitted,
+            onPayMongo = { vm.openPayMongo(context, order.id); Unit }.takeIf { order.payment_method == "paymongo" && order.payment_status == "pending" },
             close = {
                 selectedOrder = null
                 selectedOrderWasJustSubmitted = false
             },
         )
     }
-    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)${reservation.table_label?.takeIf { reservation.type == "table" }?.let { " · $it" }.orEmpty()}", reservationScheduleLabel(reservation), "Payment: ${reservation.payment_method} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }) { selectedReservation = null } }
+    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)${reservation.table_label?.takeIf { reservation.type == "table" }?.let { " · $it" }.orEmpty()}", reservationScheduleLabel(reservation), "Payment: ${paymentMethodLabel(reservation.payment_method)} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }, action = reservation.order_id?.takeIf { reservation.payment_method == "paymongo" && reservation.payment_status == "pending" && reservation.status in setOf("pending", "confirmed") }?.let { orderId -> "Pay with PayMongo" to { vm.openPayMongo(context, orderId, reservation.paymongo_checkout_url) } }) { selectedReservation = null } }
 }
 
 @Composable
@@ -1552,7 +1619,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
     val decisionOrders = remember(vm.orders) { vm.orders.filter { it.payment_status in setOf("paid", "rejected") } }
     val decisionKeys = remember(decisionOrders) { decisionOrders.map { "${it.id}:${it.payment_status}" }.toSet() }
     val unreadNotificationCount = decisionKeys.count { it !in vm.readOrderNotificationKeys }
-    val canPay = payment == "cash" || (paymentReference.length == 13 && proofUri != null)
+    val canPay = payment == "cash" || (payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && paymentReference.length == 13 && proofUri != null)
 
     LaunchedEffect(vm.cart.isEmpty()) {
         if (vm.cart.isEmpty()) checkingOut = false
@@ -1844,13 +1911,18 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
                         Spacer(Modifier.height(10.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                             Text("Payment:")
                             Spacer(Modifier.width(8.dp))
                             FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") })
                             Spacer(Modifier.width(6.dp))
                             FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") })
+                            if (vm.payMongoEnabled) {
+                                Spacer(Modifier.width(6.dp))
+                                FilterChip(selected = payment == "paymongo", onClick = { setPayment("paymongo") }, label = { Text("PayMongo") })
+                            }
                         }
+                        if (payment == "paymongo") PayMongoNote()
                         if (payment == "gcash") {
                             vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
                             OutlinedTextField(paymentReference, { paymentReference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = loginFieldColors(), shape = RoundedCornerShape(11.dp))
@@ -1878,12 +1950,23 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             shape = RoundedCornerShape(11.dp),
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
-                        ) { Text(if (vm.busy) "Submitting..." else "Confirm payment & view receipt", fontWeight = FontWeight.Bold) }
+                        ) { Text(if (vm.busy) "Submitting..." else if (payment == "paymongo") "Continue to PayMongo" else "Confirm payment & view receipt", fontWeight = FontWeight.Bold) }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PayMongoNote() {
+    Text(
+        "You will be sent to PayMongo's secure checkout page to pay. Your receipt shows Paid once PayMongo confirms the payment.",
+        color = Color(0xFF6E746B),
+        fontSize = 12.sp,
+        lineHeight = 18.sp,
+        modifier = Modifier.padding(top = 6.dp),
+    )
 }
 
 @Composable
@@ -2037,12 +2120,13 @@ private fun OrderReceiptDialog(
     order: Order,
     customerName: String,
     wasJustSubmitted: Boolean,
+    onPayMongo: (() -> Unit)?,
     close: () -> Unit,
 ) {
     val context = LocalContext.current
     val isPaid = order.payment_status.equals("paid", ignoreCase = true)
     val isRejected = order.payment_status.equals("rejected", ignoreCase = true)
-    val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
+    val paymentLabel = paymentMethodLabel(order.payment_method)
     val receiptLabel = when {
         isPaid -> "OFFICIAL RECEIPT"
         isRejected -> "ORDER REJECTED"
@@ -2057,6 +2141,7 @@ private fun OrderReceiptDialog(
         isPaid -> "Payment confirmed."
         isRejected -> "This order was rejected. No payment is required."
         order.payment_method == "gcash" -> "Payment submitted — awaiting verification."
+        order.payment_method == "paymongo" -> "Complete payment on PayMongo. This receipt shows Paid once PayMongo confirms it."
         else -> "Payment due at the counter."
     }
 
@@ -2182,6 +2267,14 @@ private fun OrderReceiptDialog(
                     }
                 }
                 HorizontalDivider(color = Color(0xFFD8DCD2))
+                onPayMongo?.let { pay ->
+                    Button(
+                        onClick = pay,
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp).height(50.dp),
+                        shape = RoundedCornerShape(11.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF737D00), contentColor = Color.White),
+                    ) { Text("Pay with PayMongo", fontWeight = FontWeight.ExtraBold) }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -2190,7 +2283,7 @@ private fun OrderReceiptDialog(
                         onClick = { printOrderReceipt(context, order, customerName) },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(11.dp),
-                    ) { Text(if (isRejected) "Print order" else "Print receipt", fontWeight = FontWeight.ExtraBold) }
+                    ) { Text(if (isRejected) "Download order" else "Download receipt", fontWeight = FontWeight.ExtraBold) }
                     Button(
                         onClick = close,
                         modifier = Modifier.weight(1f).height(50.dp),
@@ -2244,10 +2337,16 @@ private fun releasePrintedWebView(webView: WebView, printJob: PrintJob) {
     webView.postDelayed(release, 1_000)
 }
 
+private fun paymentMethodLabel(method: String): String = when (method) {
+    "gcash" -> "GCash"
+    "paymongo" -> "PayMongo online"
+    else -> "Cash / Pay at counter"
+}
+
 private fun receiptPrintHtml(order: Order, customerName: String): String {
     val isPaid = order.payment_status.equals("paid", ignoreCase = true)
     val isRejected = order.payment_status.equals("rejected", ignoreCase = true)
-    val paymentLabel = if (order.payment_method == "gcash") "GCash" else "Cash / Pay at counter"
+    val paymentLabel = paymentMethodLabel(order.payment_method)
     val receiptLabel = when {
         isPaid -> "OFFICIAL RECEIPT"
         isRejected -> "ORDER REJECTED"
@@ -2336,7 +2435,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
 }
 
 @Composable private fun HistoryEmpty(title: String, message: String) { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), color = Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD0C3))) { Column(Modifier.fillMaxWidth().padding(34.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(title, fontWeight = FontWeight.Bold); Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp)) } } }
-@Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { TextButton(onClick = close) { Text("Close") } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
+@Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, action: Pair<String, () -> Unit>? = null, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { action?.let { (label, onClick) -> Button(onClick = onClick) { Text(label) } } ?: TextButton(onClick = close) { Text("Close") } }, dismissButton = action?.let { { TextButton(onClick = close) { Text("Close") } } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
 @Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
     var type by remember { mutableStateOf("table") }; var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; var guests by remember { mutableStateOf("20") }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var payment by remember { mutableStateOf("cash") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     LaunchedEffect(vm.tableSizes) { if (size !in vm.tableSizes) size = vm.tableSizes.first() }
@@ -2344,7 +2443,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
     val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
     val reservationFee = if (type == "table") vm.tableFees[size] ?: 0.0 else vm.exclusiveFee
-    val canPay = payment == "cash" || (reference.length == 13 && proofUri != null)
+    val canPay = payment == "cash" || (payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && reference.length == 13 && proofUri != null)
     Text("BOOK A RESERVATION", color = Color(0xFF777F00), fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.ExtraBold)
     Text("Plan your visit", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 6.dp))
     Text("Complete the details below. We will confirm your request after review.", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
@@ -2370,7 +2469,8 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(reservationFee + selectedFoodTotal), fontWeight = FontWeight.Bold) }
-    Spacer(Modifier.height(8.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }) }
+    Spacer(Modifier.height(8.dp)); Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }); if (vm.payMongoEnabled) { Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "paymongo", onClick = { payment = "paymongo" }, label = { Text("PayMongo") }) } }
+    if (payment == "paymongo") PayMongoNote()
     if (payment == "gcash") {
         vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
         OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
@@ -2389,7 +2489,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
                     menuItems = emptyMap()
                     reference = ""
                     proofUri = null
-                    setMessage("Reservation request submitted.")
+                    setMessage(if (payment == "paymongo") "Reservation request submitted. Complete your payment on PayMongo." else "Reservation request submitted.")
                 }
             }
         },
