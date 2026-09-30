@@ -10,8 +10,7 @@
         <div class="activity-log-page">
             <header class="activity-log-header">
                 <div>
-                    <p>SUPER ADMIN</p>
-                    <h1>Activity logs</h1>
+                    <h1>Activity Logs</h1>
                     <span>Review account and system activity, request details, and device information.</span>
                 </div>
                 <div class="activity-log-count" aria-label="{{ number_format($logs->total()) }} total activity records">
@@ -23,7 +22,7 @@
             <section class="activity-log-results" aria-labelledby="activity-log-results-title">
                 <header class="activity-log-results-header">
                     <div>
-                        <h2 id="activity-log-results-title">Latest activity</h2>
+                        <h2 id="activity-log-results-title">Latest Activity</h2>
                         <p>Newest records are shown first.</p>
                     </div>
                     @if($logs->total() > 0)
@@ -70,7 +69,7 @@
                                                 <span aria-hidden="true">{{ strtoupper(substr($log->actor_name ?: 'S', 0, 1)) }}</span>
                                                 <div>
                                                     <strong>{{ $log->actor_name ?: 'System' }}</strong>
-                                                    <small>{{ $log->actor_role ? str($log->actor_role)->replace('_', ' ')->title() : 'No account role' }}</small>
+                                                    <small>{{ $log->actor_role === 'super_admin' ? 'Admin' : ($log->actor_role ? str($log->actor_role)->replace('_', ' ')->title() : 'No account role') }}</small>
                                                 </div>
                                             </div>
                                         </td>

@@ -34,7 +34,7 @@ class PasswordResetTest extends TestCase
 
         $this->get(route('superadmin.password.request'))
             ->assertOk()
-            ->assertSee('Recover Super Admin access');
+            ->assertSee('Recover Admin access');
     }
 
     public function test_super_admin_recovery_sends_only_to_a_super_admin_account(): void

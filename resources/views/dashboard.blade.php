@@ -11,24 +11,24 @@
             </div><time class="date-chip" id="dashboard-date" datetime="{{ now()->toDateString() }}">{{ now()->format('F d, Y') }}</time>
         </header>
         <section class="hero-metrics">
-            <div><span>Total sales</span><strong>₱{{ number_format($sales,2) }}</strong><small>Across {{ $ordersCount }} completed orders</small></div>
+            <div><span>Total Sales</span><strong>₱{{ number_format($sales,2) }}</strong><small>Across {{ $ordersCount }} completed orders</small></div>
             <div class="sales-visual">
                 <div class="bars">@foreach($salesActivity as $day)<i tabindex="0" style="height:{{ $day['height'] }}%" data-tooltip="{{ $day['label'] }} · ₱{{ number_format($day['amount'],2) }}" aria-label="{{ $day['label'] }} sales: ₱{{ number_format($day['amount'],2) }}"></i>@endforeach</div><small>Sales activity · hover a bar for details</small>
             </div>
-            <div class="mini-metric"><span>Average sale</span><strong>₱{{ number_format($averageSale,2) }}</strong><span>Items sold</span><strong>{{ number_format($itemsSold) }}</strong></div>
+            <div class="mini-metric"><span>Average Sale</span><strong>₱{{ number_format($averageSale,2) }}</strong><span>Items Sold</span><strong>{{ number_format($itemsSold) }}</strong></div>
         </section>
         <section class="stat-row">
-            <div><span>Active products</span><strong>{{ $productsCount }}</strong><small>Available in catalog</small></div>
-            <div><span>Low stock alerts</span><strong>{{ $lowStock->count() }}</strong><small>Products need attention</small></div>
+            <div><span>Active Products</span><strong>{{ $productsCount }}</strong><small>Available in catalog</small></div>
+            <div><span>Low Stock Alerts</span><strong>{{ $lowStock->count() }}</strong><small>Products need attention</small></div>
             <div><span>Transactions</span><strong>{{ $ordersCount }}</strong><small>All recorded sales</small></div>
         </section>
         <div class="dash-grid">
             <section class="panel">
                 <div class="panel-head">
                     <div>
-                        <h2>Recent sales</h2>
+                        <h2>Recent Sales</h2>
                         <p>Latest completed transactions</p>
-                    </div>@if(auth()->user()->hasRole('super_admin'))<a href="{{ route('reports') }}">View reports</a>@endif
+                    </div>@if(auth()->user()->hasRole('super_admin'))<a href="{{ route('reports') }}">View Reports</a>@endif
                 </div>
                 <div class="sales-list">@forelse($recentOrders as $order)<a href="{{ route('receipts.show',$order) }}"><span class="order-mark">#{{ $order->id }}</span>
                         <div><strong>{{ $order->user->name }}</strong><small>{{ $order->created_at->format('M d · h:i A') }} · {{ ucfirst($order->payment_method) }}</small></div><b>₱{{ number_format($order->total,2) }}</b>
@@ -37,7 +37,7 @@
             <section class="panel">
                 <div class="panel-head">
                     <div>
-                        <h2>Inventory alerts</h2>
+                        <h2>Inventory Alerts</h2>
                         <p>Items running low</p>
                     </div>@if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">Manage</a>@endif
                 </div>

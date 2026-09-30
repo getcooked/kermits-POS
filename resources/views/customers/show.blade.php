@@ -43,7 +43,7 @@
                 <button class="button" type="submit">Save customer account</button>
             </form>
         @else
-            <div class="read-only-note"><strong>Read-only account details</strong><span>Only the Super Admin can edit login details or reset a customer password.</span></div>
+            <div class="read-only-note"><strong>Read-only account details</strong><span>Only the Admin can edit login details or reset a customer password.</span></div>
         @endif
     </section>
     @if(auth()->user()->hasRole('super_admin'))<section class="danger-zone"><div><strong>Delete customer account</strong><span>This removes login access and personal profile details. Transaction totals and audit records are retained.</span></div><form method="POST" action="{{ route('customers.destroy',$customer) }}" data-confirm="Delete this customer account? This action cannot be undone." data-confirm-title="Delete customer account?">@csrf @method('DELETE')<button type="submit">Delete account</button></form></section>@endif

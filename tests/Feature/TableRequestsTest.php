@@ -210,7 +210,7 @@ class TableRequestsTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
 
         $this->actingAs($admin)->get(route('tables.index'))->assertOk()
-            ->assertSee('Tables in the restaurant')
+            ->assertSee('Tables In The Restaurant')
             ->assertSee('3 &times; 2-seat', false)
             ->assertSee('name="turnover_minutes"', false);
 

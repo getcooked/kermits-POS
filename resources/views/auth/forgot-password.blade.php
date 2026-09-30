@@ -4,13 +4,13 @@
 <main class="reset-page">
     <section class="reset-brand">
         <a href="{{ route('home') }}"><img src="{{ asset('kermits-logo.jpg') }}" alt="Kermit's"><strong>KERMIT'S</strong></a>
-        <div><p>ACCOUNT RECOVERY</p><h1>Let’s get you<br>back in.</h1><span>Enter the email connected to your {{ $superAdminRecovery ? 'Super Admin' : '' }} account. We’ll send you a secure, expiring reset link.</span></div>
+        <div><p>ACCOUNT RECOVERY</p><h1>Let’s get you<br>back in.</h1><span>Enter the email connected to your {{ $superAdminRecovery ? 'Admin' : '' }} account. We’ll send you a secure, expiring reset link.</span></div>
         <small>Time-honored recipes since 2000</small>
     </section>
     <section class="reset-form"><div class="reset-inner">
-        <p class="reset-eyebrow">{{ $superAdminRecovery ? 'SUPER ADMIN RECOVERY' : 'FORGOT PASSWORD' }}</p>
-        <h2>{{ $superAdminRecovery ? 'Recover Super Admin access' : 'Reset your password' }}</h2>
-        <p class="muted">{{ $superAdminRecovery ? 'Only an active Super Admin account can receive a reset link from this page. We’ll send instructions to the registered email address.' : 'Your Kermit’s account will receive a reset link from this page. Thank You!' }}</p>
+        <p class="reset-eyebrow">{{ $superAdminRecovery ? 'ADMIN RECOVERY' : 'FORGOT PASSWORD' }}</p>
+        <h2>{{ $superAdminRecovery ? 'Recover Admin access' : 'Reset your password' }}</h2>
+        <p class="muted">{{ $superAdminRecovery ? 'Only an active Admin account can receive a reset link from this page. We’ll send instructions to the registered email address.' : 'Your Kermit’s account will receive a reset link from this page. Thank You!' }}</p>
         @if(session('status'))<div class="reset-success">{{ session('status') }}</div>@endif
         <form method="POST" action="{{ route($superAdminRecovery ? 'superadmin.password.email' : 'password.email') }}">
             @csrf

@@ -12,7 +12,7 @@
 
     @include('tables.partials.floor')
     @if($floor['tables'] === [])
-        <section class="welcome"><p class="table-help">Tables aren't set up yet. Ask the super admin to add them in Table Management.</p></section>
+        <section class="welcome"><p class="table-help">Tables aren't set up yet. Ask the admin to add them in Table Management.</p></section>
     @endif
 </div></main></div>
 @push('styles')

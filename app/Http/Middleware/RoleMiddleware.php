@@ -17,7 +17,7 @@ class RoleMiddleware
             $request->session()->regenerateToken();
 
             return redirect()->route('login')
-                ->withErrors(['email' => 'This account has been disabled. Please contact a Super Admin.']);
+                ->withErrors(['email' => 'This account has been disabled. Please contact an Admin.']);
         }
 
         abort_unless($request->user()?->hasRole(...$roles), 403, 'You do not have permission to access this page.');

@@ -5,7 +5,7 @@
     @include('partials.admin-sidebar')
     <main class="admin-workspace admin-accounts-page">
         <div class="dashboard">
-            <header class="accounts-head"><div><p>SUPER ADMIN</p><h1>Admin accounts</h1><span>Reset an Admin password and revoke their active sessions.</span></div><strong>{{ $admins->count() }}</strong></header>
+            <header class="accounts-head"><div><h1>Admin Accounts</h1><span>Reset an Admin password and revoke their active sessions.</span></div><strong>{{ $admins->count() }}</strong></header>
             @if(session('status'))<div class="account-message success">{{ session('status') }}</div>@endif
             @if($errors->any())<div class="account-message error">{{ $errors->first() }}</div>@endif
 
@@ -15,9 +15,9 @@
                     <header><span>{{ strtoupper(substr($admin->name,0,1)) }}</span><div><h2>{{ $admin->name }}</h2><p>{{ $admin->email }}</p></div><b>Admin</b></header>
                     <form method="POST" action="{{ route('admins.password.update',$admin) }}" data-ajax-form data-ajax-loading="Updating..." data-ajax-reset="true">
                         @csrf @method('PUT')
-                        <div class="field"><label for="password-{{ $admin->id }}">New password</label><input class="control" id="password-{{ $admin->id }}" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, number, and symbol.</small></div>
-                        <div class="field"><label for="password-confirmation-{{ $admin->id }}">Confirm new password</label><input class="control" id="password-confirmation-{{ $admin->id }}" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>
-                        <button class="button" type="submit">Change password</button>
+                        <div class="field"><label for="password-{{ $admin->id }}">New Password</label><input class="control" id="password-{{ $admin->id }}" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, number, and symbol.</small></div>
+                        <div class="field"><label for="password-confirmation-{{ $admin->id }}">Confirm New Password</label><input class="control" id="password-confirmation-{{ $admin->id }}" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>
+                        <button class="button" type="submit">Change Password</button>
                     </form>
                 </article>
                 @empty

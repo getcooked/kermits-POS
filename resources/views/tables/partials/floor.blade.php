@@ -2,7 +2,7 @@
     <section class="welcome floor">
         <div class="floor-heading">
             <div>
-                <h2>Today's tables</h2>
+                <h2>Today's Tables</h2>
                 <p class="table-help">Mark a table occupied when guests sit down and free when they leave. Customers only choose an arrival time, so a freed table can be booked again after the cleanup time.</p>
             </div>
             <a class="row-add" href="{{ url()->current() }}">Refresh</a>
@@ -55,7 +55,7 @@
             @endforeach
         </div>
 
-        <h3>Arriving today</h3>
+        <h3>Arriving Today</h3>
         @if($floor['arrivals']->isEmpty())
             <p class="table-help">No approved table bookings are waiting to be seated today.</p>
         @else

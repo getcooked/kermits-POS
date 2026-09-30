@@ -7,8 +7,7 @@
 <div class="report-dashboard">
     <header class="report-topbar">
         <div>
-            <p>BUSINESS OVERVIEW</p>
-            <h1>Sales & operations</h1>
+            <h1>Sales & Operations</h1>
             <span>{{ $periodFrom->format('M d, Y') }} – {{ $periodTo->format('M d, Y') }}</span>
         </div>
         <div class="period-tabs" aria-label="Report period">
@@ -28,8 +27,8 @@
         <a href="{{ route('reports',['period'=>'month']) }}">Reset</a>
     </form>
     <section class="metric-grid">
-        <article class="metric-card sales"><div class="metric-icon">&#8369;</div><span>Total sales</span><strong>&#8369;{{ number_format($salesTotal,2) }}</strong><small class="{{ $salesChange<0?'down':'up' }}">{{ $salesChange>=0?'↗':'↘' }} {{ number_format(abs($salesChange),1) }}% from prior period</small></article>
-        <article class="metric-card orders"><div class="metric-icon">#</div><span>Filtered orders</span><strong>{{ $orders->count() }}</strong><small>Completed and paid sales</small></article>
+        <article class="metric-card sales"><div class="metric-icon">&#8369;</div><span>Total Sales</span><strong>&#8369;{{ number_format($salesTotal,2) }}</strong><small class="{{ $salesChange<0?'down':'up' }}">{{ $salesChange>=0?'↗':'↘' }} {{ number_format(abs($salesChange),1) }}% from prior period</small></article>
+        <article class="metric-card orders"><div class="metric-icon">#</div><span>Filtered Orders</span><strong>{{ $orders->count() }}</strong><small>Completed and paid sales</small></article>
         <article class="metric-card cash"><div class="metric-icon">&#8369;</div><span>Cash · {{ $cashCount }} sales</span><strong>&#8369;{{ number_format($cashTotal,2) }}</strong><small>{{ $salesTotal>0?number_format(((float)$cashTotal/$salesTotal)*100,1):0 }}% of filtered sales</small></article>
         <article class="metric-card gcash"><div class="metric-icon">G</div><span>GCash · {{ $gcashCount }} sales</span><strong>&#8369;{{ number_format($gcashTotal,2) }}</strong><small>{{ $salesTotal>0?number_format(((float)$gcashTotal/$salesTotal)*100,1):0 }}% of filtered sales</small></article>
         <article class="metric-card paymongo"><div class="metric-icon">P</div><span>PayMongo · {{ $paymongoCount }} sales</span><strong>&#8369;{{ number_format($paymongoTotal,2) }}</strong><small>{{ $salesTotal>0?number_format(((float)$paymongoTotal/$salesTotal)*100,1):0 }}% of filtered sales</small></article>
@@ -37,12 +36,12 @@
 
     <section class="dashboard-grid">
         <article class="dashboard-card sales-chart-card">
-            <div class="card-heading"><div><p>SALES PERFORMANCE</p><h2>Sales by payment method</h2></div><span>{{ ucfirst($period) }} view</span></div>
+            <div class="card-heading"><div><p>SALES PERFORMANCE</p><h2>Sales By Payment Method</h2></div><span>{{ ucfirst($period) }} view</span></div>
             <div class="chart-wrap"><canvas id="sales-chart" aria-label="Interactive sales chart"></canvas><div class="chart-tooltip" hidden></div><div class="chart-empty" hidden>No paid sales in this period.</div></div>
             <div class="chart-legend"><span><i class="cash-dot"></i>Cash</span><span><i class="gcash-dot"></i>GCash</span><span><i class="paymongo-dot"></i>PayMongo</span></div>
         </article>
         <article class="dashboard-card payment-card-report">
-            <div class="card-heading"><div><p>PAYMENTS</p><h2>Payment mix</h2></div></div>
+            <div class="card-heading"><div><p>PAYMENTS</p><h2>Payment Mix</h2></div></div>
             @php($paymentTotal=(float)$cashTotal+(float)$gcashTotal+(float)$paymongoTotal)
             @php($cashPercent=$paymentTotal>0?((float)$cashTotal/$paymentTotal)*100:0)
             @php($gcashPercent=$paymentTotal>0?((float)$gcashTotal/$paymentTotal)*100:0)
@@ -51,34 +50,34 @@
         </article>
 
         <article class="dashboard-card recent-sales">
-            <div class="card-heading"><div><p>TRANSACTIONS</p><h2>Recent sales and receipts</h2></div><span>{{ $orders->count() }} records</span></div>
+            <div class="card-heading"><div><p>TRANSACTIONS</p><h2>Recent Sales And Receipts</h2></div><span>{{ $orders->count() }} records</span></div>
             <div class="table-scroll"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Date</th><th>Payment</th><th>Total</th><th></th></tr></thead><tbody>
             @forelse($orders->take(10) as $order)<tr><td>#{{ $order->id }}</td><td><strong>{{ $order->customer?->name ?? 'Walk-in Customer' }}</strong><small>{{ $order->customer?->email ?? 'Cashier transaction' }}</small></td><td>{{ $order->created_at->format('M d, Y') }}<small>{{ $order->created_at->format('h:i A') }}</small></td><td><span class="payment-badge {{ $order->payment_method }}">{{ strtoupper($order->payment_method) }}</span><small>{{ $order->payment_reference ?: '—' }}</small></td><td><strong>&#8369;{{ number_format($order->total,2) }}</strong></td><td><a class="table-action" href="{{ route('receipts.show',$order) }}">Receipt</a></td></tr>
             @empty<tr><td colspan="6" class="empty-row">No paid transactions in this period.</td></tr>@endforelse
             </tbody></table></div>
         </article>
         <article class="dashboard-card stock-summary">
-            <div class="card-heading"><div><p>STOCK HISTORY</p><h2>Inventory activity</h2></div><a href="{{ route('inventory.index') }}">Open inventory</a></div>
+            <div class="card-heading"><div><p>STOCK HISTORY</p><h2>Inventory Activity</h2></div><a href="{{ route('inventory.index') }}">Open inventory</a></div>
             <div class="stacked-metrics">
-                <div><span>Stock received</span><strong>{{ number_format($stockIn) }}</strong><small>units added</small></div>
-                <div><span>Stock released</span><strong>{{ number_format($stockOut) }}</strong><small>sold or removed</small></div>
-                <div><span>Inventory value</span><strong>&#8369;{{ number_format($inventoryValue,2) }}</strong><small>current live value</small></div>
-                <div class="{{ $lowStock?'attention':'' }}"><span>Low-stock alerts</span><strong>{{ $lowStock }}</strong><small>products need attention</small></div>
+                <div><span>Stock Received</span><strong>{{ number_format($stockIn) }}</strong><small>Units Added</small></div>
+                <div><span>Stock Released</span><strong>{{ number_format($stockOut) }}</strong><small>Sold Or Removed</small></div>
+                <div><span>Inventory Value</span><strong>&#8369;{{ number_format($inventoryValue,2) }}</strong><small>Current Live Value</small></div>
+                <div class="{{ $lowStock?'attention':'' }}"><span>Low-Stock Alerts</span><strong>{{ $lowStock }}</strong><small>Products Need Attention</small></div>
             </div>
         </article>
 
         <article class="dashboard-card best-products">
-            <div class="card-heading"><div><p>PRODUCT PERFORMANCE</p><h2>Best-selling products</h2></div></div>
+            <div class="card-heading"><div><p>PRODUCT PERFORMANCE</p><h2>Best-Selling Products</h2></div></div>
             <div class="rank-list">@forelse($topProducts as $item)<div><span class="rank-number">{{ $loop->iteration }}</span><span><strong>{{ $item->product?->name ?? 'Product' }}</strong><small>{{ $item->units }} units sold</small></span><b>&#8369;{{ number_format($item->sales,2) }}</b></div>@empty<p class="empty-row">No paid product sales yet.</p>@endforelse</div>
         </article>
         <article class="dashboard-card stock-alerts">
-            <div class="card-heading"><div><p>LIVE INVENTORY</p><h2>Stock alert</h2></div></div>
+            <div class="card-heading"><div><p>LIVE INVENTORY</p><h2>Stock Alert</h2></div></div>
             <div class="alert-list">@forelse($products->take(8) as $product)<div><span>{{ $product->name }}</span><strong class="{{ $product->stock<=\App\Models\Product::LOW_STOCK_THRESHOLD?'danger':'healthy' }}">{{ $product->stock }}</strong></div>@empty<p class="empty-row">No products available.</p>@endforelse</div>
         </article>
 
         <article class="dashboard-card reservation-card">
-            <div class="card-heading"><div><p>BOOKING FLOW</p><h2>Reservation report</h2></div><a href="{{ route('reservations.index') }}">Manage reservations</a></div>
-            <div class="reservation-metrics"><div><span>Total requests</span><strong>{{ $reservationCount }}</strong></div><div><span>Waiting approval</span><strong>{{ $pendingReservations }}</strong></div><div><span>Approved/completed</span><strong>{{ $approvedReservations }}</strong></div><div><span>Approved value</span><strong>&#8369;{{ number_format($approvedReservationValue,2) }}</strong></div></div>
+            <div class="card-heading"><div><p>BOOKING FLOW</p><h2>Reservation Report</h2></div><a href="{{ route('reservations.index') }}">Manage Reservations</a></div>
+            <div class="reservation-metrics"><div><span>Total Requests</span><strong>{{ $reservationCount }}</strong></div><div><span>Waiting Approval</span><strong>{{ $pendingReservations }}</strong></div><div><span>Approved/Completed</span><strong>{{ $approvedReservations }}</strong></div><div><span>Approved Value</span><strong>&#8369;{{ number_format($approvedReservationValue,2) }}</strong></div></div>
             <div class="table-scroll"><table><thead><tr><th>Reference</th><th>Customer</th><th>Schedule</th><th>Status</th><th>Total</th></tr></thead><tbody>@forelse($reservations->take(6) as $reservation)<tr><td>{{ $reservation->reference }}</td><td>{{ $reservation->customer_name }}</td><td>{{ $reservation->reservation_at->format('M d, Y H:i') }}</td><td><span class="reservation-status {{ $reservation->booking_status }}">{{ ucfirst($reservation->booking_status) }}</span></td><td>&#8369;{{ number_format($reservation->total_amount,2) }}</td></tr>@empty<tr><td colspan="5" class="empty-row">No reservation requests in this period.</td></tr>@endforelse</tbody></table></div>
         </article>
         <article class="dashboard-card requested-food">
@@ -87,7 +86,7 @@
         </article>
 
         <article class="dashboard-card movement-card">
-            <div class="card-heading"><div><p>AUDIT TRAIL</p><h2>Stock movement report</h2></div><a href="{{ route('inventory.index') }}">View all stock</a></div>
+            <div class="card-heading"><div><p>AUDIT TRAIL</p><h2>Stock Movement Report</h2></div><a href="{{ route('inventory.index') }}">View All Stock</a></div>
             <div class="table-scroll"><table><thead><tr><th>Date</th><th>Product</th><th>Movement</th><th>Qty</th><th>Before</th><th>After</th><th>Recorded by</th></tr></thead><tbody>@forelse($stockMovements as $movement)<tr><td>{{ $movement->created_at->format('M d, H:i') }}</td><td>{{ $movement->product?->name ?? 'Deleted product' }}</td><td>{{ str($movement->type)->replace('_',' ')->title() }}</td><td>{{ $movement->quantity }}</td><td>{{ $movement->stock_before }}</td><td>{{ $movement->stock_after }}</td><td>{{ $movement->user?->name ?? 'System' }}</td></tr>@empty<tr><td colspan="7" class="empty-row">No stock movements in this period.</td></tr>@endforelse</tbody></table></div>
         </article>
     </section>

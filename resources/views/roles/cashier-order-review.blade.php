@@ -120,7 +120,7 @@
                         <button class="reject-order" type="button" data-open-reject-order>Reject order</button>
                         <button class="confirm-payment" type="submit" form="confirm-payment-form">{{ $order->payment_method === 'gcash' ? 'Verify GCash and confirm paid' : 'Receive cash and confirm paid' }} <span>→</span></button>
                     </div>
-                    <p class="confirm-note">Confirming sends this sale to the Admin and Super Admin dashboards and reports.</p>
+                    <p class="confirm-note">Confirming sends this sale to the Admin dashboard and reports.</p>
 
                     <dialog class="reject-dialog" id="reject-order-dialog" aria-labelledby="reject-order-title">
                         <div class="reject-dialog-panel">

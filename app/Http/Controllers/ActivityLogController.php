@@ -14,7 +14,7 @@ class ActivityLogController extends Controller
     {
         $search = $request->string('search')->trim()->limit(120)->toString();
         $roles = [
-            User::ROLE_SUPER_ADMIN => 'Super Admin',
+            User::ROLE_SUPER_ADMIN => 'Admin',
             User::ROLE_ADMIN => 'Admin',
             User::ROLE_CASHIER => 'Cashier',
         ];

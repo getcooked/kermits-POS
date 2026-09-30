@@ -19,5 +19,5 @@
             <a class="{{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.payment.edit') }}">@include('partials.nav-icon',['name'=>'settings']) Settings</a>
         @endif
     </nav>
-    <div class="admin-user"><div><strong>Hi, {{ auth()->user()->name }}</strong><small>{{ str(auth()->user()->role)->replace('_',' ')->title() }}</small></div><form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg></button></form></div>
+    <div class="admin-user"><div><strong>Hi, {{ auth()->user()->name }}</strong><small>{{ auth()->user()->role === 'super_admin' ? 'Admin' : str(auth()->user()->role)->replace('_',' ')->title() }}</small></div><form method="POST" action="{{ route('logout') }}">@csrf<button class="logout-icon" type="submit" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg></button></form></div>
 </aside>

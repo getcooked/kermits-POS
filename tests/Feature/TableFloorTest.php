@@ -78,7 +78,7 @@ class TableFloorTest extends TestCase
 
         $this->actingAs($this->admin)->get(route('tables.index'))
             ->assertOk()
-            ->assertSee("Today's tables", false)
+            ->assertSee("Today's Tables", false)
             ->assertSee('Staying longer than usual.');
     }
 

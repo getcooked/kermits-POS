@@ -18,7 +18,7 @@
 
     <div class="table-settings-grid">
     <section class="welcome">
-        <h2>Table options</h2>
+        <h2>Table Options</h2>
         <p class="table-help">The party sizes customers choose from when booking, and the reservation price for each.</p>
         <form method="POST" action="{{ route('tables.update') }}" data-ajax-form data-ajax-target=".table-management" data-ajax-loading="Saving..." data-rows-form data-max-rows="{{ $maxTables }}">
             @csrf @method('PUT')
@@ -43,8 +43,8 @@
             </template>
             <p class="table-help">Guest number is the most guests the option allows, up to {{ $maxGuests }} (the largest bookable table). Changes apply to new bookings only; existing reservations keep their original price.</p>
             <div class="table-actions">
-                <button class="row-add" type="button" data-row-add>+ Add option</button>
-                <button class="button" type="submit">Save table options</button>
+                <button class="row-add" type="button" data-row-add>+ Add Option</button>
+                <button class="button" type="submit">Save Table Options</button>
             </div>
         </form>
     </section>
@@ -64,7 +64,7 @@
     </section>
 
     <section class="welcome">
-        <h2>Tables in the restaurant</h2>
+        <h2>Tables In The Restaurant</h2>
         <p class="table-help">Each numbered table and how many people it seats. Customers are seated at the smallest free table that fits, or at the table they request.</p>
         @if($seatSummary->isNotEmpty())
             <p class="seat-summary">@foreach($seatSummary as $seats => $count)<span>{{ $count }} &times; {{ $seats }}-seat</span>@endforeach</p>
@@ -106,8 +106,8 @@
             </div>
             <p class="table-help">Click Available or Unavailable to switch whether customers can book a table; new tables are available once saved. Tables with reservations can't be removed; make them Unavailable instead. Changes that would leave an upcoming reservation without a table are refused.</p>
             <div class="table-actions">
-                <button class="row-add" type="button" data-row-add>+ Add table</button>
-                <button class="button" type="submit">Save tables</button>
+                <button class="row-add" type="button" data-row-add>+ Add Table</button>
+                <button class="button" type="submit">Save Tables</button>
             </div>
         </form>
         {{-- The Available/Unavailable buttons sit inside the layout form, so they submit these instead. --}}

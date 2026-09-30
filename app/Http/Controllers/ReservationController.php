@@ -193,13 +193,23 @@ class ReservationController extends Controller
             'type' => ['nullable', 'in:table,exclusive'],
         ]);
 
-        $reservations = Reservation::query()
+        $allReservations = Reservation::query()
             ->with(['handler', 'items.product', 'diningTable'])
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->orderBy('reservation_at')
-            ->get()->when($filters['status'] ?? null, fn ($items, $status) => $items->where('booking_status', $status));
+            ->get();
 
-        return view('reservations.index', compact('reservations'));
+        $statusCounts = $allReservations->countBy('booking_status');
+        $arrivingToday = $allReservations
+            ->filter(fn (Reservation $reservation) => $reservation->reservation_at->isToday()
+                && in_array($reservation->booking_status, ['pending', 'confirmed'], true))
+            ->count();
+        $reservations = $allReservations
+            ->when($filters['status'] ?? null, fn ($items, $status) => $items->where('booking_status', $status));
+
+        return view('reservations.index', compact('reservations', 'statusCounts', 'arrivingToday') + [
+            'totalCount' => $allReservations->count(),
+        ]);
     }
 
     public function proof(Request $request, Reservation $reservation)

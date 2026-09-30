@@ -14,7 +14,7 @@
 
     <section class="welcome account-card customer-list">
         <div class="account-card-head">
-            <div><p class="account-eyebrow">REGISTERED CUSTOMERS</p><h2>Customer accounts</h2></div>
+            <div><p class="account-eyebrow">REGISTERED CUSTOMERS</p></div>
             <strong>{{ $customers->count() }}</strong>
         </div>
         @if($customers->isNotEmpty())

@@ -25,7 +25,7 @@ class AdminAccountManagementTest extends TestCase
             ->assertSeeInOrder(['Admin Accounts', '3', 'Active Admin Accounts', '2', 'Disabled Admin Accounts', '1'])
             ->assertSee('Create Admin Account')
             ->assertSee('Send code')
-            ->assertSee('Edit account')
+            ->assertSee('Edit Account')
             ->assertSee('Main Admin')
             ->assertSee('Old Admin')
             ->assertDontSee('A Cashier')
@@ -161,7 +161,7 @@ class AdminAccountManagementTest extends TestCase
 
         $this->post(route('login.store'), ['email' => 'other.admin@gmail.com', 'password' => 'Other123!'])
             ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['email' => 'This account has been disabled. Please contact a Super Admin.']);
+            ->assertSessionHasErrors(['email' => 'This account has been disabled. Please contact an Admin.']);
         $this->assertGuest();
 
         $this->actingAs($me)->patch(route('superadmin.admins.enable', $other))->assertSessionHas('status');

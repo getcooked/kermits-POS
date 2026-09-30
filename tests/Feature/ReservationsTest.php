@@ -361,7 +361,7 @@ class ReservationsTest extends TestCase
             ->assertSee('Kermit Special')
             ->assertSee('350.00')
             ->assertSee('No peanuts')
-            ->assertSee('Approve reservation');
+            ->assertSee('Approve Reservation');
     }
 
     public function test_reservation_only_becomes_successful_after_super_admin_approval(): void

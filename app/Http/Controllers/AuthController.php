@@ -174,7 +174,7 @@ class AuthController extends Controller
             $request->session()->regenerateToken();
 
             return redirect()->route('login')
-                ->withErrors(['email' => 'This account has been disabled. Please contact a Super Admin.'])
+                ->withErrors(['email' => 'This account has been disabled. Please contact an Admin.'])
                 ->onlyInput('email');
         }
 

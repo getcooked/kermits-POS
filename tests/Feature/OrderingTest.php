@@ -200,7 +200,7 @@ class OrderingTest extends TestCase
 
         $this->actingAs($superAdmin)->get('/reports')
             ->assertOk()
-            ->assertSee('<span>Total sales</span><strong>&#8369;100.00</strong>', false)
+            ->assertSee('<span>Total Sales</span><strong>&#8369;100.00</strong>', false)
             ->assertDontSee('999.00')
             ->assertDontSee('Awaiting payment confirmation');
     }
@@ -1049,7 +1049,7 @@ class OrderingTest extends TestCase
 
         $this->actingAs($superAdmin)->get('/reports?payment_method=cash')
             ->assertOk()
-            ->assertSee('Filtered orders')
+            ->assertSee('Filtered Orders')
             ->assertDontSee('GCASH-REPORT-123');
     }
 
@@ -1084,10 +1084,10 @@ class OrderingTest extends TestCase
 
         $this->actingAs($superAdmin)->get('/reports')
             ->assertOk()
-            ->assertSee('Reservation report')
+            ->assertSee('Reservation Report')
             ->assertSee('KRM-REPORT-LIVE')
-            ->assertSee('Stock movement report')
-            ->assertSee('Best-selling products');
+            ->assertSee('Stock Movement Report')
+            ->assertSee('Best-Selling Products');
     }
 
     public function test_cashier_sales_are_always_recorded_as_walk_in_purchases(): void
