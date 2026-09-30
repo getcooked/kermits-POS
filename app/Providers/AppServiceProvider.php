@@ -55,12 +55,12 @@ class AppServiceProvider extends ServiceProvider
         );
 
         View::composer('partials.admin-sidebar', function ($view): void {
-            $view->with(
-                'lowStockCount',
-                auth()->user()?->hasRole('super_admin')
-                    ? Product::query()->available()->lowStock()->count()
-                    : 0,
-            );
+            $isAdmin = (bool) auth()->user()?->hasRole('super_admin');
+
+            $view->with([
+                'lowStockCount' => $isAdmin ? Product::query()->available()->lowStock()->count() : 0,
+                'pendingReservationCount' => $isAdmin ? Reservation::query()->withBookingStatus('pending')->count() : 0,
+            ]);
         });
 
         View::composer('shop.index', function ($view): void {

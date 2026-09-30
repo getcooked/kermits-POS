@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReservationRequest;
 use App\Http\Requests\UpdateReservationStatusRequest;
+use App\Models\DiningTable;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
@@ -14,6 +15,7 @@ use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -191,25 +193,124 @@ class ReservationController extends Controller
         $filters = $request->validate([
             'status' => ['nullable', 'in:pending,confirmed,completed,cancelled,rejected,expired'],
             'type' => ['nullable', 'in:table,exclusive'],
+            'when' => ['nullable', 'in:upcoming,past,all'],
+            'view' => ['nullable', 'in:list,timeline'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'search' => ['nullable', 'string', 'max:100'],
         ]);
+        $search = trim($filters['search'] ?? '');
+        $view = $filters['view'] ?? 'list';
+        $when = $filters['when'] ?? 'upcoming';
+        $today = today();
 
-        $allReservations = Reservation::query()
-            ->with(['handler', 'items.product', 'diningTable'])
+        $stats = [
+            'pending' => Reservation::query()->withBookingStatus('pending')->count(),
+            'today' => Reservation::query()->whereDate('reservation_at', $today)
+                ->where(fn ($query) => $query->withBookingStatus('pending')->orWhere('status', 'confirmed'))->count(),
+            'confirmed' => Reservation::query()->where('status', 'confirmed')->where('reservation_at', '>=', $today)->count(),
+            'completed' => Reservation::query()->where('status', 'completed')->count(),
+        ];
+
+        if ($view === 'timeline') {
+            $date = isset($filters['date']) ? Carbon::parse($filters['date'])->startOfDay() : $today;
+
+            return view('reservations.index', compact('view', 'when', 'stats', 'date') + [
+                'timeline' => $this->timeline($date),
+            ]);
+        }
+
+        $scoped = fn () => Reservation::query()
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
+            ->when($when === 'upcoming', fn ($query) => $query->where('reservation_at', '>=', $today))
+            ->when($when === 'past', fn ($query) => $query->where('reservation_at', '<', $today))
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+                $like = '%'.addcslashes($search, '%_\\').'%';
+                $query->where('customer_name', 'like', $like)
+                    ->orWhere('reference', 'like', $like)
+                    ->orWhere('phone', 'like', $like)
+                    ->orWhere('email', 'like', $like);
+            }));
+
+        $statusCounts = collect(['pending', 'confirmed', 'completed', 'cancelled', 'rejected', 'expired'])
+            ->mapWithKeys(fn (string $status) => [$status => $scoped()->withBookingStatus($status)->count()]);
+
+        $reservations = $scoped()
+            ->with(['handler', 'items.product', 'diningTable'])
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->withBookingStatus($status))
+            ->orderBy('reservation_at', $when === 'upcoming' ? 'asc' : 'desc')
+            ->orderBy('id')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('reservations.index', compact('view', 'when', 'stats', 'statusCounts', 'reservations', 'search') + [
+            'totalCount' => $scoped()->count(),
+        ]);
+    }
+
+    /**
+     * One row per table for the day, each booking placed as a block between its arrival and
+     * estimated end. Bookings that overlap on the same row get their own lane and are flagged.
+     */
+    private function timeline(Carbon $date): array
+    {
+        $open = $date->copy()->setTimeFromTimeString(config('reservations.opening_time'));
+        $close = $date->copy()->setTimeFromTimeString(config('reservations.closing_time'));
+        $span = max(1, (int) $open->diffInMinutes($close));
+
+        $reservations = Reservation::query()
+            ->with('diningTable')
+            ->whereDate('reservation_at', $date)
+            ->where(fn ($query) => $query->withBookingStatus('pending')->orWhereIn('status', ['confirmed', 'completed']))
             ->orderBy('reservation_at')
             ->get();
 
-        $statusCounts = $allReservations->countBy('booking_status');
-        $arrivingToday = $allReservations
-            ->filter(fn (Reservation $reservation) => $reservation->reservation_at->isToday()
-                && in_array($reservation->booking_status, ['pending', 'confirmed'], true))
-            ->count();
-        $reservations = $allReservations
-            ->when($filters['status'] ?? null, fn ($items, $status) => $items->where('booking_status', $status));
+        $rows = DiningTable::query()->active()->orderBy('number')->get()
+            ->mapWithKeys(fn (DiningTable $table) => [$table->id => ['label' => $table->label(), 'seats' => $table->seats, 'items' => []]])
+            ->all();
+        $rows['any'] = ['label' => 'Any Available Table', 'seats' => null, 'items' => []];
 
-        return view('reservations.index', compact('reservations', 'statusCounts', 'arrivingToday') + [
-            'totalCount' => $allReservations->count(),
-        ]);
+        foreach ($reservations->where('type', 'table') as $reservation) {
+            $start = $reservation->reservation_at->max($open);
+            $end = ($reservation->reservation_end_at ?? $reservation->reservation_at->copy()->addMinutes(config('reservations.duration_minutes')))->min($close);
+            if ($start >= $close) {
+                continue;
+            }
+            $key = $reservation->dining_table_id && isset($rows[$reservation->dining_table_id]) ? $reservation->dining_table_id : 'any';
+            $rows[$key]['items'][] = [
+                'reservation' => $reservation,
+                'start' => $start,
+                'end' => $end,
+                'left' => round($open->diffInMinutes($start) / $span * 100, 3),
+                'width' => round(max(15, $start->diffInMinutes($end)) / $span * 100, 3),
+            ];
+        }
+
+        foreach ($rows as $key => $row) {
+            $laneEnds = [];
+            foreach ($row['items'] as $index => $item) {
+                $lane = collect($laneEnds)->search(fn ($laneEnd) => $laneEnd <= $item['start']);
+                $lane = $lane === false ? count($laneEnds) : $lane;
+                $laneEnds[$lane] = $item['end'];
+                $rows[$key]['items'][$index]['lane'] = $lane;
+            }
+            $rows[$key]['lanes'] = max(1, count($laneEnds));
+            $rows[$key]['conflict'] = $key !== 'any' && count($laneEnds) > 1;
+        }
+
+        if ($rows['any']['items'] === []) {
+            unset($rows['any']);
+        }
+
+        return [
+            'rows' => $rows,
+            'exclusive' => $reservations->where('type', 'exclusive')->values(),
+            'hours' => collect(range(0, intdiv($span, 60)))->map(fn (int $hour) => $open->copy()->addHours($hour)),
+            'span' => $span,
+            'now' => $date->isToday() && now()->between($open, $close)
+                ? round($open->diffInMinutes(now()) / $span * 100, 3)
+                : null,
+            'count' => $reservations->count(),
+        ];
     }
 
     public function proof(Request $request, Reservation $reservation)

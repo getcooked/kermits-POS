@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -93,6 +94,19 @@ class Reservation extends Model
         }
 
         return $this->created_at->copy()->addMinutes(config('reservations.hold_minutes'))->lte(now()) ? 'expired' : 'pending';
+    }
+
+    /**
+     * SQL version of the booking_status accessor, so lists can filter and paginate in the database.
+     */
+    public function scopeWithBookingStatus(Builder $query, string $status): Builder
+    {
+        return match ($status) {
+            'pending' => $query->where('status', 'pending')
+                ->where(fn (Builder $q) => $q->whereNull('hold_expires_at')->orWhere('hold_expires_at', '>', now())),
+            'expired' => $query->where('status', 'pending')->where('hold_expires_at', '<=', now()),
+            default => $query->where('status', $status),
+        };
     }
 
     public function getTypeLabelAttribute(): string
