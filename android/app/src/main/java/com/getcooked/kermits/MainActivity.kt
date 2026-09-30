@@ -89,6 +89,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -845,7 +847,7 @@ fun KermitsApp(
                         selectedOrderWasJustSubmitted = false
                         vm.loadOrder(it) { order -> selectedOrder = order }
                     }, onReservation = { vm.loadReservation(it) { selectedReservation = it } }, onReserve = { tab = 2 })
-                    2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { ReservationScreen(vm, onDetail = { id -> vm.loadReservation(id) { selectedReservation = it } }) { message -> submissionMessage = message } }
+                    2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { ReservationScreen(vm) { message -> submissionMessage = message } }
                     else -> AccountScreen(vm)
                 }
             }
@@ -1739,13 +1741,16 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             Column(Modifier.padding(12.dp)) {
                                 Text(product.name, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                                 Text(product.description.orEmpty(), maxLines = 2, color = Color(0xFF6D746B), fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 5.dp))
+                                val quantity = vm.cart[product.id] ?: 0
+                                // Same as the web menu: stock already in the cart is no longer available.
+                                val remaining = (product.stock - quantity).coerceAtLeast(0)
+                                val lowStock = remaining < 10
                                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Column {
                                         Text(money(product.price), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                                        Text("${product.stock} available", color = Color(0xFF596273), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(if (lowStock) "Low stock · $remaining available" else "$remaining available", color = if (lowStock) Color(0xFFC62828) else Color(0xFF596273), fontSize = 11.sp, fontWeight = if (lowStock) FontWeight.ExtraBold else FontWeight.SemiBold)
                                     }
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        val quantity = vm.cart[product.id] ?: 0
                                         if (quantity > 0) {
                                             IconButton(onClick = { vm.remove(product) }, Modifier.size(34.dp)) { Icon(Icons.Default.Remove, "Remove", Modifier.size(18.dp)) }
                                             Text(quantity.toString(), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
@@ -2439,56 +2444,65 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
 
 @Composable private fun HistoryEmpty(title: String, message: String) { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), color = Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD0C3))) { Column(Modifier.fillMaxWidth().padding(34.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(title, fontWeight = FontWeight.Bold); Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp)) } } }
 @Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, action: Pair<String, () -> Unit>? = null, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { action?.let { (label, onClick) -> Button(onClick = onClick) { Text(label) } } ?: TextButton(onClick = close) { Text("Close") } }, dismissButton = action?.let { { TextButton(onClick = close) { Text("Close") } } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
-@Composable private fun ReservationScreen(vm: AppViewModel, onDetail: (Int) -> Unit, setMessage: (String) -> Unit) {
-    var type by remember { mutableStateOf("table") }; var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var size by remember { mutableStateOf("4") }; var guests by remember { mutableStateOf("20") }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var payment by remember { mutableStateOf("cash") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
-    LaunchedEffect(vm.tableSizes) { if (size !in vm.tableSizes) size = vm.tableSizes.first() }
-    var diningTableId by remember { mutableStateOf<Int?>(null) }
+private const val EXCLUSIVE_MIN_GUESTS = 30
+private const val EXCLUSIVE_MAX_GUESTS = 40
+private const val RESERVATION_FOOD_MAX = 22
+
+@Composable private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
+    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var guests by remember { mutableIntStateOf(EXCLUSIVE_MIN_GUESTS) }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
+    // The Exclusive Venue is only reserved once part of it is paid online.
+    var payment by remember { mutableStateOf(if (vm.payMongoEnabled) "paymongo" else "gcash") }
+    LaunchedEffect(vm.payMongoEnabled) { if (payment == "paymongo" && !vm.payMongoEnabled) payment = "gcash" }
     val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
     val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
-    val reservationFee = if (type == "table") vm.tableFees[size] ?: 0.0 else vm.exclusiveFee
     var paymentPlan by remember { mutableStateOf("downpayment") }
-    val exclusive = type == "exclusive"
-    val bookingTotal = reservationFee + selectedFoodTotal
+    val bookingTotal = vm.exclusiveFee + selectedFoodTotal
     // Same rounding as the server: the downpayment share rounded up to the centavo.
     val payNow = if (paymentPlan == "full") bookingTotal else kotlin.math.ceil(kotlin.math.round(bookingTotal * 100) * vm.exclusiveDownpaymentPercent / 100.0) / 100.0
-    // The Exclusive Venue is only reserved once part of it is paid online.
-    LaunchedEffect(exclusive) { if (exclusive && payment == "cash") payment = if (vm.payMongoEnabled) "paymongo" else "gcash" }
-    val canPay = (payment == "cash" && !exclusive) ||(payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && reference.length == 13 && proofUri != null)
+    val canPay = (payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && reference.length == 13 && proofUri != null)
     Text("BOOK A RESERVATION", color = Color(0xFF777F00), fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.ExtraBold)
-    Text("Plan your visit", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 6.dp))
-    Text("Complete the details below. We will confirm your request after review.", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
-    Row(Modifier.horizontalScroll(rememberScrollState())) { FilterChip(selected = type == "table", onClick = { type = "table" }, label = { Text("Table") }, modifier = Modifier.padding(end = 8.dp)); FilterChip(selected = type == "exclusive", onClick = { type = "exclusive" }, label = { Text("Exclusive Venue · whole day") }) }
-    Spacer(Modifier.height(10.dp)); OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
-    DateTimePickerField(date, "Choose your schedule", if (exclusive) "Select the date" else "Select date and time", if (exclusive) "Kermit's is yours from 8 AM to 11 PM (Philippine time). Book at least 1 day ahead." else "Open 8 AM-11 PM (Philippine time). Last arrival: 10 PM.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; ReservationSlotChoices(vm, date, type, (if (type == "table") size else guests).toIntOrNull() ?: 1, tableId = if (type == "table") diningTableId else null) { date = it }; Spacer(Modifier.height(10.dp))
-    if (type == "table") {
-        Text("Party size", color = MaterialTheme.colorScheme.onSurfaceVariant); Row(Modifier.horizontalScroll(rememberScrollState())) { vm.tableSizes.forEach { value -> FilterChip(selected = size == value, onClick = { size = value }, label = { Text("Up to $value guests · ${money(vm.tableFees[value] ?: 0.0)}") }, modifier = Modifier.padding(end = 6.dp)) } }
-        TableChoice(vm, size.toIntOrNull() ?: 1, diningTableId) { diningTableId = it }
-    } else {
-        OutlinedTextField(guests, { guests = it.filter(Char::isDigit).take(3) }, label = { Text("Number of guests") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        Text("Pay at least ${vm.exclusiveDownpaymentPercent}% online now to secure the date. The balance is paid on the event day.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
-            FilterChip(selected = paymentPlan == "downpayment", onClick = { paymentPlan = "downpayment" }, label = { Text("${vm.exclusiveDownpaymentPercent}% downpayment") }, modifier = Modifier.padding(end = 6.dp))
-            FilterChip(selected = paymentPlan == "full", onClick = { paymentPlan = "full" }, label = { Text("Pay in full") })
-        }
+    Text("Exclusive Venue", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 6.dp))
+    Text("Kermit's is all yours for the whole day · ${money(vm.exclusiveFee)}", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
+    OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
+    DateTimePickerField(date, "Choose your schedule", "Select the date", "Open 8 AM-11 PM (Philippine time). Book at least 1 day ahead.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; ReservationSlotChoices(vm, date, "exclusive", guests) { date = it }; Spacer(Modifier.height(14.dp))
+    Text("Number of guests", fontWeight = FontWeight.Bold)
+    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        FilledTonalIconButton(onClick = { guests-- }, enabled = guests > EXCLUSIVE_MIN_GUESTS, modifier = Modifier.semantics { contentDescription = "Fewer guests" }) { Icon(Icons.Default.Remove, contentDescription = null) }
+        Text(guests.toString(), fontSize = 24.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.width(56.dp))
+        FilledTonalIconButton(onClick = { guests++ }, enabled = guests < EXCLUSIVE_MAX_GUESTS, modifier = Modifier.semantics { contentDescription = "More guests" }) { Icon(Icons.Default.Add, contentDescription = null) }
+        Text("$EXCLUSIVE_MIN_GUESTS-$EXCLUSIVE_MAX_GUESTS guests", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
     }
-    Spacer(Modifier.height(12.dp)); Text("Food request", fontWeight = FontWeight.Bold); Text("Optional pre-order items", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-    vm.products.take(8).forEach { product ->
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text(product.name, fontWeight = FontWeight.SemiBold); Text(money(product.price), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
-            val quantity = menuItems[product.id] ?: 0
-            IconButton(onClick = { menuItems = if (quantity <= 1) menuItems - product.id else menuItems + (product.id to quantity - 1) }, enabled = quantity > 0) { Icon(Icons.Default.Remove, "Remove") }
-            Text(quantity.toString(), fontWeight = FontWeight.Bold)
-            IconButton(onClick = { if (quantity < 22) menuItems = menuItems + (product.id to quantity + 1) }) { Icon(Icons.Default.Add, "Add") }
+    Spacer(Modifier.height(12.dp))
+    Text("Pay at least ${vm.exclusiveDownpaymentPercent}% online now to secure the date.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    Row(Modifier.horizontalScroll(rememberScrollState())) {
+        FilterChip(selected = paymentPlan == "downpayment", onClick = { paymentPlan = "downpayment" }, label = { Text("${vm.exclusiveDownpaymentPercent}% downpayment") }, modifier = Modifier.padding(end = 6.dp))
+        FilterChip(selected = paymentPlan == "full", onClick = { paymentPlan = "full" }, label = { Text("Pay in full") })
+    }
+    Spacer(Modifier.height(20.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text("FOODS", fontSize = 22.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Black, modifier = Modifier.semantics { heading() })
+        if (selectedFoodTotal > 0) Text(money(selectedFoodTotal), color = Color(0xFF747D00), fontWeight = FontWeight.ExtraBold)
+    }
+    if (vm.products.isEmpty()) Text("No foods are available right now.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+    vm.products.groupBy { it.category ?: "Favorites" }.forEach { (category, products) ->
+        Text(category, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF171817), modifier = Modifier.padding(top = 14.dp, bottom = 8.dp))
+        products.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                pair.forEach { product ->
+                    ReservationFoodCard(product, menuItems[product.id] ?: 0, Modifier.weight(1f)) { quantity ->
+                        menuItems = if (quantity <= 0) menuItems - product.id else menuItems + (product.id to quantity.coerceAtMost(RESERVATION_FOOD_MAX))
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
     OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(bookingTotal), fontWeight = FontWeight.Bold) }
-    if (exclusive) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Pay now"); Text(money(payNow), fontWeight = FontWeight.Bold) }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Balance on the event day"); Text(money(bookingTotal - payNow)) }
-    }
-    Spacer(Modifier.height(8.dp)); Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); if (!exclusive) { FilterChip(selected = payment == "cash", onClick = { payment = "cash" }, label = { Text("Cash") }); Spacer(Modifier.width(6.dp)) }; FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }); if (vm.payMongoEnabled) { Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "paymongo", onClick = { payment = "paymongo" }, label = { Text("PayMongo") }) } }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Pay now"); Text(money(payNow), fontWeight = FontWeight.Bold) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Balance on the event day"); Text(money(bookingTotal - payNow)) }
+    Spacer(Modifier.height(8.dp)); Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }); if (vm.payMongoEnabled) { Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "paymongo", onClick = { payment = "paymongo" }, label = { Text("PayMongo") }) } }
     if (payment == "paymongo") PayMongoNote()
     if (payment == "gcash") {
         vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
@@ -2503,7 +2517,7 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
     Spacer(Modifier.height(16.dp))
     Button(
         onClick = {
-            vm.placeReservation(context, type, phone, date, size, guests, notes, foodRequest, menuItems, payment, reference, proofUri, diningTableId = diningTableId, paymentPlan = paymentPlan) { ok ->
+            vm.placeReservation(context, "exclusive", phone, date, "", guests.toString(), notes, foodRequest, menuItems, payment, reference, proofUri, paymentPlan = paymentPlan) { ok ->
                 if (ok) {
                     menuItems = emptyMap()
                     reference = ""
@@ -2512,12 +2526,65 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
                 }
             }
         },
-        enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && (type == "table" || (guests.toIntOrNull() ?: 0) in 1..300) && canPay,
+        enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && guests in EXCLUSIVE_MIN_GUESTS..EXCLUSIVE_MAX_GUESTS && canPay,
         modifier = Modifier.fillMaxWidth(),
     ) { Text(if (vm.busy) "Submitting..." else "Request reservation") }
-    Spacer(Modifier.height(26.dp)); Text("Recent reservations", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.height(14.dp))
-    if (vm.reservations.isEmpty()) Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else vm.reservations.forEach { reservation ->
-        ListItem(headlineContent = { Text("#${reservation.id}  ${reservation.reference}  ${reservation.status}  ${money(reservation.total_amount)}") }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { onDetail(reservation.id) })
+    Spacer(Modifier.height(26.dp))
+}
+
+@Composable
+private fun ReservationFoodCard(product: Product, quantity: Int, modifier: Modifier = Modifier, onQuantity: (Int) -> Unit) {
+    val context = LocalContext.current
+    val selected = quantity > 0
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) Color(0xFFB5C019) else Color(0xFFE1E4D9)),
+    ) {
+        Column {
+            Box {
+                if (product.image_url != null) {
+                    AsyncImage(
+                        remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).size(480, 360).crossfade(true).build() },
+                        product.name,
+                        Modifier.fillMaxWidth().height(112.dp),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Box(Modifier.fillMaxWidth().height(112.dp).background(Color(0xFFE9ECD4)), contentAlignment = Alignment.Center) {
+                        Text(product.name.take(1), color = Color(0xFF747D00), fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (selected) {
+                    Surface(shape = RoundedCornerShape(50.dp), color = Color(0xFF5800F0), modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                        Text("× $quantity", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp))
+                    }
+                }
+            }
+            Column(Modifier.padding(10.dp)) {
+                Text(product.name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(money(product.price), color = Color(0xFF747D00), fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+                if (!selected) {
+                    OutlinedButton(
+                        onClick = { onQuantity(1) },
+                        shape = RoundedCornerShape(50.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.fillMaxWidth().height(34.dp).semantics { contentDescription = "Add ${product.name}" },
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Row(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(50.dp)).background(Color(0xFFF1F3E4)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { onQuantity(quantity - 1) }, modifier = Modifier.size(34.dp).semantics { contentDescription = "Decrease ${product.name}" }) { Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        Text(quantity.toString(), fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { onQuantity(quantity + 1) }, enabled = quantity < RESERVATION_FOOD_MAX, modifier = Modifier.size(34.dp).semantics { contentDescription = "Increase ${product.name}" }) { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    }
+                }
+            }
+        }
     }
 }
 private val receiptDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a", Locale.US)
