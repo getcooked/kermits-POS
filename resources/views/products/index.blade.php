@@ -1,9 +1,28 @@
 @extends('layouts.app')
 @section('title', 'Product Management')
 @section('content')
+@php
+    $maxStock = \App\Models\Product::MAX_STOCK;
+    $lowThreshold = \App\Models\Product::LOW_STOCK_THRESHOLD;
+    $canCreate = auth()->user()->hasRole('super_admin', 'admin');
+    $canDelete = auth()->user()->hasRole('super_admin');
+    $groups = $products->groupBy(fn ($product) => $product->category ?: 'Uncategorized');
+    $formContext = (string) old('form_context', '');
+    $stats = [
+        'all' => ['label' => 'All Products', 'count' => $products->count()],
+        'visible' => ['label' => 'On Menu', 'count' => $products->where('active', true)->count()],
+        'hidden' => ['label' => 'Hidden', 'count' => $products->where('active', false)->count()],
+        'low' => ['label' => 'Low Stock', 'count' => $products->filter(fn ($product) => $product->stock <= $lowThreshold)->count()],
+    ];
+    $stockState = fn ($product) => match (true) {
+        $product->stock === 0 => ['class' => 'is-out', 'label' => 'Out of stock'],
+        $product->stock <= $lowThreshold => ['class' => 'is-low', 'label' => 'Low · '.$product->stock.' left'],
+        default => ['class' => 'is-ok', 'label' => $product->stock.' in stock'],
+    };
+@endphp
 <div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard">
     <header class="topbar product-management-header">
-        <div class="product-page-heading"><h1>Product Management</h1></div>
+        <div class="product-page-heading"><h1>Product Management</h1><p class="muted">Menu items, prices, stock and visibility</p></div>
         <div class="product-header-actions">
         <form method="GET" action="{{ route('products.index') }}" class="product-search-form" aria-label="Search products">
             <div class="product-search-control">
@@ -21,52 +40,141 @@
             <button class="product-search-button" type="submit">Search</button>
             @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}" aria-label="Clear search" title="Clear search"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>@endif
         </form>
-        @if(auth()->user()->hasRole('super_admin', 'admin'))<button id="product-create-toggle" class="product-create-toggle" type="button" aria-controls="product-create-panel" aria-expanded="{{ old('form_context') === 'create' ? 'true' : 'false' }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>{{ old('form_context') === 'create' ? 'Close Form' : 'Add Product' }}</span></button>@endif
+        @if($canCreate)<button id="product-create-toggle" class="product-create-toggle" type="button" aria-controls="product-create-panel" aria-expanded="{{ $formContext === 'create' ? 'true' : 'false' }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>{{ $formContext === 'create' ? 'Close Form' : 'Add Product' }}</span></button>@endif
         </div>
     </header>
     @if($search !== '')<p class="product-search-summary">{{ $products->count() }} {{ Str::plural('product', $products->count()) }} found for “{{ $search }}”</p>@endif
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
-    @if($errors->any())<div class="error" style="background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px">{{ $errors->first() }}</div>@endif
-    @if(auth()->user()->hasRole('super_admin', 'admin'))<section id="product-create-panel" class="welcome product-create-panel" {{ old('form_context') === 'create' ? '' : 'hidden' }}>
-        <h2>New Product</h2>
-        <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data" class="product-ajax-form" data-action-label="Adding product...">@csrf
+    @if($errors->any())<div class="error pm-page-error">{{ $errors->first() }}</div>@endif
+
+    @if($canCreate)<section id="product-create-panel" class="welcome product-create-panel" {{ $formContext === 'create' ? '' : 'hidden' }}>
+        <div class="pm-panel-head"><h2>New Product</h2><p class="muted">It appears on the cashier page as soon as it's saved and visible.</p></div>
+        <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data" class="product-ajax-form pm-create-layout" data-action-label="Adding product...">@csrf
             <input type="hidden" name="form_context" value="create">
-            <div class="product-create-grid">
+            <div class="pm-photo-field">
+                <div class="pm-photo-preview" data-pm-preview><span class="pm-photo-empty"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="m21 16-5-5-8 8"></path></svg>No picture yet</span></div>
+                <input class="pm-file-input" id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" data-pm-image-input>
+                <label class="pm-upload-button" for="image">Choose Picture</label>
+                <small class="pm-hint" data-pm-file-name>JPG, PNG or WebP · up to 2 MB</small>
+            </div>
+            <div class="pm-fields pm-fields-wide">
                 <div class="field"><label for="name">Product Name</label><input class="control" id="name" name="name" value="{{ old('name') }}" required></div>
                 <div class="field"><label for="category">Category</label>@include('products.partials.category-picker', ['id' => 'category', 'value' => old('category'), 'placeholder' => 'Select or type a new category'])</div>
                 <div class="field"><label for="price">Price (₱)</label><input class="control" id="price" name="price" type="number" min="0.01" step="0.01" value="{{ old('price') }}" required></div>
-                <div class="field"><label for="stock">Stock <span style="font-weight:400;color:#687286">(max {{ \App\Models\Product::MAX_STOCK }})</span></label><input class="control" id="stock" name="stock" type="number" min="0" max="{{ \App\Models\Product::MAX_STOCK }}" step="1" inputmode="numeric" value="{{ old('stock', 0) }}" data-stock-limit required></div>
+                <div class="field"><label for="stock">Stock</label><input class="control" id="stock" name="stock" type="number" min="0" max="{{ $maxStock }}" step="1" inputmode="numeric" value="{{ old('stock', 0) }}" data-stock-limit required><small class="pm-hint">0–{{ $maxStock }} units</small></div>
+                <div class="field pm-span"><label for="description">Description</label><textarea class="control" id="description" name="description" rows="2" maxlength="500">{{ old('description') }}</textarea></div>
+                <div class="pm-span pm-form-actions">
+                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $formContext !== 'create' || old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Show on cashier page</strong><small>Hidden products can't be ordered.</small></span></label>
+                    <button class="button pm-primary" type="submit">Add Product</button>
+                </div>
             </div>
-            <div class="field"><label for="description">Description</label><textarea class="control" id="description" name="description" rows="2">{{ old('description') }}</textarea></div>
-            <div class="field"><label for="image">Product Picture <span style="font-weight:400;color:#687286">(JPG, PNG or WebP, up to 2 MB)</span></label><input class="control" id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
-            <label class="check"><input name="active" type="checkbox" value="1" checked> Show This Product On The Cashier Page</label>
-            <button class="button" style="width:auto;padding-inline:26px" type="submit">Add Product</button>
         </form>
     </section>@endif
-    <section style="display:grid;gap:14px">
-        @forelse($products->groupBy('category') as $category => $items)
-        <h2 style="margin:20px 0 0;border-bottom:2px solid #171817;padding-bottom:8px">{{ $category }}</h2>
-        @foreach($items as $product)
-        <article class="welcome" style="padding:22px" data-product-id="{{ $product->getKey() }}">
-            <form method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data" class="product-ajax-form" data-action-label="Saving...">@csrf @method('PUT')
-                @if($imageUrl = $product->imageUrl())
-                    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><img src="{{ $imageUrl }}" alt="{{ $product->name }}" style="width:86px;height:86px;object-fit:cover;border-radius:12px"><label class="check" style="margin:0"><input name="remove_image" type="checkbox" value="1"> Remove Current Picture</label></div>
-                @endif
-                <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr auto;gap:12px;align-items:end">
-                    <div><label>Name</label><input class="control" name="name" value="{{ $product->name }}" required></div>
-                    <div><label for="category-{{ $product->getKey() }}">Category</label>@include('products.partials.category-picker', ['id' => 'category-'.$product->getKey(), 'value' => $product->category, 'placeholder' => 'Select or type a category'])</div>
-                    <div><label>Price (₱)</label><input class="control" name="price" type="number" min="0.01" step="0.01" value="{{ $product->price }}" required></div>
-                    <div><label>Stock <span style="font-weight:400;color:#687286">(max {{ \App\Models\Product::MAX_STOCK }})</span></label><input class="control" name="stock" type="number" min="0" max="{{ \App\Models\Product::MAX_STOCK }}" step="1" inputmode="numeric" value="{{ $product->stock }}" data-stock-limit required></div>
-                    <button class="button" style="width:auto" type="submit">Save</button>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px"><div><label>Description</label><input class="control" name="description" value="{{ $product->description }}"></div><label class="check" style="margin:0 0 11px"><input name="active" type="checkbox" value="1" {{ $product->active ? 'checked' : '' }}> Visible</label></div>
-                <div style="margin-top:12px"><label>Replace Picture</label><input class="control" name="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
-            </form>
-            @if(auth()->user()->hasRole('super_admin'))<form method="POST" action="{{ route('products.destroy', $product) }}" class="product-ajax-form" data-action-label="Deleting..." data-confirm="Permanently delete this product?" data-confirm-title="Delete product?" style="margin-top:12px">@csrf @method('DELETE')<button class="logout" style="color:#b42318" type="submit">Delete</button></form>@endif
-        </article>
+
+    @if($products->isNotEmpty())
+    <section class="pm-stats" aria-label="Filter by status">
+        @foreach($stats as $status => $stat)
+            <button type="button" class="pm-stat pm-stat-{{ $status }}" data-pm-status="{{ $status }}" aria-pressed="{{ $status === 'all' ? 'true' : 'false' }}"><span>{{ $stat['label'] }}</span><strong>{{ $stat['count'] }}</strong></button>
         @endforeach
-        @empty <div class="welcome">{{ $search !== '' ? 'No products match your search.' : 'No products yet. Add your first product above.' }}</div> @endforelse
     </section>
+
+    <div class="pm-toolbar">
+        <div class="pm-chips" role="group" aria-label="Filter by category">
+            <button type="button" class="pm-chip" data-pm-category="" aria-pressed="true">All <span>{{ $products->count() }}</span></button>
+            @foreach($groups as $category => $items)<button type="button" class="pm-chip" data-pm-category="{{ $category }}" aria-pressed="false">{{ $category }} <span>{{ $items->count() }}</span></button>@endforeach
+        </div>
+        <div class="pm-view-toggle" role="group" aria-label="Layout">
+            <button type="button" data-pm-view="grid" aria-pressed="true" aria-label="Grid view" title="Grid view"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"></rect></svg></button>
+            <button type="button" data-pm-view="list" aria-pressed="false" aria-label="List view" title="List view"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1"></circle><circle cx="4.5" cy="12" r="1"></circle><circle cx="4.5" cy="18" r="1"></circle></svg></button>
+        </div>
+    </div>
+    @endif
+
+    <section class="pm-catalog" data-pm-catalog data-view="grid">
+        @forelse($groups as $category => $items)
+        <div class="pm-group" data-pm-group data-category="{{ $category }}">
+            <header class="pm-group-head"><h2>{{ $category }}</h2><span>{{ $items->count() }} {{ Str::plural('product', $items->count()) }}</span></header>
+            <div class="pm-grid">
+                @foreach($items as $product)
+                @php $stock = $stockState($product); @endphp
+                <article class="pm-card {{ $product->active ? '' : 'is-hidden' }}" data-pm-item data-product-id="{{ $product->getKey() }}" data-category="{{ $category }}" data-active="{{ $product->active ? '1' : '0' }}" data-low="{{ $product->stock <= $lowThreshold ? '1' : '0' }}">
+                    <div class="pm-media">
+                        @if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="" loading="lazy">@else<span class="pm-placeholder" aria-hidden="true">{{ Str::upper(Str::substr($product->name, 0, 1)) }}</span>@endif
+                        @unless($product->active)<span class="pm-flag">Hidden</span>@endunless
+                    </div>
+                    <div class="pm-body">
+                        <h3>{{ $product->name }}</h3>
+                        <p class="pm-desc">{{ $product->description ?: 'No description' }}</p>
+                    </div>
+                    <div class="pm-meta">
+                        <strong class="pm-price">₱{{ number_format((float) $product->price, 2) }}</strong>
+                        <span class="pm-stock {{ $stock['class'] }}">{{ $stock['label'] }}</span>
+                    </div>
+                    <button type="button" class="pm-edit" data-pm-open="product-editor-{{ $product->getKey() }}" aria-haspopup="dialog" aria-controls="product-editor-{{ $product->getKey() }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg><span>Edit<span class="pm-sr"> {{ $product->name }}</span></span></button>
+                </article>
+                @endforeach
+            </div>
+        </div>
+        @empty
+        <div class="welcome pm-empty-state">
+            <h2>{{ $search !== '' ? 'No products match your search' : 'No products yet' }}</h2>
+            <p class="muted">{{ $search !== '' ? 'Try a different name or category.' : 'Add your first product to start building the menu.' }}</p>
+        </div>
+        @endforelse
+        <p class="pm-filter-empty" data-pm-empty hidden>No products match these filters.</p>
+    </section>
+
+    @foreach($products as $product)
+    @php
+        $productId = $product->getKey();
+        $editing = $formContext === 'edit-'.$productId;
+        $value = fn (string $field, $default) => $editing ? old($field, $default) : $default;
+        $imageUrl = $product->imageUrl();
+    @endphp
+    <div id="product-editor-{{ $productId }}" class="pm-drawer" role="dialog" aria-modal="true" aria-labelledby="product-editor-{{ $productId }}-title" data-pm-drawer data-product-id="{{ $productId }}" {{ $editing ? '' : 'hidden' }}>
+        <div class="pm-drawer-backdrop" data-pm-close></div>
+        <div class="pm-drawer-panel">
+            <header class="pm-drawer-head">
+                <div><small>Edit product</small><h2 id="product-editor-{{ $productId }}-title">{{ $product->name }}</h2></div>
+                <button type="button" class="pm-icon-button" data-pm-close aria-label="Close editor"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+            </header>
+            <div class="pm-drawer-scroll">
+                <form id="product-edit-{{ $productId }}" method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data" class="product-ajax-form pm-drawer-form" data-action-label="Saving...">@csrf @method('PUT')
+                    <input type="hidden" name="form_context" value="edit-{{ $productId }}">
+                    @if($editing && $errors->any())<div class="product-ajax-inline-error" role="alert">{{ $errors->first() }}</div>@endif
+                    <div class="pm-photo-field pm-photo-row">
+                        <div class="pm-photo-preview" data-pm-preview>@if($imageUrl)<img src="{{ $imageUrl }}" alt="">@else<span class="pm-placeholder" aria-hidden="true">{{ Str::upper(Str::substr($product->name, 0, 1)) }}</span>@endif</div>
+                        <div class="pm-photo-actions">
+                            <input class="pm-file-input" id="image-{{ $productId }}" name="image" type="file" accept="image/jpeg,image/png,image/webp" data-pm-image-input>
+                            <label class="pm-upload-button" for="image-{{ $productId }}">{{ $imageUrl ? 'Replace Picture' : 'Add Picture' }}</label>
+                            <small class="pm-hint" data-pm-file-name>JPG, PNG or WebP · up to 2 MB</small>
+                            @if($imageUrl)<label class="pm-inline-check"><input name="remove_image" type="checkbox" value="1"> Remove current picture</label>@endif
+                        </div>
+                    </div>
+                    <div class="pm-fields">
+                        <div class="field pm-span"><label for="name-{{ $productId }}">Name</label><input class="control" id="name-{{ $productId }}" name="name" value="{{ $value('name', $product->name) }}" required></div>
+                        <div class="field pm-span"><label for="category-{{ $productId }}">Category</label>@include('products.partials.category-picker', ['id' => 'category-'.$productId, 'value' => $value('category', $product->category), 'placeholder' => 'Select or type a category'])</div>
+                        <div class="field"><label for="price-{{ $productId }}">Price (₱)</label><input class="control" id="price-{{ $productId }}" name="price" type="number" min="0.01" step="0.01" value="{{ $value('price', $product->price) }}" required></div>
+                        <div class="field"><label for="stock-{{ $productId }}">Stock</label><input class="control" id="stock-{{ $productId }}" name="stock" type="number" min="0" max="{{ $maxStock }}" step="1" inputmode="numeric" value="{{ $value('stock', $product->stock) }}" data-stock-limit required><small class="pm-hint">0–{{ $maxStock }} units</small></div>
+                        <div class="field pm-span"><label for="description-{{ $productId }}">Description</label><textarea class="control" id="description-{{ $productId }}" name="description" rows="3" maxlength="500">{{ $value('description', $product->description) }}</textarea></div>
+                    </div>
+                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ ($editing ? old('active') : $product->active) ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Show on cashier page</strong><small>Hidden products stay in your records but can't be ordered.</small></span></label>
+                </form>
+                @if($canDelete)
+                <form method="POST" action="{{ route('products.destroy', $product) }}" class="product-ajax-form pm-danger" data-action-label="Deleting..." data-confirm="Permanently delete this product?" data-confirm-title="Delete product?">@csrf @method('DELETE')
+                    <div><strong>Delete product</strong><small>Only products with no order, reservation or inventory history can be deleted.</small></div>
+                    <button class="pm-delete" type="submit">Delete</button>
+                </form>
+                @endif
+            </div>
+            <footer class="pm-drawer-foot">
+                <button type="button" class="logout" data-pm-close>Cancel</button>
+                <button class="button pm-primary" type="submit" form="product-edit-{{ $productId }}">Save Changes</button>
+            </footer>
+        </div>
+    </div>
+    @endforeach
+
     <template id="category-options-template">
         @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-category="{{ $category }}"><span>{{ $category }}</span></button>@endforeach
         <p class="product-search-empty" hidden>New category — it will be added when you save.</p>
@@ -77,6 +185,7 @@
 .product-management-header{gap:24px}
 .product-page-heading{flex:0 0 auto}
 .product-page-heading h1{margin:0;font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-.035em}
+.product-page-heading .muted{margin:4px 0 0;font-size:14px}
 .product-header-actions{min-width:0;flex:1;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .product-search-form{width:min(560px,100%);min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .product-search-control{position:relative;min-width:0;flex:1}
@@ -104,9 +213,149 @@
 .product-create-toggle:hover{background:#30322e}
 .product-create-toggle svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;transition:transform .18s}
 .product-create-toggle[aria-expanded="true"] svg{transform:rotate(45deg)}
+.pm-page-error{background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:18px}
+.pm-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* Create panel */
 .product-create-panel{margin:0 0 22px;padding:26px}
-.product-create-panel h2{margin:0 0 20px;font-size:20px}
-.product-create-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px}
+.pm-panel-head{margin-bottom:20px}
+.pm-panel-head h2{margin:0;font-size:20px}
+.pm-panel-head .muted{margin:4px 0 0;font-size:13px}
+.pm-create-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:26px;align-items:start}
+.pm-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.pm-fields .field{margin:0;min-width:0}
+.pm-fields label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
+.pm-fields-wide{grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)}
+.pm-span{grid-column:1/-1}
+.pm-hint{display:block;margin-top:5px;color:#80857c;font-size:12px}
+.pm-form-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:4px}
+.pm-primary{width:auto;padding-inline:26px}
+
+/* Picture field */
+.pm-photo-field{display:grid;gap:8px;align-content:start}
+.pm-photo-preview{position:relative;aspect-ratio:4/3;border:1px dashed #c9ccbf;border-radius:14px;overflow:hidden;background:#f3f4ec;display:grid;place-items:center}
+.pm-photo-preview img{width:100%;height:100%;object-fit:cover}
+.pm-photo-empty{display:grid;justify-items:center;gap:6px;color:#80857c;font-size:12px}
+.pm-photo-empty svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.pm-file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.pm-upload-button{height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 14px;border:1px solid #d2d5cb;border-radius:10px;background:#fff;color:#252724;font-size:13px;font-weight:700;cursor:pointer}
+.pm-upload-button:hover{background:#eff0ea}
+.pm-file-input:focus-visible+.pm-upload-button{outline:2px solid #98a20f;outline-offset:2px}
+.pm-photo-row{grid-template-columns:128px minmax(0,1fr);gap:16px;align-items:center}
+.pm-photo-row .pm-photo-preview{aspect-ratio:1}
+.pm-photo-actions{display:grid;gap:8px;justify-items:start}
+.pm-photo-actions .pm-hint{margin:0}
+.pm-inline-check{display:flex;align-items:center;gap:8px;color:#536078;font-size:13px;cursor:pointer}
+.pm-inline-check input{width:16px;height:16px}
+
+/* Visibility switch */
+.pm-switch{display:flex;align-items:center;gap:12px;cursor:pointer}
+.pm-switch input{position:absolute;opacity:0;width:1px;height:1px}
+.pm-switch-track{position:relative;flex:0 0 42px;height:24px;border-radius:999px;background:#cfd2c8;transition:background-color .15s}
+.pm-switch-track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
+.pm-switch input:checked+.pm-switch-track{background:#7f8a0c}
+.pm-switch input:checked+.pm-switch-track::after{transform:translateX(18px)}
+.pm-switch input:focus-visible+.pm-switch-track{outline:2px solid #98a20f;outline-offset:2px}
+.pm-switch-copy{display:grid;gap:2px}
+.pm-switch-copy strong{font-size:14px}
+.pm-switch-copy small{color:#80857c;font-size:12px}
+
+/* Status tiles double as filters */
+.pm-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.pm-stat{display:grid;gap:4px;padding:16px 18px;border:1px solid var(--line,#d8d9cf);border-radius:14px;background:var(--surface,#fffefa);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.pm-stat span{color:#6c7068;font-size:13px;font-weight:600}
+.pm-stat strong{font-size:26px;line-height:1.1;letter-spacing:-.03em}
+.pm-stat:hover{border-color:#b9beb0}
+.pm-stat[aria-pressed="true"]{border-color:#171817;box-shadow:inset 0 0 0 1px #171817}
+.pm-stat-hidden strong{color:#6c7068}
+.pm-stat-low strong{color:#b42318}
+
+/* Toolbar */
+.pm-toolbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:6px}
+.pm-chips{display:flex;flex-wrap:wrap;gap:8px}
+.pm-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1px solid #d8d9cf;border-radius:999px;background:#fff;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.pm-chip span{min-width:20px;padding:1px 6px;border-radius:999px;background:#f0f1ea;color:#6c7068;font-size:11px;font-weight:700;text-align:center}
+.pm-chip:hover{border-color:#8d960f}
+.pm-chip[aria-pressed="true"]{background:#171817;border-color:#171817;color:#fff}
+.pm-chip[aria-pressed="true"] span{background:rgba(255,255,255,.18);color:#fff}
+.pm-view-toggle{flex:0 0 auto;display:flex;padding:3px;border:1px solid #d8d9cf;border-radius:10px;background:#fff}
+.pm-view-toggle button{width:34px;height:32px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:#6c7068;cursor:pointer}
+.pm-view-toggle button[aria-pressed="true"]{background:#171817;color:#fff}
+.pm-view-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+
+/* Catalog */
+.pm-group{margin-top:22px}
+.pm-group[hidden]{display:none}
+.pm-group-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #dfe1d7}
+.pm-group-head h2{margin:0;font-size:18px;letter-spacing:-.02em}
+.pm-group-head span{color:#6c7068;font-size:13px}
+.pm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:16px}
+.pm-card{position:relative;display:flex;flex-direction:column;min-width:0;border:1px solid #d8d9cf;border-radius:16px;background:var(--surface,#fffefa);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.pm-card[hidden]{display:none}
+.pm-card:hover{border-color:#aeb39f;box-shadow:0 10px 26px rgba(24,25,22,.08)}
+.pm-card:focus-within{border-color:#8d960f}
+.pm-media{position:relative;aspect-ratio:4/3;background:#eff1df}
+.pm-media img{display:block;width:100%;height:100%;object-fit:cover}
+.pm-placeholder{width:100%;height:100%;display:grid;place-items:center;background:#eff1df;color:#747d00;font-size:34px;font-weight:800}
+.pm-card.is-hidden .pm-media img,.pm-card.is-hidden .pm-placeholder{opacity:.55;filter:grayscale(.7)}
+.pm-flag{position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:999px;background:rgba(23,24,23,.84);color:#fff;font-size:11px;font-weight:700;letter-spacing:.02em}
+.pm-body{flex:1;padding:14px 16px 0;min-width:0}
+.pm-body h3{margin:0;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.pm-desc{margin:5px 0 0;color:#6c7068;font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pm-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px}
+.pm-price{font-size:17px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pm-stock{padding:4px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.pm-stock.is-ok{background:#e7f4eb;color:#23683c}
+.pm-stock.is-low{background:#fff1d6;color:#8a5200}
+.pm-stock.is-out{background:#fde9e7;color:#b42318}
+.pm-edit{height:40px;margin:0 16px 16px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d8d9cf;border-radius:10px;background:#fff;color:#171817;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.pm-edit::after{content:"";position:absolute;inset:0}
+.pm-card:hover .pm-edit{background:#edf0cf;border-color:#c6cc8d}
+.pm-edit svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.pm-filter-empty{margin:24px 0 0;color:#6c7068;text-align:center}
+.pm-empty-state{text-align:center}
+.pm-empty-state h2{margin:0 0 6px;font-size:20px}
+.pm-empty-state p{margin:0}
+
+/* List view */
+.pm-catalog[data-view="list"] .pm-grid{grid-template-columns:minmax(0,1fr);gap:8px}
+.pm-catalog[data-view="list"] .pm-card{display:grid;grid-template-columns:56px minmax(0,1fr) auto auto;align-items:center;gap:16px;padding:10px 14px;border-radius:12px}
+.pm-catalog[data-view="list"] .pm-media{width:56px;height:56px;aspect-ratio:auto;border-radius:10px;overflow:hidden}
+.pm-catalog[data-view="list"] .pm-placeholder{font-size:20px}
+.pm-catalog[data-view="list"] .pm-flag{top:auto;bottom:3px;left:3px;right:3px;padding:1px 0;font-size:9px;text-align:center}
+.pm-catalog[data-view="list"] .pm-body{padding:0}
+.pm-catalog[data-view="list"] .pm-desc{-webkit-line-clamp:1;line-clamp:1}
+.pm-catalog[data-view="list"] .pm-meta{padding:0;flex-wrap:nowrap;gap:14px}
+.pm-catalog[data-view="list"] .pm-price{min-width:96px;text-align:right}
+.pm-catalog[data-view="list"] .pm-stock{min-width:112px;text-align:center}
+.pm-catalog[data-view="list"] .pm-edit{margin:0;padding:0 14px}
+
+/* Edit drawer (sits below the z-index 4000 confirm dialog) */
+body.pm-drawer-open{overflow:hidden}
+body.pm-drawer-open .admin-workspace{overflow:hidden!important}
+.pm-drawer{position:fixed;inset:0;z-index:3000;display:flex;justify-content:flex-end}
+.pm-drawer[hidden]{display:none}
+.pm-drawer-backdrop{position:absolute;inset:0;background:rgba(16,18,15,.48);backdrop-filter:blur(3px);animation:pm-fade .2s ease}
+.pm-drawer-panel{position:relative;width:min(520px,100%);height:100%;display:flex;flex-direction:column;background:#fffefa;box-shadow:-24px 0 60px rgba(10,12,9,.2);animation:pm-slide .24s cubic-bezier(.22,.72,.18,1)}
+.pm-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:22px 24px 18px;border-bottom:1px solid #e3e4dc}
+.pm-drawer-head small{color:#6c7068;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.pm-drawer-head h2{margin:4px 0 0;font-size:21px;letter-spacing:-.02em;overflow-wrap:anywhere}
+.pm-icon-button{flex:0 0 auto;width:38px;height:38px;display:grid;place-items:center;padding:0;border:0;border-radius:10px;background:transparent;color:#555b52;cursor:pointer}
+.pm-icon-button:hover{background:#eff0ea;color:#171817}
+.pm-icon-button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.pm-drawer-scroll{flex:1;overflow-y:auto;padding:22px 24px;display:grid;align-content:start;gap:22px}
+.pm-drawer-form{display:grid;gap:20px}
+.pm-drawer-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid #e3e4dc;background:#fffefa}
+.pm-drawer-foot .logout,.pm-drawer-foot .button{min-height:44px;width:auto}
+.pm-danger{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #efc8c5;border-radius:12px;background:#fff8f7}
+.pm-danger div{display:grid;gap:3px}
+.pm-danger strong{color:#b42318;font-size:14px}
+.pm-danger small{color:#80655f;font-size:12px}
+.pm-delete{flex:0 0 auto;height:38px;padding:0 16px;border:1px solid #e3b4b0;border-radius:10px;background:#fff;color:#b42318;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.pm-delete:hover{background:#b42318;border-color:#b42318;color:#fff}
+@keyframes pm-slide{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pm-fade{from{opacity:0}to{opacity:1}}
+
 .category-picker{position:relative}
 .category-picker-input{padding-right:42px}
 .category-picker-toggle{position:absolute;z-index:2;top:50%;right:5px;width:32px;height:32px;padding:0;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:#62675f;cursor:pointer;transform:translateY(-50%)}
@@ -116,10 +365,12 @@
 .category-picker .product-search-options{max-height:260px}
 .product-ajax-form[aria-busy="true"]{opacity:.72;pointer-events:none}
 .product-ajax-inline-error{margin:0 0 14px;padding:11px 13px;border:1px solid #efc8c5;border-radius:9px;background:#fff0f0;color:#a51d16;font-size:13px}
-@media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
-@media(max-width:820px){.product-create-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}#product-search{font-size:16px}.product-search-button{padding-inline:14px}.product-create-toggle{width:100%;justify-content:center}}
-@media(max-width:520px){.product-create-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}.pm-fields-wide{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.pm-create-layout{grid-template-columns:minmax(0,1fr)}.pm-create-layout>.pm-photo-field{grid-template-columns:120px minmax(0,1fr);align-items:center}.pm-create-layout>.pm-photo-field .pm-photo-preview{grid-row:span 3;aspect-ratio:1}.pm-catalog[data-view="list"] .pm-desc{display:none}}
+@media(max-width:780px){.pm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pm-toolbar{align-items:center;gap:10px}.pm-chips{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}.pm-chips::-webkit-scrollbar{display:none}.pm-chip{flex:0 0 auto;white-space:nowrap}.pm-catalog[data-view="list"] .pm-card{grid-template-columns:48px minmax(0,1fr) auto;gap:12px}.pm-catalog[data-view="list"] .pm-media{width:48px;height:48px}.pm-catalog[data-view="list"] .pm-meta{grid-column:2;grid-row:2;justify-content:flex-start}.pm-catalog[data-view="list"] .pm-price,.pm-catalog[data-view="list"] .pm-stock{min-width:0;text-align:left}.pm-catalog[data-view="list"] .pm-edit{grid-column:3;grid-row:1/span 2;width:auto}.pm-drawer-foot .logout,.pm-drawer-foot .button{flex:1}}
+@media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}#product-search{font-size:16px}.product-search-button{padding-inline:14px}.product-create-toggle{width:100%;justify-content:center}.pm-drawer-panel{width:100%}.pm-drawer-head,.pm-drawer-scroll,.pm-drawer-foot{padding-inline:16px}}
+@media(max-width:520px){.pm-fields,.pm-fields-wide{grid-template-columns:minmax(0,1fr)}.pm-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pm-body{padding:10px 12px 0}.pm-body h3{font-size:14px}.pm-desc{display:none}.pm-meta{padding:8px 12px 10px;gap:6px}.pm-price{font-size:15px}.pm-stock{font-size:11px;padding:3px 7px}.pm-edit{height:36px;margin:0 12px 12px;font-size:13px}.pm-stat{padding:12px 14px}.pm-stat strong{font-size:22px}.pm-photo-row{grid-template-columns:96px minmax(0,1fr)}.pm-danger{flex-direction:column;align-items:stretch}.pm-primary{width:100%}}
+@media(prefers-reduced-motion:reduce){.pm-drawer-panel,.pm-drawer-backdrop{animation:none}}
 </style>
 @endpush
 @push('scripts')
@@ -201,7 +452,10 @@ const initializeProductCreateToggle = () => {
         panel.hidden = !opening;
         toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
         toggle.querySelector('span').textContent = opening ? 'Close Form' : 'Add Product';
-        if (opening) panel.querySelector('input:not([type="hidden"])')?.focus();
+        if (opening) {
+            panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            panel.querySelector('#name')?.focus({ preventScroll: true });
+        }
     });
 };
 
@@ -292,6 +546,7 @@ const initializeCategoryPickers = () => {
                 event.preventDefault();
                 selectOption(visible[activeIndex]);
             } else if (event.key === 'Escape' || event.key === 'Tab') {
+                if (!panel.hidden) event.stopPropagation();
                 setCategoryPickerOpen(picker, false);
                 activeIndex = -1;
             }
@@ -299,10 +554,141 @@ const initializeCategoryPickers = () => {
     });
 };
 
+// Filters and layout survive the AJAX re-render because they live outside the replaced markup.
+const productView = { category: '', status: 'all', view: 'grid' };
+try { productView.view = localStorage.getItem('products.view') === 'list' ? 'list' : 'grid'; } catch (error) {}
+
+const applyProductFilters = () => {
+    const catalog = document.querySelector('[data-pm-catalog]');
+    if (!catalog) return;
+    const items = [...catalog.querySelectorAll('[data-pm-item]')];
+    if (productView.category && !items.some(item => item.dataset.category === productView.category)) productView.category = '';
+
+    let visible = 0;
+    items.forEach(item => {
+        const status = productView.status;
+        const matchesCategory = !productView.category || item.dataset.category === productView.category;
+        const matchesStatus = status === 'all'
+            || (status === 'visible' && item.dataset.active === '1')
+            || (status === 'hidden' && item.dataset.active === '0')
+            || (status === 'low' && item.dataset.low === '1');
+        item.hidden = !(matchesCategory && matchesStatus);
+        if (!item.hidden) visible++;
+    });
+    catalog.querySelectorAll('[data-pm-group]').forEach(group => {
+        group.hidden = !group.querySelector('[data-pm-item]:not([hidden])');
+    });
+    catalog.dataset.view = productView.view;
+    document.querySelectorAll('[data-pm-category]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.pmCategory === productView.category)));
+    document.querySelectorAll('[data-pm-status]').forEach(tile => tile.setAttribute('aria-pressed', String(tile.dataset.pmStatus === productView.status)));
+    document.querySelectorAll('[data-pm-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.pmView === productView.view)));
+    const empty = catalog.querySelector('[data-pm-empty]');
+    if (empty) empty.hidden = !items.length || visible > 0;
+};
+
+let productDrawerTrigger = null;
+const openProductDrawer = (drawer, trigger = null) => {
+    productDrawerTrigger = trigger;
+    drawer.hidden = false;
+    document.body.classList.add('pm-drawer-open');
+    drawer.querySelector('input.control:not([type="hidden"])')?.focus({ preventScroll: true });
+};
+const closeProductDrawer = drawer => {
+    drawer.hidden = true;
+    drawer.querySelectorAll('form').forEach(form => form.reset());
+    drawer.querySelectorAll('.product-ajax-inline-error').forEach(error => error.remove());
+    drawer.querySelectorAll('[data-pm-image-input]').forEach(resetImagePreview);
+    document.querySelectorAll('.category-picker').forEach(picker => setCategoryPickerOpen(picker, false));
+    if (!document.querySelector('[data-pm-drawer]:not([hidden])')) document.body.classList.remove('pm-drawer-open');
+    if (productDrawerTrigger?.isConnected) productDrawerTrigger.focus({ preventScroll: true });
+    productDrawerTrigger = null;
+};
+
+const imagePreviewParts = input => {
+    const field = input.closest('.pm-photo-field');
+    return { preview: field?.querySelector('[data-pm-preview]'), fileName: field?.querySelector('[data-pm-file-name]') };
+};
+const resetImagePreview = input => {
+    const { preview, fileName } = imagePreviewParts(input);
+    if (preview?.dataset.original !== undefined) {
+        URL.revokeObjectURL(preview.querySelector('img')?.src ?? '');
+        preview.innerHTML = preview.dataset.original;
+        delete preview.dataset.original;
+    }
+    if (fileName?.dataset.original !== undefined) fileName.textContent = fileName.dataset.original;
+};
+
+document.addEventListener('change', event => {
+    const input = event.target.closest?.('[data-pm-image-input]');
+    if (!input) return;
+    const file = input.files?.[0];
+    resetImagePreview(input);
+    if (!file) return;
+    const { preview, fileName } = imagePreviewParts(input);
+    if (preview) {
+        preview.dataset.original = preview.innerHTML;
+        const image = document.createElement('img');
+        image.alt = '';
+        image.src = URL.createObjectURL(file);
+        preview.replaceChildren(image);
+    }
+    if (fileName) {
+        fileName.dataset.original = fileName.textContent;
+        fileName.textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
+    }
+});
+
+document.addEventListener('click', event => {
+    const opener = event.target.closest('[data-pm-open]');
+    if (opener) {
+        const drawer = document.getElementById(opener.dataset.pmOpen);
+        if (drawer) openProductDrawer(drawer, opener);
+        return;
+    }
+    const closer = event.target.closest('[data-pm-close]');
+    if (closer) {
+        closeProductDrawer(closer.closest('[data-pm-drawer]'));
+        return;
+    }
+    const chip = event.target.closest('[data-pm-category]');
+    const tile = event.target.closest('[data-pm-status]');
+    const viewButton = event.target.closest('[data-pm-view]');
+    if (chip) productView.category = chip.dataset.pmCategory;
+    if (tile) productView.status = tile.dataset.pmStatus;
+    if (viewButton) {
+        productView.view = viewButton.dataset.pmView;
+        try { localStorage.setItem('products.view', productView.view); } catch (error) {}
+    }
+    if (chip || tile || viewButton) applyProductFilters();
+});
+
+document.addEventListener('keydown', event => {
+    const drawer = document.querySelector('[data-pm-drawer]:not([hidden])');
+    if (!drawer || document.querySelector('.app-alert-layer')) return;
+    if (event.key === 'Escape') {
+        closeProductDrawer(drawer);
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...drawer.querySelectorAll('button, [href], input:not([type="hidden"]), textarea, select, [tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.disabled && element.getClientRects().length);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+    }
+});
+
 const initializeProductPage = () => {
     initializeProductSearch();
     initializeProductCreateToggle();
     initializeCategoryPickers();
+    applyProductFilters();
+    document.body.classList.toggle('pm-drawer-open', Boolean(document.querySelector('[data-pm-drawer]:not([hidden])')));
 };
 
 document.addEventListener('input', event => {
@@ -350,6 +736,7 @@ const showProductFormError = (form, message, field = '') => {
     error.setAttribute('role', 'alert');
     error.textContent = message;
     form.prepend(error);
+    error.scrollIntoView({ block: 'nearest' });
     if (field) form.elements.namedItem(field)?.focus();
     showProductToast(message, true);
 };
@@ -379,6 +766,7 @@ document.addEventListener('submit', async event => {
 
     const submitButton = event.submitter ?? form.querySelector('[type="submit"]');
     const originalLabel = submitButton?.textContent;
+    const savedProductId = form.closest('[data-pm-drawer]')?.dataset.productId;
     form.setAttribute('aria-busy', 'true');
     if (submitButton) {
         submitButton.disabled = true;
@@ -436,6 +824,14 @@ document.addEventListener('submit', async event => {
         window.requestAnimationFrame(() => {
             if (workspace) workspace.scrollTop = workspaceScroll;
             window.scrollTo({ top: windowScroll, behavior: 'instant' });
+            const savedCard = savedProductId && !serverError
+                ? document.querySelector(`[data-pm-item][data-product-id="${savedProductId}"]:not([hidden])`)
+                : null;
+            if (savedCard) {
+                savedCard.scrollIntoView({ block: 'nearest' });
+                savedCard.classList.add('km-saved');
+                savedCard.addEventListener('animationend', () => savedCard.classList.remove('km-saved'), { once: true });
+            }
         });
         showProductToast(serverError || status || 'Product changes saved successfully.', Boolean(serverError));
     } catch (error) {
