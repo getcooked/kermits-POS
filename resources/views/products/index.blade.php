@@ -33,18 +33,9 @@
             <input type="hidden" name="form_context" value="create">
             <div class="product-create-grid">
                 <div class="field"><label for="name">Product name</label><input class="control" id="name" name="name" value="{{ old('name') }}" required></div>
-                <div class="field"><label for="category">Category</label>
-                    <div class="category-picker">
-                        <input class="control category-picker-input" id="category" name="category" value="{{ old('category') }}" placeholder="Select or type a new category" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="category-options" aria-expanded="false" data-pascal-case required>
-                        <button class="category-picker-toggle" type="button" aria-label="Show all categories" title="Show all categories" aria-controls="category-options" aria-expanded="false" tabindex="-1"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"></path></svg></button>
-                        <div id="category-options" class="product-search-options" role="listbox" hidden>
-                            @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-category="{{ $category }}"><span>{{ $category }}</span></button>@endforeach
-                            <p class="product-search-empty" hidden>New category — it will be added when you save.</p>
-                        </div>
-                    </div>
-                </div>
+                <div class="field"><label for="category">Category</label>@include('products.partials.category-picker', ['id' => 'category', 'value' => old('category'), 'placeholder' => 'Select or type a new category'])</div>
                 <div class="field"><label for="price">Price (₱)</label><input class="control" id="price" name="price" type="number" min="0.01" step="0.01" value="{{ old('price') }}" required></div>
-                <div class="field"><label for="stock">Stock <span style="font-weight:400;color:#687286">(max {{ \App\Models\Product::MAX_NEW_PRODUCT_STOCK }})</span></label><input class="control" id="stock" name="stock" type="number" min="0" max="{{ \App\Models\Product::MAX_NEW_PRODUCT_STOCK }}" step="1" value="{{ old('stock', 0) }}" required></div>
+                <div class="field"><label for="stock">Stock <span style="font-weight:400;color:#687286">(max {{ \App\Models\Product::MAX_STOCK }})</span></label><input class="control" id="stock" name="stock" type="number" min="0" max="{{ \App\Models\Product::MAX_STOCK }}" step="1" inputmode="numeric" value="{{ old('stock', 0) }}" data-stock-limit required></div>
             </div>
             <div class="field"><label for="description">Description</label><textarea class="control" id="description" name="description" rows="2">{{ old('description') }}</textarea></div>
             <div class="field"><label for="image">Product picture <span style="font-weight:400;color:#687286">(JPG, PNG or WebP, up to 2 MB)</span></label><input class="control" id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
@@ -63,9 +54,9 @@
                 @endif
                 <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr auto;gap:12px;align-items:end">
                     <div><label>Name</label><input class="control" name="name" value="{{ $product->name }}" required></div>
-                    <div><label>Category</label><input class="control" name="category" value="{{ $product->category }}" maxlength="80" data-pascal-case required></div>
+                    <div><label for="category-{{ $product->getKey() }}">Category</label>@include('products.partials.category-picker', ['id' => 'category-'.$product->getKey(), 'value' => $product->category, 'placeholder' => 'Select or type a category'])</div>
                     <div><label>Price (₱)</label><input class="control" name="price" type="number" min="0.01" step="0.01" value="{{ $product->price }}" required></div>
-                    <div><label>Stock</label><input class="control" name="stock" type="number" min="0" value="{{ $product->stock }}" required></div>
+                    <div><label>Stock <span style="font-weight:400;color:#687286">(max {{ \App\Models\Product::MAX_STOCK }})</span></label><input class="control" name="stock" type="number" min="0" max="{{ \App\Models\Product::MAX_STOCK }}" step="1" inputmode="numeric" value="{{ $product->stock }}" data-stock-limit required></div>
                     <button class="button" style="width:auto" type="submit">Save</button>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px"><div><label>Description</label><input class="control" name="description" value="{{ $product->description }}"></div><label class="check" style="margin:0 0 11px"><input name="active" type="checkbox" value="1" {{ $product->active ? 'checked' : '' }}> Visible</label></div>
@@ -76,6 +67,10 @@
         @endforeach
         @empty <div class="welcome">{{ $search !== '' ? 'No products match your search.' : 'No products yet. Add your first product above.' }}</div> @endforelse
     </section>
+    <template id="category-options-template">
+        @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-category="{{ $category }}"><span>{{ $category }}</span></button>@endforeach
+        <p class="product-search-empty" hidden>New category — it will be added when you save.</p>
+    </template>
 </div></main></div>
 @push('styles')
 <style>
@@ -214,81 +209,100 @@ const toPascalCase = value => value
     .toLocaleLowerCase()
     .replace(/(^|[^\p{L}\p{M}\p{N}'’])(\p{L})/gu, (match, boundary, letter) => boundary + letter.toLocaleUpperCase());
 
-const initializeCategoryPicker = () => {
-    const input = document.getElementById('category');
-    const toggle = document.querySelector('.category-picker-toggle');
-    const panel = document.getElementById('category-options');
-    const empty = panel?.querySelector('.product-search-empty');
-    const options = [...(panel?.querySelectorAll('.product-search-option') ?? [])];
-    let activeIndex = -1;
-    if (!input || !toggle || !panel || input.dataset.categoryPickerBound === 'true') return;
-    input.dataset.categoryPickerBound = 'true';
+const setCategoryPickerOpen = (picker, open) => {
+    const panel = picker.querySelector('.category-picker-options');
+    panel.hidden = !open;
+    picker.querySelectorAll('[aria-expanded]').forEach(control => control.setAttribute('aria-expanded', String(open)));
+    if (!open) panel.querySelectorAll('.is-active').forEach(option => option.classList.remove('is-active'));
+};
 
-    const visibleOptions = () => options.filter(option => !option.hidden);
-    const setActive = index => {
-        const visible = visibleOptions();
-        options.forEach(option => option.classList.remove('is-active'));
-        activeIndex = visible.length ? Math.max(-1, Math.min(index, visible.length - 1)) : -1;
-        if (activeIndex >= 0) {
-            visible[activeIndex].classList.add('is-active');
-            visible[activeIndex].scrollIntoView({ block: 'nearest' });
-        }
-    };
-    const setOpen = open => {
-        panel.hidden = !open;
-        input.setAttribute('aria-expanded', String(open));
-        toggle.setAttribute('aria-expanded', String(open));
-        if (!open) setActive(-1);
-    };
-    const showOptions = query => {
-        const normalized = query.trim().toLocaleLowerCase();
-        let matches = 0;
-        options.forEach(option => {
-            option.hidden = normalized !== '' && !option.dataset.category.toLocaleLowerCase().includes(normalized);
-            if (!option.hidden) matches++;
-        });
-        if (empty) {
-            const exists = options.some(option => option.dataset.category.toLocaleLowerCase() === normalized);
-            empty.hidden = matches > 0 || exists || normalized === '';
-        }
-        setActive(-1);
-        setOpen(true);
-    };
-    const selectOption = option => {
-        input.value = option.dataset.category;
-        setOpen(false);
-        input.focus();
-    };
+const initializeCategoryPickers = () => {
+    const template = document.getElementById('category-options-template');
+    if (!template) return;
 
-    input.addEventListener('focus', () => showOptions(''));
-    input.addEventListener('click', () => { if (panel.hidden) showOptions(''); });
-    input.addEventListener('input', () => showOptions(input.value));
-    toggle.addEventListener('click', () => {
-        if (panel.hidden) showOptions('');
-        else setOpen(false);
-        input.focus();
-    });
-    [toggle, ...options].forEach(control => control.addEventListener('mousedown', event => event.preventDefault()));
-    options.forEach(option => option.addEventListener('click', () => selectOption(option)));
-    input.addEventListener('keydown', event => {
-        const visible = visibleOptions();
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
+    document.querySelectorAll('.category-picker').forEach(picker => {
+        if (picker.dataset.categoryPickerBound === 'true') return;
+        picker.dataset.categoryPickerBound = 'true';
+
+        const input = picker.querySelector('.category-picker-input');
+        const toggle = picker.querySelector('.category-picker-toggle');
+        const panel = picker.querySelector('.category-picker-options');
+        let options = [];
+        let empty = null;
+        let activeIndex = -1;
+
+        const ensureOptions = () => {
+            if (options.length || empty) return;
+            panel.append(template.content.cloneNode(true));
+            options = [...panel.querySelectorAll('.product-search-option')];
+            empty = panel.querySelector('.product-search-empty');
+            options.forEach(option => {
+                option.addEventListener('mousedown', event => event.preventDefault());
+                option.addEventListener('click', () => selectOption(option));
+            });
+        };
+        const visibleOptions = () => options.filter(option => !option.hidden);
+        const setActive = index => {
+            const visible = visibleOptions();
+            options.forEach(option => option.classList.remove('is-active'));
+            activeIndex = visible.length ? Math.max(-1, Math.min(index, visible.length - 1)) : -1;
+            if (activeIndex >= 0) {
+                visible[activeIndex].classList.add('is-active');
+                visible[activeIndex].scrollIntoView({ block: 'nearest' });
+            }
+        };
+        const showOptions = query => {
+            ensureOptions();
+            const normalized = query.trim().toLocaleLowerCase();
+            let matches = 0;
+            options.forEach(option => {
+                option.hidden = normalized !== '' && !option.dataset.category.toLocaleLowerCase().includes(normalized);
+                if (!option.hidden) matches++;
+            });
+            if (empty) empty.hidden = matches > 0 || normalized === '';
+            document.querySelectorAll('.category-picker').forEach(other => {
+                if (other !== picker) setCategoryPickerOpen(other, false);
+            });
+            setActive(-1);
+            setCategoryPickerOpen(picker, true);
+        };
+        const selectOption = option => {
+            input.value = option.dataset.category;
+            setCategoryPickerOpen(picker, false);
+            activeIndex = -1;
+            input.focus();
+        };
+
+        input.addEventListener('focus', () => showOptions(''));
+        input.addEventListener('click', () => { if (panel.hidden) showOptions(''); });
+        input.addEventListener('input', () => showOptions(input.value));
+        toggle.addEventListener('mousedown', event => event.preventDefault());
+        toggle.addEventListener('click', () => {
             if (panel.hidden) showOptions('');
-            setActive(event.key === 'ArrowDown' ? activeIndex + 1 : (activeIndex <= 0 ? visible.length - 1 : activeIndex - 1));
-        } else if (event.key === 'Enter' && !panel.hidden && activeIndex >= 0) {
-            event.preventDefault();
-            selectOption(visible[activeIndex]);
-        } else if (event.key === 'Escape' || event.key === 'Tab') {
-            setOpen(false);
-        }
+            else setCategoryPickerOpen(picker, false);
+            input.focus();
+        });
+        input.addEventListener('keydown', event => {
+            const visible = visibleOptions();
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (panel.hidden) showOptions('');
+                setActive(event.key === 'ArrowDown' ? activeIndex + 1 : (activeIndex <= 0 ? visible.length - 1 : activeIndex - 1));
+            } else if (event.key === 'Enter' && !panel.hidden && activeIndex >= 0) {
+                event.preventDefault();
+                selectOption(visible[activeIndex]);
+            } else if (event.key === 'Escape' || event.key === 'Tab') {
+                setCategoryPickerOpen(picker, false);
+                activeIndex = -1;
+            }
+        });
     });
 };
 
 const initializeProductPage = () => {
     initializeProductSearch();
     initializeProductCreateToggle();
-    initializeCategoryPicker();
+    initializeCategoryPickers();
 };
 
 document.addEventListener('input', event => {
@@ -304,6 +318,24 @@ document.addEventListener('input', event => {
 document.addEventListener('focusout', event => {
     const input = event.target.closest?.('[data-pascal-case]');
     if (input) input.value = toPascalCase(input.value.replace(/\s+/g, ' ').trim());
+});
+
+document.addEventListener('keydown', event => {
+    if (event.target.matches?.('[data-stock-limit]') && ['e', 'E', '+', '-', '.', ','].includes(event.key)) {
+        event.preventDefault();
+    }
+});
+
+document.addEventListener('input', event => {
+    const input = event.target.closest?.('[data-stock-limit]');
+    if (!input) return;
+    const digits = input.value.replace(/\D/g, '');
+    if (digits === '') {
+        input.value = '';
+        return;
+    }
+    const clamped = String(Math.min(Number(digits), Number(input.max)));
+    if (clamped !== input.value) input.value = clamped;
 });
 
 const showProductToast = (message, isError = false) => {
@@ -323,12 +355,10 @@ const showProductFormError = (form, message, field = '') => {
 };
 
 document.addEventListener('click', event => {
-    if (event.target.closest('.category-picker')) return;
-    const categoryPanel = document.getElementById('category-options');
-    if (!categoryPanel || categoryPanel.hidden) return;
-    categoryPanel.hidden = true;
-    document.getElementById('category')?.setAttribute('aria-expanded', 'false');
-    document.querySelector('.category-picker-toggle')?.setAttribute('aria-expanded', 'false');
+    const current = event.target.closest('.category-picker');
+    document.querySelectorAll('.category-picker').forEach(picker => {
+        if (picker !== current) setCategoryPickerOpen(picker, false);
+    });
 });
 
 document.addEventListener('click', event => {

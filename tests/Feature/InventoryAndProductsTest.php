@@ -182,18 +182,23 @@ class InventoryAndProductsTest extends TestCase
             ->assertDontSee(route('products.update', $almondRoca), false);
     }
 
-    public function test_new_product_stock_cannot_exceed_fifty(): void
+    public function test_product_stock_cannot_exceed_fifty(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $payload = ['name' => 'Overstocked', 'category' => 'Drinks', 'price' => 95, 'active' => 1];
 
         $this->actingAs($superAdmin)->post('/products', [...$payload, 'stock' => 51])
-            ->assertSessionHasErrors(['stock' => 'Stock for a new product cannot be more than 50.']);
+            ->assertSessionHasErrors(['stock' => 'Stock cannot be more than 50.']);
         $this->assertDatabaseMissing('products', ['name' => 'Overstocked']);
 
         $this->actingAs($superAdmin)->post('/products', [...$payload, 'stock' => 50])
             ->assertRedirect('/products');
-        $this->assertDatabaseHas('products', ['name' => 'Overstocked', 'stock' => 50]);
+        $product = Product::query()->where('name', 'Overstocked')->firstOrFail();
+        $this->assertSame(50, $product->stock);
+
+        $this->actingAs($superAdmin)->put(route('products.update', $product), [...$payload, 'stock' => 51])
+            ->assertSessionHasErrors(['stock' => 'Stock cannot be more than 50.']);
+        $this->assertSame(50, $product->fresh()->stock);
     }
 
     public function test_product_categories_are_saved_in_pascal_case(): void
@@ -222,16 +227,18 @@ class InventoryAndProductsTest extends TestCase
         $this->assertSame('House Specials', $product->fresh()->category);
     }
 
-    public function test_add_product_form_lists_every_existing_category(): void
+    public function test_product_forms_offer_every_existing_category(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
-        Product::query()->create(['name' => 'Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
+        $latte = Product::query()->create(['name' => 'Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
         Product::query()->create(['name' => 'Nachos', 'category' => 'Starters', 'price' => 180, 'stock' => 10]);
 
         $this->actingAs($superAdmin)
             ->get('/products?search=Latte')
             ->assertOk()
-            ->assertSee('id="category-options"', false)
+            ->assertSee('id="category-options-template"', false)
+            ->assertSee('aria-controls="category-options"', false)
+            ->assertSee('aria-controls="category-'.$latte->getKey().'-options"', false)
             ->assertSee('data-category="Drinks"', false)
             ->assertSee('data-category="Starters"', false)
             ->assertSee('max="50"', false);
