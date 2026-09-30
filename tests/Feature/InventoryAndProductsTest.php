@@ -540,17 +540,125 @@ class InventoryAndProductsTest extends TestCase
 
         [$width, $height, $type] = getimagesizefromstring($processed);
         $this->assertSame(IMAGETYPE_WEBP, $type);
-        $this->assertSame($width, $height);
-        $this->assertLessThanOrEqual(ProductImageProcessor::SIZE, $width);
+        $this->assertSame([ProductImageProcessor::SIZE, ProductImageProcessor::SIZE], [$width, $height]);
 
-        // The dish now fills most of the frame instead of about an eighth of its width.
+        // The dish now fills the standard share of the frame instead of about an eighth of its width.
         $result = imagecreatefromstring($processed);
         $center = imagecolorsforindex($result, imagecolorat($result, intdiv($width, 2), intdiv($height, 2)));
-        $nearEdge = imagecolorsforindex($result, imagecolorat($result, (int) ($width * 0.1), intdiv($height, 2)));
+        $insideEdge = imagecolorsforindex($result, imagecolorat($result, (int) ($width * 0.15), intdiv($height, 2)));
+        $margin = imagecolorsforindex($result, imagecolorat($result, (int) ($width * 0.06), intdiv($height, 2)));
         $corner = imagecolorsforindex($result, imagecolorat($result, 2, 2));
         $this->assertLessThan(160, $center['red']);
-        $this->assertLessThan(160, $nearEdge['red']);
+        $this->assertLessThan(160, $insideEdge['red']);
+        $this->assertGreaterThan(240, $margin['green']);
         $this->assertGreaterThan(240, $corner['green']);
+    }
+
+    public function test_small_pictures_on_off_white_backgrounds_come_out_as_the_same_standard_square(): void
+    {
+        // A tiny, tall cup on a light grey backdrop.
+        $image = imagecreatetruecolor(300, 200);
+        imagefill($image, 0, 0, imagecolorallocate($image, 225, 225, 220));
+        imagefilledrectangle($image, 140, 40, 159, 159, imagecolorallocate($image, 40, 110, 60));
+        ob_start();
+        imagepng($image);
+        $processed = app(ProductImageProcessor::class)->processContents(ob_get_clean());
+
+        [$width, $height] = getimagesizefromstring($processed);
+        $this->assertSame([ProductImageProcessor::SIZE, ProductImageProcessor::SIZE], [$width, $height]);
+
+        $result = imagecreatefromstring($processed);
+        $top = imagecolorsforindex($result, imagecolorat($result, 400, (int) (800 * 0.12)));
+        $besideCup = imagecolorsforindex($result, imagecolorat($result, 300, 400));
+        $this->assertLessThan(140, $top['red'], 'The cup is scaled up to fill the standard height.');
+        $this->assertGreaterThanOrEqual(250, min($besideCup['red'], $besideCup['green'], $besideCup['blue']), 'The grey backdrop becomes pure white.');
+    }
+
+    public function test_the_brand_logo_is_recognised_but_dish_photos_are_not(): void
+    {
+        $images = app(ProductImageProcessor::class);
+        $logo = (string) file_get_contents(public_path('kermits-logo.jpg'));
+
+        $this->assertTrue($images->isBrandLogo($logo));
+        $this->assertTrue($images->isBrandLogo((string) $images->processContents($logo)));
+        $this->assertFalse($images->isBrandLogo($this->dishPng()));
+    }
+
+    public function test_the_brand_logo_cannot_be_uploaded_as_a_product_picture(): void
+    {
+        Storage::fake('public');
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $logo = UploadedFile::fake()->createWithContent('logo.jpg', (string) file_get_contents(public_path('kermits-logo.jpg')));
+
+        $this->actingAs($superAdmin)->post('/products', [
+            'name' => 'Logo Cake',
+            'category' => 'Cakes',
+            'price' => 100,
+            'stock' => 5,
+            'image' => $logo,
+        ])->assertSessionHasErrors(['image' => "That's the Kermit's logo. Please upload a photo of the dish instead."]);
+
+        $this->assertDatabaseMissing('products', ['name' => 'Logo Cake']);
+    }
+
+    public function test_picture_urls_change_when_a_new_picture_is_stored(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('products/first.webp', 'first');
+        Storage::disk('public')->put('products/second.webp', 'second');
+        $product = Product::query()->create(['name' => 'Versioned', 'price' => 50, 'stock' => 5, 'image_path' => 'products/first.webp']);
+
+        $firstUrl = $product->imageUrl();
+        $product->update(['image_path' => 'products/second.webp']);
+
+        $this->assertStringStartsWith('/menu-images/'.$product->id.'?v=', $firstUrl);
+        $this->assertNotSame($firstUrl, $product->imageUrl());
+    }
+
+    public function test_optimize_images_command_standardizes_pictures_and_clears_logo_and_missing_links(): void
+    {
+        Storage::fake('public');
+        $disk = Storage::disk('public');
+        $disk->put('products/dish.png', $this->dishPng());
+        $disk->put('products/logo.webp', (string) file_get_contents(public_path('kermits-logo.jpg')));
+        $first = Product::query()->create(['name' => 'Dish One', 'price' => 50, 'stock' => 5, 'image_path' => 'products/dish.png']);
+        $second = Product::query()->create(['name' => 'Dish Two', 'price' => 50, 'stock' => 5, 'image_path' => 'products/dish.png']);
+        $logo = Product::query()->create(['name' => 'Logo Item', 'price' => 50, 'stock' => 5, 'image_path' => 'products/logo.webp']);
+        $missing = Product::query()->create(['name' => 'Missing Item', 'price' => 50, 'stock' => 5, 'image_path' => 'products/menu/gone.png']);
+
+        $this->artisan('products:optimize-images', ['--all' => true, '--clear-missing' => true, '--clear-logos' => true, '--dry-run' => true])
+            ->expectsOutputToContain('[dry run] 1 standardized, 1 logo stand-ins, 1 missing files')
+            ->assertSuccessful();
+        $this->assertSame('products/dish.png', $first->fresh()->image_path);
+
+        $this->artisan('products:optimize-images', ['--all' => true, '--clear-missing' => true, '--clear-logos' => true])->assertSuccessful();
+
+        $newPath = $first->fresh()->image_path;
+        $this->assertStringEndsWith('.webp', $newPath);
+        $this->assertSame($newPath, $second->fresh()->image_path);
+        $this->assertSame([ProductImageProcessor::SIZE, ProductImageProcessor::SIZE], array_slice(getimagesizefromstring($disk->get($newPath)), 0, 2));
+        $this->assertNull($logo->fresh()->image_path);
+        $this->assertNull($missing->fresh()->image_path);
+
+        // Originals are kept with a manifest so the run can be undone.
+        $this->assertFalse($disk->exists('products/dish.png'));
+        $backup = collect($disk->allFiles('products/originals'));
+        $this->assertTrue($backup->contains(fn (string $path) => str_ends_with($path, '/products/dish.png')));
+        $this->assertTrue($backup->contains(fn (string $path) => str_ends_with($path, '/products/logo.webp')));
+        $manifest = json_decode($disk->get($backup->first(fn (string $path) => str_ends_with($path, 'manifest.json'))), true);
+        $this->assertEqualsCanonicalizing(['converted', 'logo', 'missing'], array_column($manifest, 'reason'));
+    }
+
+    private function dishPng(): string
+    {
+        $image = imagecreatetruecolor(600, 400);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        imagefilledellipse($image, 300, 200, 320, 220, imagecolorallocate($image, 230, 150, 40));
+        imagefilledellipse($image, 300, 200, 120, 80, imagecolorallocate($image, 120, 40, 20));
+        ob_start();
+        imagepng($image);
+
+        return (string) ob_get_clean();
     }
 
     private function fakePng(string $name): UploadedFile

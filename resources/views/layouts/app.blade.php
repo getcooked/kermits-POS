@@ -288,6 +288,7 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
 
     <link rel="stylesheet" href="{{ asset('css/kermits-motion.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/product-images.css') }}">
     @stack('styles')
 </head>
 <body data-feedback="{{ $errors->any() ? 'error' : (session('status') ? 'success' : '') }}">

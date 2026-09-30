@@ -41,7 +41,7 @@
                         <p>Items running low</p>
                     </div>@if(auth()->user()->hasRole('super_admin'))<a href="{{ route('products.index') }}">Manage</a>@endif
                 </div>
-                <div class="stock-list">@forelse($lowStock as $product)<div>@if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="">@else<span>{{ strtoupper(substr($product->name,0,1)) }}</span>@endif<div><strong>{{ $product->name }}</strong><small>Only {{ $product->stock }} remaining</small></div><b>{{ $product->stock }}</b></div>@empty<p class="empty">Stock levels look healthy.</p>@endforelse</div>
+                <div class="stock-list">@forelse($lowStock as $product)<div>@if($imageUrl = $product->imageUrl())<img class="product-image" src="{{ $imageUrl }}" alt="">@else<span>{{ strtoupper(substr($product->name,0,1)) }}</span>@endif<div><strong>{{ $product->name }}</strong><small>Only {{ $product->stock }} remaining</small></div><b>{{ $product->stock }}</b></div>@empty<p class="empty">Stock levels look healthy.</p>@endforelse</div>
             </section>
         </div>
     </main>

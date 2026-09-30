@@ -53,7 +53,7 @@
                                             @php($productImageUrl = $product->imageUrl())
                                             <article class="add-product" data-add-product data-name="{{ str($product->name.' '.$product->category)->lower() }}" data-price="{{ $product->price }}">
                                                 @if($productImageUrl)
-                                                    <img src="{{ $productImageUrl }}" alt="">
+                                                    <img class="product-image" src="{{ $productImageUrl }}" alt="">
                                                 @else
                                                     <span class="add-product-placeholder" aria-hidden="true">{{ str($product->name)->substr(0, 1)->upper() }}</span>
                                                 @endif

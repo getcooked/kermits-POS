@@ -70,7 +70,7 @@
                 <div class="pm-photo-preview" data-pm-preview><span class="pm-photo-empty"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="m21 16-5-5-8 8"></path></svg>No picture yet</span></div>
                 <input class="pm-file-input" id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" data-pm-image-input>
                 <label class="pm-upload-button" for="image">Choose Picture</label>
-                <small class="pm-hint" data-pm-file-name>JPG, PNG or WebP · up to 2 MB</small>
+                <small class="pm-hint" data-pm-file-name>JPG, PNG or WebP · up to 2 MB. Saved as a square on white — a plain background works best.</small>
             </div>
             <div class="pm-fields pm-fields-wide">
                 <div class="field"><label for="name">Product Name</label><input class="control" id="name" name="name" value="{{ old('name') }}" required></div>
@@ -138,7 +138,7 @@
                     @if($canDelete) data-destroy-url="{{ route('products.destroy', $product) }}" @endif>
                     <label class="pm-select"><input type="checkbox" data-pm-select value="{{ $product->getKey() }}"><span class="pm-sr">Select {{ $product->name }}</span></label>
                     <div class="pm-media">
-                        @if($imageUrl)<img src="{{ $imageUrl }}" alt="" loading="lazy">@else<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($product->name) }}</span>@endif
+                        @if($imageUrl)<img class="product-image" src="{{ $imageUrl }}" alt="" loading="lazy">@else<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($product->name) }}</span>@endif
                         <span class="pm-flag" data-pm-flag @if($product->active) hidden @endif>Hidden</span>
                     </div>
                     <div class="pm-body">
@@ -201,7 +201,7 @@
                     <input type="hidden" name="form_context" value="{{ $editing ? $formContext : '' }}">
                     @if($editing && $errors->any())<div class="product-ajax-inline-error" role="alert">{{ $errors->first() }}</div>@endif
                     <div class="pm-photo-field pm-photo-row">
-                        <div class="pm-photo-preview" data-pm-preview>@if($editingImage)<img src="{{ $editingImage }}" alt="">@elseif($editing)<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($editingProduct->name) }}</span>@endif</div>
+                        <div class="pm-photo-preview" data-pm-preview>@if($editingImage)<img class="product-image" src="{{ $editingImage }}" alt="">@elseif($editing)<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($editingProduct->name) }}</span>@endif</div>
                         <div class="pm-photo-actions">
                             <input class="pm-file-input" id="image-edit" name="image" type="file" accept="image/jpeg,image/png,image/webp" data-pm-image-input>
                             <label class="pm-upload-button" for="image-edit" data-pm-upload-label>{{ $editingImage ? 'Replace Picture' : 'Add Picture' }}</label>
@@ -291,7 +291,7 @@
 
 /* Picture field */
 .pm-photo-field{display:grid;gap:8px;align-content:start}
-.pm-photo-preview{position:relative;aspect-ratio:4/3;border:1px dashed #c9ccbf;border-radius:14px;overflow:hidden;background:#f3f4ec;display:grid;place-items:center}
+.pm-photo-preview{position:relative;aspect-ratio:1;border:1px dashed #c9ccbf;border-radius:14px;overflow:hidden;background:#fff;display:grid;place-items:center}
 .pm-photo-preview img{width:100%;height:100%;object-fit:cover}
 .pm-photo-empty{display:grid;justify-items:center;gap:6px;color:#80857c;font-size:12px}
 .pm-photo-empty svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
@@ -359,7 +359,7 @@
 .pm-card[hidden]{display:none}
 .pm-card:hover{border-color:#aeb39f;box-shadow:0 10px 26px rgba(24,25,22,.08)}
 .pm-card:focus-within{border-color:#8d960f}
-.pm-media{position:relative;aspect-ratio:4/3;background:#eff1df}
+.pm-media{position:relative;aspect-ratio:1;background:#fff;border-bottom:1px solid #eceee6}
 .pm-media img{display:block;width:100%;height:100%;object-fit:cover}
 .pm-placeholder{width:100%;height:100%;display:grid;place-items:center;background:#eff1df;color:#747d00;font-size:34px;font-weight:800}
 .pm-card.is-hidden .pm-media img,.pm-card.is-hidden .pm-placeholder{opacity:.55;filter:grayscale(.7)}
@@ -882,6 +882,7 @@ const fillProductEditor = (drawer, card) => {
     const preview = drawer.querySelector('[data-pm-preview]');
     if (data.imageUrl) {
         const image = document.createElement('img');
+        image.className = 'product-image';
         image.alt = '';
         image.src = data.imageUrl;
         preview.replaceChildren(image);
@@ -953,6 +954,7 @@ document.addEventListener('change', event => {
     if (preview) {
         preview.dataset.original = preview.innerHTML;
         const image = document.createElement('img');
+        image.className = 'product-image';
         image.alt = '';
         image.src = URL.createObjectURL(file);
         preview.replaceChildren(image);

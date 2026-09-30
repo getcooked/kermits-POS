@@ -926,6 +926,7 @@
               }
        </style>
        <link rel="stylesheet" href="{{ asset('css/kermits-motion.css') }}">
+       <link rel="stylesheet" href="{{ asset('css/product-images.css') }}">
 </head>
 
 <body>
@@ -952,7 +953,7 @@
                                    <h2>Best Sellers</h2>
                             </div><a href="{{ route('login') }}">Log in to view the full menu &rarr;</a>
                      </div>
-                     <div class="product-grid">@forelse($products as $product)<article class="menu-card">@if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="menu-image">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif<div class="menu-copy"><span class="menu-category-label">{{ $product->category }}</span>
+                     <div class="product-grid">@forelse($products as $product)<article class="menu-card">@if($imageUrl = $product->imageUrl())<img class="product-image" src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="menu-image">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif<div class="menu-copy"><span class="menu-category-label">{{ $product->category }}</span>
                                           <h3>{{ $product->name }}</h3>
                                           <p>{{ $product->description ?: 'Prepared fresh for every guest.' }}</p><strong>&#8369;{{ number_format($product->price,2) }}</strong>
                                    </div>

@@ -3,7 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Models\Product;
+use App\Services\ProductImageProcessor;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 class ProductRequest extends FormRequest
@@ -30,7 +33,17 @@ class ProductRequest extends FormRequest
             'price' => ['required', 'decimal:0,2', 'min:0.01', 'max:999999.99'],
             'stock' => ['required', 'integer', 'min:0', 'max:'.Product::MAX_STOCK],
             'active' => ['nullable', 'boolean'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'image' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value instanceof UploadedFile && app(ProductImageProcessor::class)->isBrandLogo((string) file_get_contents($value->getRealPath()))) {
+                        $fail("That's the Kermit's logo. Please upload a photo of the dish instead.");
+                    }
+                },
+            ],
             'remove_image' => ['nullable', 'boolean'],
         ];
     }

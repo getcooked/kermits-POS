@@ -20,7 +20,7 @@ class MobileCatalogController extends Controller
                 'id' => $product->id, 'name' => $product->name, 'category' => $product->category,
                 'description' => $product->description, 'price' => (float) $product->price,
                 'stock' => $product->stock,
-                'image_url' => $product->imageUrl() ? route('products.image', $product) : null,
+                'image_url' => $product->imageUrl() ? route('products.image', $product->imageRouteParameters()) : null,
             ]);
         $qrPath = SystemSetting::get('gcash_qr_path');
 

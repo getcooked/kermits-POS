@@ -58,7 +58,17 @@ class Product extends Model
             return null;
         }
 
-        return route('products.image', $this, false);
+        return route('products.image', $this->imageRouteParameters(), false);
+    }
+
+    /**
+     * Pictures are cached for a day per URL, so the version changes whenever a new file is stored.
+     *
+     * @return array{product: self, v: string}
+     */
+    public function imageRouteParameters(): array
+    {
+        return ['product' => $this, 'v' => substr(sha1((string) $this->image_path), 0, 10)];
     }
 
     public function scopeAvailable(Builder $query): Builder

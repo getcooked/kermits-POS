@@ -55,7 +55,7 @@
                     @forelse($products->groupBy('category') as $category => $items)
                     @foreach($items as $product)
                     <article data-shop-card data-product-id="{{ $product->id }}" data-name="{{ $product->name }}" data-category="{{ $product->category }}" data-price="{{ $product->price }}">
-                        @if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="shop-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
+                        @if($imageUrl = $product->imageUrl())<img class="product-image" src="{{ $imageUrl }}" alt="{{ $product->name }}">@else<div class="shop-placeholder">{{ strtoupper(substr($product->name,0,1)) }}</div>@endif
                         <div>
                             <h3>{{ $product->name }}</h3>
                             <p>{{ $product->description }}</p>
@@ -2435,7 +2435,7 @@
                 img: card.querySelector('img')?.src || '',
                 qty: +card.querySelector('.shop-quantity').value || 0
             })).filter(item => item.qty > 0);
-            box.innerHTML = selected.length ? selected.map(item => `<div class="customer-cart-line">${item.img?`<img src="${item.img}" alt="">`:`<div class="thumb">${esc(item.name[0]||'')}</div>`}<div><h3>${esc(item.name)}</h3><div class="customer-cart-controls"><strong>${money(item.price)}</strong><button type="button" data-shop-step="-1" data-product-id="${item.card.dataset.productId}">−</button><b>${item.qty}</b><button type="button" data-shop-step="1" data-product-id="${item.card.dataset.productId}">+</button></div></div></div>`).join('') : '<p>No items selected.</p>';
+            box.innerHTML = selected.length ? selected.map(item => `<div class="customer-cart-line">${item.img?`<img class="product-image" src="${item.img}" alt="">`:`<div class="thumb">${esc(item.name[0]||'')}</div>`}<div><h3>${esc(item.name)}</h3><div class="customer-cart-controls"><strong>${money(item.price)}</strong><button type="button" data-shop-step="-1" data-product-id="${item.card.dataset.productId}">−</button><b>${item.qty}</b><button type="button" data-shop-step="1" data-product-id="${item.card.dataset.productId}">+</button></div></div></div>`).join('') : '<p>No items selected.</p>';
             total.textContent = money(selected.reduce((sum, item) => sum + item.price * item.qty, 0))
         }
 

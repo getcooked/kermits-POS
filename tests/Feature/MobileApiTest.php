@@ -305,7 +305,7 @@ class MobileApiTest extends TestCase
 
         $this->withToken($this->login($customer))->getJson('/api/v1/products')
             ->assertOk()
-            ->assertJsonPath('data.products.0.image_url', route('products.image', $product));
+            ->assertJsonPath('data.products.0.image_url', route('products.image', $product->imageRouteParameters()));
     }
 
     public function test_customer_can_create_and_view_a_cash_reservation(): void

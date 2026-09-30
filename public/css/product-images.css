@@ -1,0 +1,3 @@
+/* Product pictures share one frame on every page: the whole square picture on white, never cropped.
+   Pictures are standardized to 800x800 on white when uploaded, so the frame blends into them. */
+img.product-image{object-fit:contain!important;background:#fff!important}

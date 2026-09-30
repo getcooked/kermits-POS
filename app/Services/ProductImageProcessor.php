@@ -8,19 +8,28 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * Normalizes menu pictures so the dish is clearly visible in small cards:
- * trims plain borders, squares the picture with a small margin, resizes it
- * and re-encodes it as a compact WebP file.
+ * Brings every menu picture to one house standard so they look uniform side by side:
+ * an exact 800x800 square on pure white, with the dish centered and its longest side
+ * filling the same share of the frame. Photos on busy backgrounds cannot be cleaned
+ * up automatically, so they are cropped to their centered square instead.
  */
 class ProductImageProcessor
 {
     public const SIZE = 800;
 
-    private const MARGIN = 0.06;
+    /** Share of the frame the dish's longest side fills, so every plate sits at the same scale. */
+    public const FILL = 0.8;
 
     private const BACKGROUND_TOLERANCE = 28;
 
     private const QUALITY = 82;
+
+    private const BRAND_LOGO = 'kermits-logo.jpg';
+
+    /** Maximum differing bits (out of 256) for a picture to count as the brand logo. */
+    private const LOGO_DISTANCE = 32;
+
+    private static ?string $brandLogoFingerprint = null;
 
     public function store(UploadedFile $file, string $directory = 'products'): string
     {
@@ -30,6 +39,14 @@ class ProductImageProcessor
             return $file->store($directory, 'public');
         }
 
+        return $this->put($processed, $directory);
+    }
+
+    /**
+     * Saves already-processed WebP bytes under a fresh name, so picture URLs change and caches refresh.
+     */
+    public function put(string $processed, string $directory = 'products'): string
+    {
         $path = trim($directory, '/').'/'.Str::random(40).'.webp';
         Storage::disk('public')->put($path, $processed);
 
@@ -37,9 +54,68 @@ class ProductImageProcessor
     }
 
     /**
-     * Returns the optimized WebP bytes, or null when GD is unavailable or the image cannot be read.
+     * Returns the standardized WebP bytes, or null when GD is unavailable or the image cannot be read.
      */
     public function processContents(string $contents): ?string
+    {
+        $image = $this->normalize($contents);
+
+        if ($image === null) {
+            return null;
+        }
+
+        ob_start();
+        imagewebp($image, null, self::QUALITY);
+
+        return ob_get_clean() ?: null;
+    }
+
+    /**
+     * Detects the Kermit's logo used as a stand-in picture, even after it was trimmed or re-encoded.
+     */
+    public function isBrandLogo(string $contents): bool
+    {
+        $reference = $this->brandLogoFingerprint();
+        $fingerprint = $this->fingerprint($contents);
+
+        return $reference !== null
+            && $fingerprint !== null
+            && $this->bitDistance($fingerprint, $reference) <= self::LOGO_DISTANCE;
+    }
+
+    /**
+     * A 256-bit average hash of the standardized picture, compared bit by bit to spot near-duplicates.
+     */
+    public function fingerprint(string $contents): ?string
+    {
+        $image = $this->normalize($contents);
+
+        if ($image === null) {
+            return null;
+        }
+
+        $small = imagecreatetruecolor(16, 16);
+        imagecopyresampled($small, $image, 0, 0, 0, 0, 16, 16, self::SIZE, self::SIZE);
+        $luma = [];
+
+        for ($y = 0; $y < 16; $y++) {
+            for ($x = 0; $x < 16; $x++) {
+                [$red, $green, $blue] = $this->rgb($small, $x, $y);
+                $luma[] = 0.299 * $red + 0.587 * $green + 0.114 * $blue;
+            }
+        }
+
+        $mean = array_sum($luma) / count($luma);
+
+        return implode('', array_map(fn (float $value): string => $value < $mean ? '1' : '0', $luma));
+    }
+
+    public function bitDistance(string $a, string $b): int
+    {
+        return count(array_diff_assoc(str_split($a), str_split($b)));
+    }
+
+    private function normalize(string $contents): ?GdImage
     {
         if (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
             return null;
@@ -52,40 +128,61 @@ class ProductImageProcessor
         }
 
         imagepalettetotruecolor($source);
+        $canvas = imagecreatetruecolor(self::SIZE, self::SIZE);
+        imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
         $background = $this->backgroundColor($source);
-        [$x, $y, $width, $height] = $background !== null
-            ? $this->contentBox($source, $background)
-            : $this->centerSquare($source);
 
-        $side = $background !== null
-            ? (int) ceil(max($width, $height) / (1 - 2 * self::MARGIN))
-            : max($width, $height);
-        $scale = min(1, self::SIZE / $side);
-        $canvasSide = max(1, (int) round($side * $scale));
+        if ($background === null) {
+            [$x, $y, $side] = $this->centerSquare($source);
+            imagecopyresampled($canvas, $source, 0, 0, $x, $y, self::SIZE, self::SIZE, $side, $side);
 
-        $canvas = imagecreatetruecolor($canvasSide, $canvasSide);
-        [$red, $green, $blue] = $background ?? [255, 255, 255];
-        imagefill($canvas, 0, 0, imagecolorallocate($canvas, $red, $green, $blue));
+            return $canvas;
+        }
 
+        [$x, $y, $width, $height] = $this->contentBox($source, $background);
+        $scale = self::SIZE * self::FILL / max($width, $height);
         $targetWidth = max(1, (int) round($width * $scale));
         $targetHeight = max(1, (int) round($height * $scale));
-        imagecopyresampled(
-            $canvas,
-            $source,
-            intdiv($canvasSide - $targetWidth, 2),
-            intdiv($canvasSide - $targetHeight, 2),
-            $x,
-            $y,
-            $targetWidth,
-            $targetHeight,
-            $width,
-            $height,
+        $left = intdiv(self::SIZE - $targetWidth, 2);
+        $top = intdiv(self::SIZE - $targetHeight, 2);
+        imagecopyresampled($canvas, $source, $left, $top, $x, $y, $targetWidth, $targetHeight, $width, $height);
+        $this->whiten($canvas, $background, $left, $top, $targetWidth, $targetHeight);
+
+        return $canvas;
+    }
+
+    /**
+     * Shifts an off-white studio background to pure white with a per-channel levels curve,
+     * so the pasted photo blends into the white frame without a visible edge.
+     *
+     * @param  array{int, int, int}  $background
+     */
+    private function whiten(GdImage $image, array $background, int $left, int $top, int $width, int $height): void
+    {
+        if (min($background) === 255) {
+            return;
+        }
+
+        [$red, $green, $blue] = array_map(
+            fn (int $channel): array => array_map(fn (int $value): int => min(255, (int) round($value * 255 / $channel)), range(0, 255)),
+            $background,
         );
 
-        ob_start();
-        imagewebp($canvas, null, self::QUALITY);
+        for ($y = $top; $y < $top + $height; $y++) {
+            for ($x = $left; $x < $left + $width; $x++) {
+                $color = imagecolorat($image, $x, $y);
+                imagesetpixel($image, $x, $y, ($red[($color >> 16) & 255] << 16) | ($green[($color >> 8) & 255] << 8) | $blue[$color & 255]);
+            }
+        }
+    }
 
-        return ob_get_clean() ?: null;
+    private function brandLogoFingerprint(): ?string
+    {
+        if (self::$brandLogoFingerprint === null && is_file($logo = public_path(self::BRAND_LOGO))) {
+            self::$brandLogoFingerprint = $this->fingerprint((string) file_get_contents($logo));
+        }
+
+        return self::$brandLogoFingerprint;
     }
 
     /**
@@ -167,7 +264,7 @@ class ProductImageProcessor
     /**
      * Photos on a busy background (tables, posters) are cropped to their centered square instead.
      *
-     * @return array{int, int, int, int}
+     * @return array{int, int, int}
      */
     private function centerSquare(GdImage $image): array
     {
@@ -175,7 +272,7 @@ class ProductImageProcessor
         $height = imagesy($image);
         $side = min($width, $height);
 
-        return [intdiv($width - $side, 2), intdiv($height - $side, 2), $side, $side];
+        return [intdiv($width - $side, 2), intdiv($height - $side, 2), $side];
     }
 
     /**

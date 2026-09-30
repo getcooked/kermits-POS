@@ -33,42 +33,100 @@ Artisan::command('mail:diagnose {to? : Address to receive the test emails}', fun
     }
 })->purpose('Send a test email through each SMTP mailer and print any errors');
 
-Artisan::command('products:optimize-images {--prune : Also delete product pictures no product uses} {--dry-run : Only report what would change}', function (ProductImageProcessor $images) {
+Artisan::command('products:optimize-images
+    {--all : Also re-process pictures that are already WebP (run once after the picture standard changes)}
+    {--clear-missing : Remove picture links whose file no longer exists}
+    {--clear-logos : Remove the Kermit\'s logo used as a stand-in picture}
+    {--prune : Also delete product pictures no product uses}
+    {--dry-run : Only report what would change}', function (ProductImageProcessor $images) {
     $disk = Storage::disk('public');
     $dryRun = (bool) $this->option('dry-run');
+    $backupDirectory = 'products/originals/'.now()->format('Ymd-His');
+    $manifest = [];
+    $counts = ['converted' => 0, 'logo' => 0, 'missing' => 0, 'failed' => 0];
     $paths = Product::query()
         ->whereNotNull('image_path')
         ->pluck('image_path')
         ->unique()
-        ->reject(fn (string $path) => filter_var($path, FILTER_VALIDATE_URL) || str_ends_with(strtolower($path), '.webp'));
+        ->reject(fn (string $path) => filter_var($path, FILTER_VALIDATE_URL));
+
+    // Originals are moved aside, not deleted, and the manifest records which products used them.
+    $replace = function (string $path, ?string $newPath, string $reason) use ($disk, $dryRun, $backupDirectory, &$manifest): void {
+        $productIds = Product::query()->where('image_path', $path)->pluck('id')->all();
+        $manifest[] = ['reason' => $reason, 'old_path' => $path, 'new_path' => $newPath, 'product_ids' => $productIds];
+
+        if ($dryRun) {
+            return;
+        }
+
+        Product::query()->whereKey($productIds)->toBase()->update(['image_path' => $newPath]);
+
+        if ($disk->exists($path)) {
+            $disk->move($path, $backupDirectory.'/'.$path);
+        }
+    };
 
     foreach ($paths as $path) {
         if (! $disk->exists($path)) {
-            $this->warn("Missing: {$path}");
+            $counts['missing']++;
+            $this->warn($this->option('clear-missing') ? "Missing, link ".($dryRun ? 'would be ' : '')."removed: {$path}" : "Missing: {$path} (use --clear-missing to remove the link)");
+
+            if ($this->option('clear-missing')) {
+                $replace($path, null, 'missing');
+            }
 
             continue;
         }
 
-        $processed = $images->processContents($disk->get($path));
+        $contents = $disk->get($path);
+
+        if ($images->isBrandLogo($contents)) {
+            $counts['logo']++;
+            $this->warn($this->option('clear-logos') ? "Logo stand-in ".($dryRun ? 'would be ' : '')."removed: {$path}" : "Logo stand-in: {$path} (use --clear-logos to remove it)");
+
+            if ($this->option('clear-logos')) {
+                $replace($path, null, 'logo');
+            }
+
+            continue;
+        }
+
+        if (! $this->option('all') && str_ends_with(strtolower($path), '.webp')) {
+            continue;
+        }
+
+        $processed = $images->processContents($contents);
 
         if ($processed === null) {
+            $counts['failed']++;
             $this->error("Could not read: {$path}");
 
             continue;
         }
 
-        $newPath = preg_replace('/\.[^.\/]+$/', '', $path).'.webp';
+        $counts['converted']++;
+        $newPath = $dryRun ? 'products/(new).webp' : $images->put($processed);
         $this->line(sprintf('%s (%d KB) -> %s (%d KB)', $path, $disk->size($path) / 1024, $newPath, strlen($processed) / 1024));
-
-        if (! $dryRun) {
-            $disk->put($newPath, $processed);
-            Product::query()->where('image_path', $path)->update(['image_path' => $newPath]);
-            $disk->delete($path);
-        }
+        $replace($path, $newPath, 'converted');
     }
 
+    if ($manifest !== [] && ! $dryRun) {
+        $disk->put($backupDirectory.'/manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $this->info("Originals and manifest kept in storage/app/public/{$backupDirectory}");
+    }
+
+    $this->info(sprintf(
+        '%s%d standardized, %d logo stand-ins, %d missing files, %d unreadable.',
+        $dryRun ? '[dry run] ' : '',
+        $counts['converted'],
+        $counts['logo'],
+        $counts['missing'],
+        $counts['failed'],
+    ));
+
     $used = Product::query()->whereNotNull('image_path')->pluck('image_path')->flip();
-    $unused = collect($disk->allFiles('products'))->reject(fn (string $path) => $used->has($path));
+    $unused = collect($disk->allFiles('products'))
+        ->reject(fn (string $path) => $used->has($path) || str_starts_with($path, 'products/originals/'));
 
     foreach ($unused as $path) {
         $this->line(($this->option('prune') && ! $dryRun ? 'Deleted unused: ' : 'Unused: ').$path);
@@ -77,7 +135,7 @@ Artisan::command('products:optimize-images {--prune : Also delete product pictur
             $disk->delete($path);
         }
     }
-})->purpose('Trim, square, resize and convert product pictures to WebP');
+})->purpose('Bring product pictures to the house standard: 800x800 WebP on white, dish centered at the same scale');
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
