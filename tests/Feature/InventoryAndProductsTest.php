@@ -182,6 +182,61 @@ class InventoryAndProductsTest extends TestCase
             ->assertDontSee(route('products.update', $almondRoca), false);
     }
 
+    public function test_new_product_stock_cannot_exceed_fifty(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $payload = ['name' => 'Overstocked', 'category' => 'Drinks', 'price' => 95, 'active' => 1];
+
+        $this->actingAs($superAdmin)->post('/products', [...$payload, 'stock' => 51])
+            ->assertSessionHasErrors(['stock' => 'Stock for a new product cannot be more than 50.']);
+        $this->assertDatabaseMissing('products', ['name' => 'Overstocked']);
+
+        $this->actingAs($superAdmin)->post('/products', [...$payload, 'stock' => 50])
+            ->assertRedirect('/products');
+        $this->assertDatabaseHas('products', ['name' => 'Overstocked', 'stock' => 50]);
+    }
+
+    public function test_product_categories_are_saved_in_pascal_case(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        $this->actingAs($superAdmin)->post('/products', [
+            'name' => 'Steak Plate',
+            'category' => '  beef   ENTRÉES ',
+            'price' => 350,
+            'stock' => 10,
+            'active' => 1,
+        ])->assertRedirect('/products');
+
+        $product = Product::query()->where('name', 'Steak Plate')->firstOrFail();
+        $this->assertSame('Beef Entrées', $product->category);
+
+        $this->actingAs($superAdmin)->put(route('products.update', $product), [
+            'name' => 'Steak Plate',
+            'category' => 'house specials',
+            'price' => 350,
+            'stock' => 10,
+            'active' => 1,
+        ])->assertRedirect('/products');
+
+        $this->assertSame('House Specials', $product->fresh()->category);
+    }
+
+    public function test_add_product_form_lists_every_existing_category(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        Product::query()->create(['name' => 'Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
+        Product::query()->create(['name' => 'Nachos', 'category' => 'Starters', 'price' => 180, 'stock' => 10]);
+
+        $this->actingAs($superAdmin)
+            ->get('/products?search=Latte')
+            ->assertOk()
+            ->assertSee('id="category-options"', false)
+            ->assertSee('data-category="Drinks"', false)
+            ->assertSee('data-category="Starters"', false)
+            ->assertSee('max="50"', false);
+    }
+
     public function test_new_categories_created_by_super_admin_are_immediately_searchable_and_available_in_catalogs(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);

@@ -11,6 +11,8 @@ class Product extends Model
 {
     public const LOW_STOCK_THRESHOLD = 10;
 
+    public const MAX_NEW_PRODUCT_STOCK = 50;
+
     protected $fillable = [
         'name',
         'category',

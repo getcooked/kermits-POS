@@ -13,7 +13,7 @@
                     <button class="product-search-dropdown" type="button" aria-label="Show products and categories" title="Show products and categories" aria-controls="product-search-options" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"></path></svg></button>
                 </div>
                 <div id="product-search-options" class="product-search-options" role="listbox" hidden>
-                    @foreach($searchCategories as $category)<button type="button" class="product-search-option" role="option" data-search-value="{{ $category }}"><span>{{ $category }}</span><small>Category</small></button>@endforeach
+                    @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-search-value="{{ $category }}"><span>{{ $category }}</span><small>Category</small></button>@endforeach
                     @foreach($searchProducts as $productName)<button type="button" class="product-search-option" role="option" data-search-value="{{ $productName }}"><span>{{ $productName }}</span><small>Product</small></button>@endforeach
                     <p class="product-search-empty" hidden>No matching products or categories</p>
                 </div>
@@ -33,9 +33,18 @@
             <input type="hidden" name="form_context" value="create">
             <div class="product-create-grid">
                 <div class="field"><label for="name">Product name</label><input class="control" id="name" name="name" value="{{ old('name') }}" required></div>
-                <div class="field"><label for="category">Category</label><input class="control" id="category" name="category" value="{{ old('category') }}" placeholder="e.g. Starters" required></div>
+                <div class="field"><label for="category">Category</label>
+                    <div class="category-picker">
+                        <input class="control category-picker-input" id="category" name="category" value="{{ old('category') }}" placeholder="Select or type a new category" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="category-options" aria-expanded="false" data-pascal-case required>
+                        <button class="category-picker-toggle" type="button" aria-label="Show all categories" title="Show all categories" aria-controls="category-options" aria-expanded="false" tabindex="-1"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"></path></svg></button>
+                        <div id="category-options" class="product-search-options" role="listbox" hidden>
+                            @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-category="{{ $category }}"><span>{{ $category }}</span></button>@endforeach
+                            <p class="product-search-empty" hidden>New category — it will be added when you save.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="field"><label for="price">Price (₱)</label><input class="control" id="price" name="price" type="number" min="0.01" step="0.01" value="{{ old('price') }}" required></div>
-                <div class="field"><label for="stock">Stock</label><input class="control" id="stock" name="stock" type="number" min="0" value="{{ old('stock', 0) }}" required></div>
+                <div class="field"><label for="stock">Stock <span style="font-weight:400;color:#687286">(max {{ \App\Models\Product::MAX_NEW_PRODUCT_STOCK }})</span></label><input class="control" id="stock" name="stock" type="number" min="0" max="{{ \App\Models\Product::MAX_NEW_PRODUCT_STOCK }}" step="1" value="{{ old('stock', 0) }}" required></div>
             </div>
             <div class="field"><label for="description">Description</label><textarea class="control" id="description" name="description" rows="2">{{ old('description') }}</textarea></div>
             <div class="field"><label for="image">Product picture <span style="font-weight:400;color:#687286">(JPG, PNG or WebP, up to 2 MB)</span></label><input class="control" id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
@@ -54,7 +63,7 @@
                 @endif
                 <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr auto;gap:12px;align-items:end">
                     <div><label>Name</label><input class="control" name="name" value="{{ $product->name }}" required></div>
-                    <div><label>Category</label><input class="control" name="category" value="{{ $product->category }}" required></div>
+                    <div><label>Category</label><input class="control" name="category" value="{{ $product->category }}" maxlength="80" data-pascal-case required></div>
                     <div><label>Price (₱)</label><input class="control" name="price" type="number" min="0.01" step="0.01" value="{{ $product->price }}" required></div>
                     <div><label>Stock</label><input class="control" name="stock" type="number" min="0" value="{{ $product->stock }}" required></div>
                     <button class="button" style="width:auto" type="submit">Save</button>
@@ -103,6 +112,13 @@
 .product-create-panel{margin:0 0 22px;padding:26px}
 .product-create-panel h2{margin:0 0 20px;font-size:20px}
 .product-create-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:14px}
+.category-picker{position:relative}
+.category-picker-input{padding-right:42px}
+.category-picker-toggle{position:absolute;z-index:2;top:50%;right:5px;width:32px;height:32px;padding:0;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:#62675f;cursor:pointer;transform:translateY(-50%)}
+.category-picker-toggle:hover{background:#eff0ea;color:#171817}
+.category-picker-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.category-picker-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+.category-picker .product-search-options{max-height:260px}
 .product-ajax-form[aria-busy="true"]{opacity:.72;pointer-events:none}
 .product-ajax-inline-error{margin:0 0 14px;padding:11px 13px;border:1px solid #efc8c5;border-radius:9px;background:#fff0f0;color:#a51d16;font-size:13px}
 @media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}}
@@ -194,10 +210,101 @@ const initializeProductCreateToggle = () => {
     });
 };
 
+const toPascalCase = value => value
+    .toLocaleLowerCase()
+    .replace(/(^|[^\p{L}\p{M}\p{N}'’])(\p{L})/gu, (match, boundary, letter) => boundary + letter.toLocaleUpperCase());
+
+const initializeCategoryPicker = () => {
+    const input = document.getElementById('category');
+    const toggle = document.querySelector('.category-picker-toggle');
+    const panel = document.getElementById('category-options');
+    const empty = panel?.querySelector('.product-search-empty');
+    const options = [...(panel?.querySelectorAll('.product-search-option') ?? [])];
+    let activeIndex = -1;
+    if (!input || !toggle || !panel || input.dataset.categoryPickerBound === 'true') return;
+    input.dataset.categoryPickerBound = 'true';
+
+    const visibleOptions = () => options.filter(option => !option.hidden);
+    const setActive = index => {
+        const visible = visibleOptions();
+        options.forEach(option => option.classList.remove('is-active'));
+        activeIndex = visible.length ? Math.max(-1, Math.min(index, visible.length - 1)) : -1;
+        if (activeIndex >= 0) {
+            visible[activeIndex].classList.add('is-active');
+            visible[activeIndex].scrollIntoView({ block: 'nearest' });
+        }
+    };
+    const setOpen = open => {
+        panel.hidden = !open;
+        input.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-expanded', String(open));
+        if (!open) setActive(-1);
+    };
+    const showOptions = query => {
+        const normalized = query.trim().toLocaleLowerCase();
+        let matches = 0;
+        options.forEach(option => {
+            option.hidden = normalized !== '' && !option.dataset.category.toLocaleLowerCase().includes(normalized);
+            if (!option.hidden) matches++;
+        });
+        if (empty) {
+            const exists = options.some(option => option.dataset.category.toLocaleLowerCase() === normalized);
+            empty.hidden = matches > 0 || exists || normalized === '';
+        }
+        setActive(-1);
+        setOpen(true);
+    };
+    const selectOption = option => {
+        input.value = option.dataset.category;
+        setOpen(false);
+        input.focus();
+    };
+
+    input.addEventListener('focus', () => showOptions(''));
+    input.addEventListener('click', () => { if (panel.hidden) showOptions(''); });
+    input.addEventListener('input', () => showOptions(input.value));
+    toggle.addEventListener('click', () => {
+        if (panel.hidden) showOptions('');
+        else setOpen(false);
+        input.focus();
+    });
+    [toggle, ...options].forEach(control => control.addEventListener('mousedown', event => event.preventDefault()));
+    options.forEach(option => option.addEventListener('click', () => selectOption(option)));
+    input.addEventListener('keydown', event => {
+        const visible = visibleOptions();
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (panel.hidden) showOptions('');
+            setActive(event.key === 'ArrowDown' ? activeIndex + 1 : (activeIndex <= 0 ? visible.length - 1 : activeIndex - 1));
+        } else if (event.key === 'Enter' && !panel.hidden && activeIndex >= 0) {
+            event.preventDefault();
+            selectOption(visible[activeIndex]);
+        } else if (event.key === 'Escape' || event.key === 'Tab') {
+            setOpen(false);
+        }
+    });
+};
+
 const initializeProductPage = () => {
     initializeProductSearch();
     initializeProductCreateToggle();
+    initializeCategoryPicker();
 };
+
+document.addEventListener('input', event => {
+    const input = event.target.closest?.('[data-pascal-case]');
+    if (!input) return;
+    const { selectionStart, selectionEnd } = input;
+    const formatted = toPascalCase(input.value);
+    if (formatted === input.value) return;
+    input.value = formatted;
+    input.setSelectionRange(selectionStart, selectionEnd);
+});
+
+document.addEventListener('focusout', event => {
+    const input = event.target.closest?.('[data-pascal-case]');
+    if (input) input.value = toPascalCase(input.value.replace(/\s+/g, ' ').trim());
+});
 
 const showProductToast = (message, isError = false) => {
     const method = isError ? 'error' : 'success';
@@ -214,6 +321,15 @@ const showProductFormError = (form, message, field = '') => {
     if (field) form.elements.namedItem(field)?.focus();
     showProductToast(message, true);
 };
+
+document.addEventListener('click', event => {
+    if (event.target.closest('.category-picker')) return;
+    const categoryPanel = document.getElementById('category-options');
+    if (!categoryPanel || categoryPanel.hidden) return;
+    categoryPanel.hidden = true;
+    document.getElementById('category')?.setAttribute('aria-expanded', 'false');
+    document.querySelector('.category-picker-toggle')?.setAttribute('aria-expanded', 'false');
+});
 
 document.addEventListener('click', event => {
     if (event.target.closest('.product-search-control')) return;
