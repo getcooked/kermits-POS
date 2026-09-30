@@ -7,9 +7,11 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\ProductImageProcessor;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
@@ -99,6 +101,44 @@ class ProductController extends Controller
         }
 
         return redirect()->route('products.index')->with('status', 'Product updated and moved to '.$product->category.'.');
+    }
+
+    public function updateVisibility(Request $request, Product $product): JsonResponse|RedirectResponse
+    {
+        $request->validate(['active' => ['required', 'boolean']]);
+        $product->update(['active' => $request->boolean('active')]);
+        $message = $product->name.($product->active ? ' is now shown on the menu.' : ' is now hidden from the menu.');
+
+        return $this->visibilityResponse($request, $message, [$product->getKey()], $product->active);
+    }
+
+    public function bulkVisibility(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer', 'distinct', 'exists:products,id'],
+            'active' => ['required', 'boolean'],
+        ]);
+        $active = $request->boolean('active');
+        $ids = array_map('intval', $validated['ids']);
+        $updated = Product::query()->whereKey($ids)->update(['active' => $active]);
+        $message = $updated.' '.Str::plural('product', $updated).($active ? ' shown on the menu.' : ' hidden from the menu.');
+
+        return $this->visibilityResponse($request, $message, $ids, $active);
+    }
+
+    private function visibilityResponse(Request $request, string $message, array $ids, bool $active): JsonResponse|RedirectResponse
+    {
+        if (! $request->expectsJson()) {
+            return back()->with('status', $message);
+        }
+
+        return response()->json([
+            'message' => $message,
+            'ids' => $ids,
+            'active' => $active,
+            'low_stock_count' => Product::query()->available()->lowStock()->count(),
+        ]);
     }
 
     private function categoryOrder(string $category, ?Product $except = null): int

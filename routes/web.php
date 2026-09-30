@@ -133,6 +133,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::patch('/products/visibility', [ProductController::class, 'bulkVisibility'])->name('products.visibility.bulk');
+        Route::patch('/products/{product}/visibility', [ProductController::class, 'updateVisibility'])->name('products.visibility');
     });
 
     Route::middleware('role:super_admin')->group(function (): void {

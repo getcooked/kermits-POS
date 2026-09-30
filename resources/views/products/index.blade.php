@@ -8,12 +8,27 @@
     $canDelete = auth()->user()->hasRole('super_admin');
     $groups = $products->groupBy(fn ($product) => $product->category ?: 'Uncategorized');
     $formContext = (string) old('form_context', '');
+    $imageUrls = $products->mapWithKeys(fn ($product) => [$product->getKey() => $product->imageUrl()]);
+    $editingProduct = str_starts_with($formContext, 'edit-')
+        ? $products->firstWhere('id', (int) substr($formContext, 5))
+        : null;
     $stats = [
         'all' => ['label' => 'All Products', 'count' => $products->count()],
         'visible' => ['label' => 'On Menu', 'count' => $products->where('active', true)->count()],
         'hidden' => ['label' => 'Hidden', 'count' => $products->where('active', false)->count()],
         'low' => ['label' => 'Low Stock', 'count' => $products->filter(fn ($product) => $product->stock <= $lowThreshold)->count()],
+        'noimage' => ['label' => 'No Picture', 'count' => $imageUrls->filter(fn ($url) => ! $url)->count()],
     ];
+    $sortOptions = [
+        'menu' => 'Menu order',
+        'name' => 'Name (A–Z)',
+        'price-asc' => 'Price: low to high',
+        'price-desc' => 'Price: high to low',
+        'stock-asc' => 'Stock: lowest first',
+        'updated' => 'Recently updated',
+    ];
+    $placeholder = fn (string $name) => Str::upper(Str::substr($name, 0, 1));
+    $position = 0;
     $stockState = fn ($product) => match (true) {
         $product->stock === 0 => ['class' => 'is-out', 'label' => 'Out of stock'],
         $product->stock <= $lowThreshold => ['class' => 'is-low', 'label' => 'Low · '.$product->stock.' left'],
@@ -83,9 +98,13 @@
             <button type="button" class="pm-chip" data-pm-category="" aria-pressed="true">All <span>{{ $products->count() }}</span></button>
             @foreach($groups as $category => $items)<button type="button" class="pm-chip" data-pm-category="{{ $category }}" aria-pressed="false">{{ $category }} <span>{{ $items->count() }}</span></button>@endforeach
         </div>
+        <div class="pm-toolbar-end">
+        <label class="pm-sort"><span class="pm-sr">Sort products</span><select class="control" data-pm-sort>@foreach($sortOptions as $sort => $label)<option value="{{ $sort }}">{{ $label }}</option>@endforeach</select></label>
+        <button type="button" class="pm-select-toggle" data-pm-select-mode aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>Select</span></button>
         <div class="pm-view-toggle" role="group" aria-label="Layout">
             <button type="button" data-pm-view="grid" aria-pressed="true" aria-label="Grid view" title="Grid view"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"></rect></svg></button>
             <button type="button" data-pm-view="list" aria-pressed="false" aria-label="List view" title="List view"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1"></circle><circle cx="4.5" cy="12" r="1"></circle><circle cx="4.5" cy="18" r="1"></circle></svg></button>
+        </div>
         </div>
     </div>
     @endif
@@ -96,11 +115,31 @@
             <header class="pm-group-head"><h2>{{ $category }}</h2><span>{{ $items->count() }} {{ Str::plural('product', $items->count()) }}</span></header>
             <div class="pm-grid">
                 @foreach($items as $product)
-                @php $stock = $stockState($product); @endphp
-                <article class="pm-card {{ $product->active ? '' : 'is-hidden' }}" data-pm-item data-product-id="{{ $product->getKey() }}" data-category="{{ $category }}" data-active="{{ $product->active ? '1' : '0' }}" data-low="{{ $product->stock <= $lowThreshold ? '1' : '0' }}">
+                @php
+                    $stock = $stockState($product);
+                    $imageUrl = $imageUrls[$product->getKey()];
+                @endphp
+                <article class="pm-card {{ $product->active ? '' : 'is-hidden' }}" data-pm-item
+                    data-product-id="{{ $product->getKey() }}"
+                    data-category="{{ $category }}"
+                    data-group="{{ $loop->parent->index }}"
+                    data-order="{{ $position++ }}"
+                    data-active="{{ $product->active ? '1' : '0' }}"
+                    data-low="{{ $product->stock <= $lowThreshold ? '1' : '0' }}"
+                    data-image="{{ $imageUrl ? '1' : '0' }}"
+                    data-name="{{ $product->name }}"
+                    data-price="{{ $product->price }}"
+                    data-stock="{{ $product->stock }}"
+                    data-updated="{{ $product->updated_at?->timestamp ?? 0 }}"
+                    data-description="{{ $product->description }}"
+                    data-image-url="{{ $imageUrl }}"
+                    data-update-url="{{ route('products.update', $product) }}"
+                    data-visibility-url="{{ route('products.visibility', $product) }}"
+                    @if($canDelete) data-destroy-url="{{ route('products.destroy', $product) }}" @endif>
+                    <label class="pm-select"><input type="checkbox" data-pm-select value="{{ $product->getKey() }}"><span class="pm-sr">Select {{ $product->name }}</span></label>
                     <div class="pm-media">
-                        @if($imageUrl = $product->imageUrl())<img src="{{ $imageUrl }}" alt="" loading="lazy">@else<span class="pm-placeholder" aria-hidden="true">{{ Str::upper(Str::substr($product->name, 0, 1)) }}</span>@endif
-                        @unless($product->active)<span class="pm-flag">Hidden</span>@endunless
+                        @if($imageUrl)<img src="{{ $imageUrl }}" alt="" loading="lazy">@else<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($product->name) }}</span>@endif
+                        <span class="pm-flag" data-pm-flag @if($product->active) hidden @endif>Hidden</span>
                     </div>
                     <div class="pm-body">
                         <h3>{{ $product->name }}</h3>
@@ -110,7 +149,10 @@
                         <strong class="pm-price">₱{{ number_format((float) $product->price, 2) }}</strong>
                         <span class="pm-stock {{ $stock['class'] }}">{{ $stock['label'] }}</span>
                     </div>
-                    <button type="button" class="pm-edit" data-pm-open="product-editor-{{ $product->getKey() }}" aria-haspopup="dialog" aria-controls="product-editor-{{ $product->getKey() }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg><span>Edit<span class="pm-sr"> {{ $product->name }}</span></span></button>
+                    <div class="pm-actions">
+                        <button type="button" class="pm-toggle" role="switch" aria-checked="{{ $product->active ? 'true' : 'false' }}" data-pm-visibility title="Show on cashier page"><span class="pm-toggle-track" aria-hidden="true"></span><span class="pm-toggle-label" data-pm-toggle-label>{{ $product->active ? 'On menu' : 'Hidden' }}</span><span class="pm-sr"> – {{ $product->name }}</span></button>
+                        <button type="button" class="pm-edit" data-pm-open aria-haspopup="dialog" aria-controls="product-editor"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg><span>Edit<span class="pm-sr"> {{ $product->name }}</span></span></button>
+                    </div>
                 </article>
                 @endforeach
             </div>
@@ -121,47 +163,63 @@
             <p class="muted">{{ $search !== '' ? 'Try a different name or category.' : 'Add your first product to start building the menu.' }}</p>
         </div>
         @endforelse
+        @if($products->isNotEmpty())
+        <div class="pm-group" data-pm-flat hidden>
+            <header class="pm-group-head"><h2 data-pm-flat-title>All products</h2><span data-pm-flat-count></span></header>
+            <div class="pm-grid"></div>
+        </div>
+        @endif
         <p class="pm-filter-empty" data-pm-empty hidden>No products match these filters.</p>
     </section>
 
-    @foreach($products as $product)
+    @if($products->isNotEmpty())
+    <div class="pm-bulkbar" data-pm-bulkbar data-url="{{ route('products.visibility.bulk') }}" role="region" aria-label="Bulk actions" hidden>
+        <strong data-pm-selected-count>0 selected</strong>
+        <button type="button" class="pm-link" data-pm-select-all>Select all shown</button>
+        <button type="button" class="pm-link" data-pm-select-none>Clear</button>
+        <span class="pm-bulk-spacer"></span>
+        <button type="button" class="pm-bulk-button" data-pm-bulk="1" disabled>Show on menu</button>
+        <button type="button" class="pm-bulk-button" data-pm-bulk="0" disabled>Hide</button>
+        <button type="button" class="pm-bulk-done" data-pm-select-mode>Done</button>
+    </div>
+    <p class="pm-sr" role="status" aria-live="polite" data-pm-live></p>
+
     @php
-        $productId = $product->getKey();
-        $editing = $formContext === 'edit-'.$productId;
-        $value = fn (string $field, $default) => $editing ? old($field, $default) : $default;
-        $imageUrl = $product->imageUrl();
+        $editing = $editingProduct !== null;
+        $value = fn (string $field, $default = null) => $editing ? old($field, $default) : $default;
+        $editingImage = $editing ? $imageUrls[$editingProduct->getKey()] : null;
     @endphp
-    <div id="product-editor-{{ $productId }}" class="pm-drawer" role="dialog" aria-modal="true" aria-labelledby="product-editor-{{ $productId }}-title" data-pm-drawer data-product-id="{{ $productId }}" {{ $editing ? '' : 'hidden' }}>
+    <div id="product-editor" class="pm-drawer" role="dialog" aria-modal="true" aria-labelledby="product-editor-title" data-pm-drawer data-product-id="{{ $editingProduct?->getKey() }}" {{ $editing ? '' : 'hidden' }}>
         <div class="pm-drawer-backdrop" data-pm-close></div>
         <div class="pm-drawer-panel">
             <header class="pm-drawer-head">
-                <div><small>Edit product</small><h2 id="product-editor-{{ $productId }}-title">{{ $product->name }}</h2></div>
+                <div><small>Edit product</small><h2 id="product-editor-title" data-pm-editor-title>{{ $editingProduct?->name }}</h2></div>
                 <button type="button" class="pm-icon-button" data-pm-close aria-label="Close editor"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
             </header>
             <div class="pm-drawer-scroll">
-                <form id="product-edit-{{ $productId }}" method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data" class="product-ajax-form pm-drawer-form" data-action-label="Saving...">@csrf @method('PUT')
-                    <input type="hidden" name="form_context" value="edit-{{ $productId }}">
+                <form id="product-edit-form" method="POST" @if($editing) action="{{ route('products.update', $editingProduct) }}" @endif enctype="multipart/form-data" class="product-ajax-form pm-drawer-form" data-action-label="Saving...">@csrf @method('PUT')
+                    <input type="hidden" name="form_context" value="{{ $editing ? $formContext : '' }}">
                     @if($editing && $errors->any())<div class="product-ajax-inline-error" role="alert">{{ $errors->first() }}</div>@endif
                     <div class="pm-photo-field pm-photo-row">
-                        <div class="pm-photo-preview" data-pm-preview>@if($imageUrl)<img src="{{ $imageUrl }}" alt="">@else<span class="pm-placeholder" aria-hidden="true">{{ Str::upper(Str::substr($product->name, 0, 1)) }}</span>@endif</div>
+                        <div class="pm-photo-preview" data-pm-preview>@if($editingImage)<img src="{{ $editingImage }}" alt="">@elseif($editing)<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($editingProduct->name) }}</span>@endif</div>
                         <div class="pm-photo-actions">
-                            <input class="pm-file-input" id="image-{{ $productId }}" name="image" type="file" accept="image/jpeg,image/png,image/webp" data-pm-image-input>
-                            <label class="pm-upload-button" for="image-{{ $productId }}">{{ $imageUrl ? 'Replace Picture' : 'Add Picture' }}</label>
+                            <input class="pm-file-input" id="image-edit" name="image" type="file" accept="image/jpeg,image/png,image/webp" data-pm-image-input>
+                            <label class="pm-upload-button" for="image-edit" data-pm-upload-label>{{ $editingImage ? 'Replace Picture' : 'Add Picture' }}</label>
                             <small class="pm-hint" data-pm-file-name>JPG, PNG or WebP · up to 2 MB</small>
-                            @if($imageUrl)<label class="pm-inline-check"><input name="remove_image" type="checkbox" value="1"> Remove current picture</label>@endif
+                            <label class="pm-inline-check" data-pm-remove-image @unless($editingImage) hidden @endunless><input name="remove_image" type="checkbox" value="1"> Remove current picture</label>
                         </div>
                     </div>
                     <div class="pm-fields">
-                        <div class="field pm-span"><label for="name-{{ $productId }}">Name</label><input class="control" id="name-{{ $productId }}" name="name" value="{{ $value('name', $product->name) }}" required></div>
-                        <div class="field pm-span"><label for="category-{{ $productId }}">Category</label>@include('products.partials.category-picker', ['id' => 'category-'.$productId, 'value' => $value('category', $product->category), 'placeholder' => 'Select or type a category'])</div>
-                        <div class="field"><label for="price-{{ $productId }}">Price (₱)</label><input class="control" id="price-{{ $productId }}" name="price" type="number" min="0.01" step="0.01" value="{{ $value('price', $product->price) }}" required></div>
-                        <div class="field"><label for="stock-{{ $productId }}">Stock</label><input class="control" id="stock-{{ $productId }}" name="stock" type="number" min="0" max="{{ $maxStock }}" step="1" inputmode="numeric" value="{{ $value('stock', $product->stock) }}" data-stock-limit required><small class="pm-hint">0–{{ $maxStock }} units</small></div>
-                        <div class="field pm-span"><label for="description-{{ $productId }}">Description</label><textarea class="control" id="description-{{ $productId }}" name="description" rows="3" maxlength="500">{{ $value('description', $product->description) }}</textarea></div>
+                        <div class="field pm-span"><label for="name-edit">Name</label><input class="control" id="name-edit" name="name" value="{{ $value('name', $editingProduct?->name) }}" required></div>
+                        <div class="field pm-span"><label for="category-edit">Category</label>@include('products.partials.category-picker', ['id' => 'category-edit', 'value' => $value('category', $editingProduct?->category), 'placeholder' => 'Select or type a category'])</div>
+                        <div class="field"><label for="price-edit">Price (₱)</label><input class="control" id="price-edit" name="price" type="number" min="0.01" step="0.01" value="{{ $value('price', $editingProduct?->price) }}" required></div>
+                        <div class="field"><label for="stock-edit">Stock</label><input class="control" id="stock-edit" name="stock" type="number" min="0" max="{{ $maxStock }}" step="1" inputmode="numeric" value="{{ $value('stock', $editingProduct?->stock) }}" data-stock-limit required><small class="pm-hint">0–{{ $maxStock }} units</small></div>
+                        <div class="field pm-span"><label for="description-edit">Description</label><textarea class="control" id="description-edit" name="description" rows="3" maxlength="500">{{ $value('description', $editingProduct?->description) }}</textarea></div>
                     </div>
-                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ ($editing ? old('active') : $product->active) ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Show on cashier page</strong><small>Hidden products stay in your records but can't be ordered.</small></span></label>
+                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $editing && old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Show on cashier page</strong><small>Hidden products stay in your records but can't be ordered.</small></span></label>
                 </form>
                 @if($canDelete)
-                <form method="POST" action="{{ route('products.destroy', $product) }}" class="product-ajax-form pm-danger" data-action-label="Deleting..." data-confirm="Permanently delete this product?" data-confirm-title="Delete product?">@csrf @method('DELETE')
+                <form method="POST" @if($editing) action="{{ route('products.destroy', $editingProduct) }}" @endif class="product-ajax-form pm-danger" data-pm-delete-form data-action-label="Deleting..." data-confirm="Permanently delete this product?" data-confirm-title="Delete product?">@csrf @method('DELETE')
                     <div><strong>Delete product</strong><small>Only products with no order, reservation or inventory history can be deleted.</small></div>
                     <button class="pm-delete" type="submit">Delete</button>
                 </form>
@@ -169,11 +227,11 @@
             </div>
             <footer class="pm-drawer-foot">
                 <button type="button" class="logout" data-pm-close>Cancel</button>
-                <button class="button pm-primary" type="submit" form="product-edit-{{ $productId }}">Save Changes</button>
+                <button class="button pm-primary" type="submit" form="product-edit-form">Save Changes</button>
             </footer>
         </div>
     </div>
-    @endforeach
+    @endif
 
     <template id="category-options-template">
         @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-category="{{ $category }}"><span>{{ $category }}</span></button>@endforeach
@@ -261,7 +319,7 @@
 .pm-switch-copy small{color:#80857c;font-size:12px}
 
 /* Status tiles double as filters */
-.pm-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.pm-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .pm-stat{display:grid;gap:4px;padding:16px 18px;border:1px solid var(--line,#d8d9cf);border-radius:14px;background:var(--surface,#fffefa);color:inherit;font:inherit;text-align:left;cursor:pointer}
 .pm-stat span{color:#6c7068;font-size:13px;font-weight:600}
 .pm-stat strong{font-size:26px;line-height:1.1;letter-spacing:-.03em}
@@ -278,6 +336,13 @@
 .pm-chip:hover{border-color:#8d960f}
 .pm-chip[aria-pressed="true"]{background:#171817;border-color:#171817;color:#fff}
 .pm-chip[aria-pressed="true"] span{background:rgba(255,255,255,.18);color:#fff}
+.pm-stat-noimage strong{color:#8a5200}
+.pm-toolbar-end{flex:0 0 auto;display:flex;align-items:center;gap:8px}
+.pm-sort select{height:40px;padding:0 34px 0 12px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer}
+.pm-select-toggle{height:40px;display:inline-flex;align-items:center;gap:7px;padding:0 13px;border:1px solid #d8d9cf;border-radius:10px;background:#fff;color:#171817;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.pm-select-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pm-select-toggle:hover{background:#eff0ea}
+.pm-select-toggle[aria-pressed="true"]{background:#171817;border-color:#171817;color:#fff}
 .pm-view-toggle{flex:0 0 auto;display:flex;padding:3px;border:1px solid #d8d9cf;border-radius:10px;background:#fff}
 .pm-view-toggle button{width:34px;height:32px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:#6c7068;cursor:pointer}
 .pm-view-toggle button[aria-pressed="true"]{background:#171817;color:#fff}
@@ -308,10 +373,39 @@
 .pm-stock.is-ok{background:#e7f4eb;color:#23683c}
 .pm-stock.is-low{background:#fff1d6;color:#8a5200}
 .pm-stock.is-out{background:#fde9e7;color:#b42318}
-.pm-edit{height:40px;margin:0 16px 16px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d8d9cf;border-radius:10px;background:#fff;color:#171817;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.pm-actions{display:flex;align-items:center;gap:8px;padding:0 16px 16px}
+.pm-toggle{position:relative;z-index:2;height:40px;flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;padding:0 11px 0 9px;border:1px solid #d8d9cf;border-radius:10px;background:#fff;color:#3b3f38;font:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer}
+.pm-toggle:hover{border-color:#aeb39f}
+.pm-toggle-track{position:relative;flex:0 0 32px;height:18px;border-radius:999px;background:#cfd2c8;transition:background-color .15s}
+.pm-toggle-track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.pm-toggle[aria-checked="true"] .pm-toggle-track{background:#7f8a0c}
+.pm-toggle[aria-checked="true"] .pm-toggle-track::after{transform:translateX(14px)}
+.pm-toggle[aria-busy="true"]{opacity:.6;pointer-events:none}
+.pm-toggle:focus-visible,.pm-edit:focus-visible{outline:2px solid #98a20f;outline-offset:2px}
+.pm-edit{height:40px;flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d8d9cf;border-radius:10px;background:#fff;color:#171817;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .pm-edit::after{content:"";position:absolute;inset:0}
 .pm-card:hover .pm-edit{background:#edf0cf;border-color:#c6cc8d}
 .pm-edit svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+
+/* Select mode: the whole card becomes the checkbox target */
+.pm-select{display:none}
+.pm-catalog[data-selecting] .pm-select{display:contents}
+.pm-select input{position:absolute;z-index:4;top:10px;right:10px;width:22px;height:22px;margin:0;accent-color:#171817;cursor:pointer}
+.pm-select::after{content:"";position:absolute;z-index:3;inset:0;cursor:pointer}
+.pm-catalog[data-selecting] .pm-card:hover{border-color:#8d960f}
+.pm-card.is-selected{border-color:#171817;box-shadow:inset 0 0 0 1px #171817}
+.pm-catalog[data-selecting] .pm-actions{opacity:.45}
+.pm-bulkbar{position:sticky;z-index:20;bottom:16px;display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:22px;padding:12px 14px 12px 18px;border-radius:14px;background:#171817;color:#fff;box-shadow:0 18px 40px rgba(10,12,9,.28)}
+.pm-bulkbar[hidden]{display:none}
+.pm-bulkbar strong{font-size:14px;white-space:nowrap}
+.pm-bulk-spacer{flex:1}
+.pm-link{padding:6px 4px;border:0;background:none;color:#d9dcc7;font:inherit;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pm-link:hover{color:#fff}
+.pm-bulk-button,.pm-bulk-done{height:38px;padding:0 14px;border:1px solid #454840;border-radius:10px;background:#292b27;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.pm-bulk-button:hover:not(:disabled){background:#3a3d36}
+.pm-bulk-button[data-pm-bulk="1"]:not(:disabled){background:#aebb19;border-color:#aebb19;color:#171817}
+.pm-bulk-button:disabled{opacity:.45;cursor:not-allowed}
+.pm-bulk-done{background:transparent}
 .pm-filter-empty{margin:24px 0 0;color:#6c7068;text-align:center}
 .pm-empty-state{text-align:center}
 .pm-empty-state h2{margin:0 0 6px;font-size:20px}
@@ -328,7 +422,11 @@
 .pm-catalog[data-view="list"] .pm-meta{padding:0;flex-wrap:nowrap;gap:14px}
 .pm-catalog[data-view="list"] .pm-price{min-width:96px;text-align:right}
 .pm-catalog[data-view="list"] .pm-stock{min-width:112px;text-align:center}
-.pm-catalog[data-view="list"] .pm-edit{margin:0;padding:0 14px}
+.pm-catalog[data-view="list"] .pm-actions{padding:0}
+.pm-catalog[data-view="list"] .pm-edit{flex:0 0 auto;padding:0 14px}
+.pm-catalog[data-view="list"] .pm-toggle{min-width:118px}
+.pm-catalog[data-view="list"] .pm-select input{top:50%;right:auto;left:10px;transform:translateY(-50%)}
+.pm-catalog[data-view="list"][data-selecting] .pm-card{padding-left:34px}
 
 /* Edit drawer (sits below the z-index 4000 confirm dialog) */
 body.pm-drawer-open{overflow:hidden}
@@ -367,9 +465,10 @@ body.pm-drawer-open .admin-workspace{overflow:hidden!important}
 .product-ajax-inline-error{margin:0 0 14px;padding:11px 13px;border:1px solid #efc8c5;border-radius:9px;background:#fff0f0;color:#a51d16;font-size:13px}
 @media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}.pm-fields-wide{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.pm-create-layout{grid-template-columns:minmax(0,1fr)}.pm-create-layout>.pm-photo-field{grid-template-columns:120px minmax(0,1fr);align-items:center}.pm-create-layout>.pm-photo-field .pm-photo-preview{grid-row:span 3;aspect-ratio:1}.pm-catalog[data-view="list"] .pm-desc{display:none}}
-@media(max-width:780px){.pm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pm-toolbar{align-items:center;gap:10px}.pm-chips{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}.pm-chips::-webkit-scrollbar{display:none}.pm-chip{flex:0 0 auto;white-space:nowrap}.pm-catalog[data-view="list"] .pm-card{grid-template-columns:48px minmax(0,1fr) auto;gap:12px}.pm-catalog[data-view="list"] .pm-media{width:48px;height:48px}.pm-catalog[data-view="list"] .pm-meta{grid-column:2;grid-row:2;justify-content:flex-start}.pm-catalog[data-view="list"] .pm-price,.pm-catalog[data-view="list"] .pm-stock{min-width:0;text-align:left}.pm-catalog[data-view="list"] .pm-edit{grid-column:3;grid-row:1/span 2;width:auto}.pm-drawer-foot .logout,.pm-drawer-foot .button{flex:1}}
+@media(max-width:1180px){.pm-toolbar{flex-direction:column;align-items:stretch;gap:12px}.pm-toolbar-end{justify-content:flex-end}}
+@media(max-width:780px){.pm-stats{display:flex;overflow-x:auto;scrollbar-width:none;gap:10px}.pm-stats::-webkit-scrollbar{display:none}.pm-stat{flex:0 0 132px}.pm-toolbar-end{justify-content:stretch}.pm-sort{flex:1;min-width:0}.pm-sort select{width:100%}.pm-bulkbar{bottom:10px;padding:12px}.pm-bulk-spacer{display:none}.pm-bulk-button{flex:1}.pm-catalog[data-view="list"] .pm-actions{grid-column:3;grid-row:1/span 2;flex-direction:column;align-items:stretch;gap:6px}.pm-catalog[data-view="list"] .pm-toggle{min-width:0;height:34px}.pm-catalog[data-view="list"] .pm-edit{height:34px}.pm-chips{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}.pm-chips::-webkit-scrollbar{display:none}.pm-chip{flex:0 0 auto;white-space:nowrap}.pm-catalog[data-view="list"] .pm-card{grid-template-columns:48px minmax(0,1fr) auto;gap:12px}.pm-catalog[data-view="list"] .pm-media{width:48px;height:48px}.pm-catalog[data-view="list"] .pm-meta{grid-column:2;grid-row:2;justify-content:flex-start}.pm-catalog[data-view="list"] .pm-price,.pm-catalog[data-view="list"] .pm-stock{min-width:0;text-align:left}.pm-drawer-foot .logout,.pm-drawer-foot .button{flex:1}}
 @media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}#product-search{font-size:16px}.product-search-button{padding-inline:14px}.product-create-toggle{width:100%;justify-content:center}.pm-drawer-panel{width:100%}.pm-drawer-head,.pm-drawer-scroll,.pm-drawer-foot{padding-inline:16px}}
-@media(max-width:520px){.pm-fields,.pm-fields-wide{grid-template-columns:minmax(0,1fr)}.pm-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pm-body{padding:10px 12px 0}.pm-body h3{font-size:14px}.pm-desc{display:none}.pm-meta{padding:8px 12px 10px;gap:6px}.pm-price{font-size:15px}.pm-stock{font-size:11px;padding:3px 7px}.pm-edit{height:36px;margin:0 12px 12px;font-size:13px}.pm-stat{padding:12px 14px}.pm-stat strong{font-size:22px}.pm-photo-row{grid-template-columns:96px minmax(0,1fr)}.pm-danger{flex-direction:column;align-items:stretch}.pm-primary{width:100%}}
+@media(max-width:520px){.pm-fields,.pm-fields-wide{grid-template-columns:minmax(0,1fr)}.pm-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pm-body{padding:10px 12px 0}.pm-body h3{font-size:14px}.pm-desc{display:none}.pm-meta{padding:8px 12px 10px;gap:6px}.pm-price{font-size:15px}.pm-stock{font-size:11px;padding:3px 7px}.pm-actions{padding:0 12px 12px;gap:6px}.pm-edit{height:36px;font-size:13px}.pm-edit svg{display:none}.pm-toggle{height:36px;padding:0 8px}.pm-catalog[data-view="grid"] .pm-toggle-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.pm-stat{padding:12px 14px}.pm-stat strong{font-size:22px}.pm-photo-row{grid-template-columns:96px minmax(0,1fr)}.pm-danger{flex-direction:column;align-items:stretch}.pm-primary{width:100%}}
 @media(prefers-reduced-motion:reduce){.pm-drawer-panel,.pm-drawer-backdrop{animation:none}}
 </style>
 @endpush
@@ -554,36 +653,249 @@ const initializeCategoryPickers = () => {
     });
 };
 
-// Filters and layout survive the AJAX re-render because they live outside the replaced markup.
-const productView = { category: '', status: 'all', view: 'grid' };
+// Filters, sorting, layout and selection live outside the replaced markup so they survive the AJAX re-render.
+const productStatuses = ['all', 'visible', 'hidden', 'low', 'noimage'];
+const productSorters = {
+    name: (a, b) => a.dataset.name.localeCompare(b.dataset.name, undefined, { sensitivity: 'base' }),
+    'price-asc': (a, b) => Number(a.dataset.price) - Number(b.dataset.price),
+    'price-desc': (a, b) => Number(b.dataset.price) - Number(a.dataset.price),
+    'stock-asc': (a, b) => Number(a.dataset.stock) - Number(b.dataset.stock),
+    updated: (a, b) => Number(b.dataset.updated) - Number(a.dataset.updated),
+};
+const initialProductParams = new URLSearchParams(window.location.search);
+const productView = {
+    category: initialProductParams.get('category') ?? '',
+    status: productStatuses.includes(initialProductParams.get('status')) ? initialProductParams.get('status') : 'all',
+    sort: Object.hasOwn(productSorters, initialProductParams.get('sort') ?? '') ? initialProductParams.get('sort') : 'menu',
+    view: 'grid',
+    selecting: false,
+    selected: new Set(),
+};
 try { productView.view = localStorage.getItem('products.view') === 'list' ? 'list' : 'grid'; } catch (error) {}
+
+const productMatchesStatus = (item, status) => status === 'all'
+    || (status === 'visible' && item.dataset.active === '1')
+    || (status === 'hidden' && item.dataset.active === '0')
+    || (status === 'low' && item.dataset.low === '1')
+    || (status === 'noimage' && item.dataset.image === '0');
+
+const arrangeProductCards = catalog => {
+    const grids = [...catalog.querySelectorAll('[data-pm-group] .pm-grid')];
+    const flatGrid = catalog.querySelector('[data-pm-flat] .pm-grid');
+    const byMenuOrder = (a, b) => Number(a.dataset.order) - Number(b.dataset.order);
+    const items = [...catalog.querySelectorAll('[data-pm-item]')];
+    if (productView.sort === 'menu' || !flatGrid) {
+        items.sort(byMenuOrder).forEach(item => grids[Number(item.dataset.group)]?.append(item));
+    } else {
+        const sorter = productSorters[productView.sort];
+        items.sort((a, b) => sorter(a, b) || byMenuOrder(a, b)).forEach(item => flatGrid.append(item));
+    }
+    catalog.dataset.arrangedSort = productView.sort;
+};
+
+const syncProductUrl = () => {
+    const url = new URL(window.location.href);
+    const params = { category: [productView.category, ''], status: [productView.status, 'all'], sort: [productView.sort, 'menu'] };
+    Object.entries(params).forEach(([key, [value, fallback]]) => {
+        if (value && value !== fallback) url.searchParams.set(key, value);
+        else url.searchParams.delete(key);
+    });
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url);
+};
+
+const renderProductSelection = () => {
+    const catalog = document.querySelector('[data-pm-catalog]');
+    const bar = document.querySelector('[data-pm-bulkbar]');
+    if (!catalog) return;
+    catalog.toggleAttribute('data-selecting', productView.selecting);
+    catalog.querySelectorAll('[data-pm-item]').forEach(item => {
+        const selected = productView.selecting && productView.selected.has(item.dataset.productId);
+        item.classList.toggle('is-selected', selected);
+        const checkbox = item.querySelector('[data-pm-select]');
+        if (checkbox) checkbox.checked = selected;
+    });
+    document.querySelector('.pm-select-toggle')?.setAttribute('aria-pressed', String(productView.selecting));
+    if (!bar) return;
+    const count = productView.selected.size;
+    bar.hidden = !productView.selecting;
+    bar.querySelector('[data-pm-selected-count]').textContent = `${count} selected`;
+    bar.querySelectorAll('[data-pm-bulk]').forEach(button => { button.disabled = count === 0; });
+};
 
 const applyProductFilters = () => {
     const catalog = document.querySelector('[data-pm-catalog]');
     if (!catalog) return;
     const items = [...catalog.querySelectorAll('[data-pm-item]')];
     if (productView.category && !items.some(item => item.dataset.category === productView.category)) productView.category = '';
+    if (catalog.dataset.arrangedSort !== productView.sort) arrangeProductCards(catalog);
 
+    const grouped = productView.sort === 'menu';
     let visible = 0;
     items.forEach(item => {
-        const status = productView.status;
         const matchesCategory = !productView.category || item.dataset.category === productView.category;
-        const matchesStatus = status === 'all'
-            || (status === 'visible' && item.dataset.active === '1')
-            || (status === 'hidden' && item.dataset.active === '0')
-            || (status === 'low' && item.dataset.low === '1');
-        item.hidden = !(matchesCategory && matchesStatus);
-        if (!item.hidden) visible++;
+        item.hidden = !(matchesCategory && productMatchesStatus(item, productView.status));
+        if (item.hidden) productView.selected.delete(item.dataset.productId);
+        else visible++;
     });
     catalog.querySelectorAll('[data-pm-group]').forEach(group => {
-        group.hidden = !group.querySelector('[data-pm-item]:not([hidden])');
+        group.hidden = !grouped || !group.querySelector('[data-pm-item]:not([hidden])');
     });
+    const flat = catalog.querySelector('[data-pm-flat]');
+    if (flat) {
+        flat.hidden = grouped || visible === 0;
+        const sortLabel = document.querySelector(`[data-pm-sort] option[value="${productView.sort}"]`)?.textContent ?? '';
+        flat.querySelector('[data-pm-flat-title]').textContent = productView.category || 'All products';
+        flat.querySelector('[data-pm-flat-count]').textContent = `${visible} ${visible === 1 ? 'product' : 'products'} · ${sortLabel}`;
+    }
     catalog.dataset.view = productView.view;
     document.querySelectorAll('[data-pm-category]').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.pmCategory === productView.category)));
     document.querySelectorAll('[data-pm-status]').forEach(tile => tile.setAttribute('aria-pressed', String(tile.dataset.pmStatus === productView.status)));
     document.querySelectorAll('[data-pm-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.pmView === productView.view)));
+    const sortSelect = document.querySelector('[data-pm-sort]');
+    if (sortSelect) sortSelect.value = productView.sort;
     const empty = catalog.querySelector('[data-pm-empty]');
     if (empty) empty.hidden = !items.length || visible > 0;
+    renderProductSelection();
+    syncProductUrl();
+};
+
+const refreshProductCounts = () => {
+    const items = [...document.querySelectorAll('[data-pm-item]')];
+    document.querySelectorAll('[data-pm-status]').forEach(tile => {
+        const value = tile.querySelector('strong');
+        if (value) value.textContent = String(items.filter(item => productMatchesStatus(item, tile.dataset.pmStatus)).length);
+    });
+};
+
+const updateLowStockBadge = count => {
+    const badge = document.getElementById('low-stock-badge');
+    if (!badge || !Number.isInteger(count)) return;
+    const noun = count === 1 ? 'product' : 'products';
+    badge.textContent = String(count);
+    badge.hidden = count === 0;
+    badge.setAttribute('aria-label', `${count} low-stock ${noun}`);
+    badge.title = `${count} ${noun} at {{ $lowThreshold }} units or below`;
+};
+
+const setProductCardActive = (card, active) => {
+    card.dataset.active = active ? '1' : '0';
+    card.classList.toggle('is-hidden', !active);
+    const flag = card.querySelector('[data-pm-flag]');
+    if (flag) flag.hidden = active;
+    card.querySelector('[data-pm-visibility]')?.setAttribute('aria-checked', String(active));
+    const label = card.querySelector('[data-pm-toggle-label]');
+    if (label) label.textContent = active ? 'On menu' : 'Hidden';
+};
+
+const sendProductVisibility = async (url, fields) => {
+    const body = new FormData();
+    body.append('_method', 'PATCH');
+    Object.entries(fields).forEach(([key, value]) => {
+        if (Array.isArray(value)) value.forEach(item => body.append(`${key}[]`, item));
+        else body.append(key, value);
+    });
+    const response = await fetch(url, {
+        method: 'POST',
+        body,
+        credentials: 'same-origin',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 419) throw new Error('Your session expired. Refresh the page and try again.');
+    if (!response.ok) {
+        const firstError = Object.values(payload.errors ?? {})[0]?.[0];
+        throw new Error(firstError || payload.message || 'The change could not be saved. Please try again.');
+    }
+    return payload;
+};
+
+const applyVisibilityPayload = payload => {
+    const ids = new Set((payload.ids ?? []).map(String));
+    document.querySelectorAll('[data-pm-item]').forEach(card => {
+        if (ids.has(card.dataset.productId)) setProductCardActive(card, Boolean(payload.active));
+    });
+    refreshProductCounts();
+    updateLowStockBadge(payload.low_stock_count);
+};
+
+// A single switch updates the card in place and stays put, so a mis-click can be undone right away.
+const toggleProductVisibility = async toggle => {
+    const card = toggle.closest('[data-pm-item]');
+    if (!card || toggle.getAttribute('aria-busy') === 'true') return;
+    const nextActive = card.dataset.active !== '1';
+    toggle.setAttribute('aria-busy', 'true');
+    setProductCardActive(card, nextActive);
+    try {
+        const payload = await sendProductVisibility(card.dataset.visibilityUrl, { active: nextActive ? 1 : 0 });
+        applyVisibilityPayload(payload);
+        const live = document.querySelector('[data-pm-live]');
+        if (live) live.textContent = payload.message ?? '';
+    } catch (error) {
+        setProductCardActive(card, !nextActive);
+        showProductToast(error.message, true);
+    } finally {
+        toggle.removeAttribute('aria-busy');
+    }
+};
+
+const runBulkVisibility = async button => {
+    const bar = button.closest('[data-pm-bulkbar]');
+    const ids = [...productView.selected];
+    if (!bar || !ids.length) return;
+    bar.querySelectorAll('button').forEach(control => { control.disabled = true; });
+    try {
+        const payload = await sendProductVisibility(bar.dataset.url, { ids, active: button.dataset.pmBulk === '1' ? 1 : 0 });
+        applyVisibilityPayload(payload);
+        productView.selected.clear();
+        showProductToast(payload.message);
+    } catch (error) {
+        showProductToast(error.message, true);
+    } finally {
+        bar.querySelectorAll('button').forEach(control => { control.disabled = false; });
+        applyProductFilters();
+    }
+};
+
+// One shared editor is filled from the clicked card's data attributes.
+const fillProductEditor = (drawer, card) => {
+    const data = card.dataset;
+    const form = drawer.querySelector('#product-edit-form');
+    const field = name => form.elements.namedItem(name);
+    drawer.querySelectorAll('[data-pm-image-input]').forEach(resetImagePreview);
+    drawer.querySelectorAll('.product-ajax-inline-error').forEach(error => error.remove());
+    drawer.dataset.productId = data.productId;
+    drawer.querySelector('[data-pm-editor-title]').textContent = data.name;
+    form.action = data.updateUrl;
+    field('form_context').value = `edit-${data.productId}`;
+    field('name').value = data.name;
+    field('category').value = data.category;
+    field('price').value = data.price;
+    field('stock').value = data.stock;
+    field('description').value = data.description ?? '';
+    field('active').checked = data.active === '1';
+    field('remove_image').checked = false;
+
+    const preview = drawer.querySelector('[data-pm-preview]');
+    if (data.imageUrl) {
+        const image = document.createElement('img');
+        image.alt = '';
+        image.src = data.imageUrl;
+        preview.replaceChildren(image);
+    } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'pm-placeholder';
+        placeholder.setAttribute('aria-hidden', 'true');
+        placeholder.textContent = [...data.name][0]?.toLocaleUpperCase() ?? '';
+        preview.replaceChildren(placeholder);
+    }
+    drawer.querySelector('[data-pm-remove-image]').hidden = !data.imageUrl;
+    drawer.querySelector('[data-pm-upload-label]').textContent = data.imageUrl ? 'Replace Picture' : 'Add Picture';
+    const deleteForm = drawer.querySelector('[data-pm-delete-form]');
+    if (deleteForm && data.destroyUrl) deleteForm.action = data.destroyUrl;
 };
 
 let productDrawerTrigger = null;
@@ -619,6 +931,19 @@ const resetImagePreview = input => {
 };
 
 document.addEventListener('change', event => {
+    const checkbox = event.target.closest?.('[data-pm-select]');
+    if (checkbox) {
+        if (checkbox.checked) productView.selected.add(checkbox.value);
+        else productView.selected.delete(checkbox.value);
+        renderProductSelection();
+        return;
+    }
+    const sortSelect = event.target.closest?.('[data-pm-sort]');
+    if (sortSelect) {
+        productView.sort = Object.hasOwn(productSorters, sortSelect.value) ? sortSelect.value : 'menu';
+        applyProductFilters();
+        return;
+    }
     const input = event.target.closest?.('[data-pm-image-input]');
     if (!input) return;
     const file = input.files?.[0];
@@ -641,13 +966,43 @@ document.addEventListener('change', event => {
 document.addEventListener('click', event => {
     const opener = event.target.closest('[data-pm-open]');
     if (opener) {
-        const drawer = document.getElementById(opener.dataset.pmOpen);
-        if (drawer) openProductDrawer(drawer, opener);
+        const drawer = document.getElementById('product-editor');
+        const card = opener.closest('[data-pm-item]');
+        if (drawer && card) {
+            fillProductEditor(drawer, card);
+            openProductDrawer(drawer, opener);
+        }
         return;
     }
     const closer = event.target.closest('[data-pm-close]');
     if (closer) {
         closeProductDrawer(closer.closest('[data-pm-drawer]'));
+        return;
+    }
+    const visibilityToggle = event.target.closest('[data-pm-visibility]');
+    if (visibilityToggle) {
+        toggleProductVisibility(visibilityToggle);
+        return;
+    }
+    if (event.target.closest('[data-pm-select-mode]')) {
+        productView.selecting = !productView.selecting;
+        if (!productView.selecting) productView.selected.clear();
+        renderProductSelection();
+        return;
+    }
+    if (event.target.closest('[data-pm-select-all]')) {
+        document.querySelectorAll('[data-pm-item]:not([hidden])').forEach(item => productView.selected.add(item.dataset.productId));
+        renderProductSelection();
+        return;
+    }
+    if (event.target.closest('[data-pm-select-none]')) {
+        productView.selected.clear();
+        renderProductSelection();
+        return;
+    }
+    const bulkButton = event.target.closest('[data-pm-bulk]');
+    if (bulkButton) {
+        runBulkVisibility(bulkButton);
         return;
     }
     const chip = event.target.closest('[data-pm-category]');
@@ -816,6 +1171,9 @@ document.addEventListener('submit', async event => {
         const workspaceScroll = workspace?.scrollTop ?? 0;
         const windowScroll = window.scrollY;
         currentDashboard.replaceWith(document.importNode(nextDashboard, true));
+        documentFromResponse.querySelectorAll('[data-ajax-sync][id]').forEach(nextElement => {
+            document.getElementById(nextElement.id)?.replaceWith(document.importNode(nextElement, true));
+        });
         document.body.dataset.feedback = serverError ? 'error' : 'success';
         if (response.url && response.url !== window.location.href) {
             window.history.replaceState({}, '', response.url);

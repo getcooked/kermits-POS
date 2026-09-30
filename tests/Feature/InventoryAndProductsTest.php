@@ -238,7 +238,8 @@ class InventoryAndProductsTest extends TestCase
             ->assertOk()
             ->assertSee('id="category-options-template"', false)
             ->assertSee('aria-controls="category-options"', false)
-            ->assertSee('aria-controls="category-'.$latte->getKey().'-options"', false)
+            ->assertSee('aria-controls="category-edit-options"', false)
+            ->assertSee('data-update-url="'.route('products.update', $latte).'"', false)
             ->assertSee('data-category="Drinks"', false)
             ->assertSee('data-category="Starters"', false)
             ->assertSee('max="50"', false);
@@ -353,6 +354,97 @@ class InventoryAndProductsTest extends TestCase
             ->assertSee('Pasta')
             ->assertSee('Beef Stroganoff')
             ->assertDontSee('Old Specials');
+    }
+
+    public function test_super_admin_can_toggle_a_single_product_visibility(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $product = Product::query()->create(['name' => 'Low Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 3, 'active' => false]);
+
+        $this->actingAs($superAdmin)
+            ->patchJson(route('products.visibility', $product), ['active' => 1])
+            ->assertOk()
+            ->assertJson([
+                'ids' => [$product->id],
+                'active' => true,
+                'low_stock_count' => 1,
+            ]);
+
+        $this->assertTrue($product->fresh()->active);
+        $this->assertDatabaseHas('activity_logs', ['route_name' => 'products.visibility']);
+
+        $this->actingAs($superAdmin)
+            ->patch(route('products.visibility', $product), ['active' => 0])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Low Latte is now hidden from the menu.');
+
+        $this->assertFalse($product->fresh()->active);
+    }
+
+    public function test_super_admin_can_show_or_hide_many_products_at_once(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $first = Product::query()->create(['name' => 'First', 'category' => 'Drinks', 'price' => 90, 'stock' => 20, 'active' => false]);
+        $second = Product::query()->create(['name' => 'Second', 'category' => 'Drinks', 'price' => 90, 'stock' => 20, 'active' => false]);
+        $untouched = Product::query()->create(['name' => 'Untouched', 'category' => 'Drinks', 'price' => 90, 'stock' => 20, 'active' => false]);
+
+        $this->actingAs($superAdmin)
+            ->patchJson(route('products.visibility.bulk'), ['ids' => [$first->id, $second->id], 'active' => 1])
+            ->assertOk()
+            ->assertJson(['message' => '2 products shown on the menu.', 'active' => true]);
+
+        $this->assertTrue($first->fresh()->active);
+        $this->assertTrue($second->fresh()->active);
+        $this->assertFalse($untouched->fresh()->active);
+
+        $this->actingAs($superAdmin)
+            ->patchJson(route('products.visibility.bulk'), ['ids' => [$first->id, 999999], 'active' => 0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ids.1');
+        $this->assertTrue($first->fresh()->active);
+
+        $this->actingAs($superAdmin)
+            ->patchJson(route('products.visibility.bulk'), ['ids' => [], 'active' => 0])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ids');
+    }
+
+    public function test_admin_cannot_change_product_visibility(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $product = Product::query()->create(['name' => 'Protected', 'category' => 'Drinks', 'price' => 90, 'stock' => 20, 'active' => true]);
+
+        $this->actingAs($admin)->patchJson(route('products.visibility', $product), ['active' => 0])->assertForbidden();
+        $this->actingAs($admin)->patchJson(route('products.visibility.bulk'), ['ids' => [$product->id], 'active' => 0])->assertForbidden();
+
+        $this->assertTrue($product->fresh()->active);
+    }
+
+    public function test_product_page_uses_one_shared_editor_and_reopens_it_after_validation_errors(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        Product::query()->create(['name' => 'Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 10]);
+        $nachos = Product::query()->create(['name' => 'Nachos', 'category' => 'Starters', 'price' => 180, 'stock' => 10]);
+
+        $page = $this->actingAs($superAdmin)->get('/products')->assertOk()->getContent();
+        $this->assertSame(1, substr_count($page, 'role="dialog"'));
+        $this->assertSame(1, substr_count($page, 'id="product-edit-form"'));
+        $this->assertMatchesRegularExpression('/<div id="product-editor"[^>]*\shidden\s*>/', $page);
+
+        $invalidEdit = $this->actingAs($superAdmin)
+            ->followingRedirects()
+            ->put(route('products.update', $nachos), [
+                'form_context' => 'edit-'.$nachos->id,
+                'name' => 'Loaded Nachos',
+                'category' => 'Starters',
+                'price' => 180,
+                'stock' => 51,
+            ])
+            ->assertOk();
+
+        $this->assertDoesNotMatchRegularExpression('/<div id="product-editor"[^>]*\shidden\s*>/', $invalidEdit->getContent());
+        $invalidEdit->assertSee('value="Loaded Nachos"', false)
+            ->assertSee('action="'.route('products.update', $nachos).'"', false);
     }
 
     public function test_super_admin_add_product_form_is_collapsed_until_needed_and_reopens_after_validation_errors(): void
