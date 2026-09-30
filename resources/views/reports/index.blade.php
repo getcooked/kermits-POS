@@ -73,7 +73,7 @@
         </article>
         <article class="dashboard-card stock-alerts">
             <div class="card-heading"><div><p>LIVE INVENTORY</p><h2>Stock alert</h2></div></div>
-            <div class="alert-list">@forelse($products->take(8) as $product)<div><span>{{ $product->name }}</span><strong class="{{ $product->stock<=5?'danger':'healthy' }}">{{ $product->stock }}</strong></div>@empty<p class="empty-row">No products available.</p>@endforelse</div>
+            <div class="alert-list">@forelse($products->take(8) as $product)<div><span>{{ $product->name }}</span><strong class="{{ $product->stock<=\App\Models\Product::LOW_STOCK_THRESHOLD?'danger':'healthy' }}">{{ $product->stock }}</strong></div>@empty<p class="empty-row">No products available.</p>@endforelse</div>
         </article>
 
         <article class="dashboard-card reservation-card">

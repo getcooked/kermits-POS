@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
+    public const LOW_STOCK_THRESHOLD = 10;
+
     protected $fillable = [
         'name',
         'category',
@@ -67,8 +69,8 @@ class Product extends Model
         return $query->orderBy('category_order')->orderBy('category')->orderBy('name');
     }
 
-    public function scopeLowStock(Builder $query, int $threshold = 5): Builder
+    public function scopeLowStock(Builder $query, ?int $threshold = null): Builder
     {
-        return $query->where('stock', '<=', $threshold);
+        return $query->where('stock', '<=', $threshold ?? self::LOW_STOCK_THRESHOLD);
     }
 }

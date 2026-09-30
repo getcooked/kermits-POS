@@ -259,6 +259,11 @@
                 || 'Changes saved successfully.';
             const targetSelector = form.dataset.ajaxTarget;
 
+            responseDocument.querySelectorAll('[data-ajax-sync][id]').forEach(nextElement => {
+                const currentElement = document.getElementById(nextElement.id);
+                if (currentElement) currentElement.replaceWith(document.importNode(nextElement, true));
+            });
+
             if (targetSelector) {
                 const currentTarget = document.querySelector(targetSelector);
                 const nextTarget = responseDocument.querySelector(targetSelector);

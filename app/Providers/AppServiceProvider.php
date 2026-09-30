@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\FcmMessageSender;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Reservation;
 use App\Observers\OrderObserver;
 use App\Observers\ReservationObserver;
@@ -52,6 +53,15 @@ class AppServiceProvider extends ServiceProvider
                 ]);
             },
         );
+
+        View::composer('partials.admin-sidebar', function ($view): void {
+            $view->with(
+                'lowStockCount',
+                auth()->user()?->hasRole('super_admin')
+                    ? Product::query()->available()->lowStock()->count()
+                    : 0,
+            );
+        });
 
         View::composer('shop.index', function ($view): void {
             $view->with(

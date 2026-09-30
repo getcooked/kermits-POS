@@ -14,6 +14,29 @@ class InventoryAndProductsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_admin_sidebar_shows_low_stock_count_at_ten_units_or_below(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        Product::query()->create(['name' => 'At Threshold', 'price' => 20, 'stock' => 10, 'active' => true]);
+        Product::query()->create(['name' => 'Empty', 'price' => 20, 'stock' => 0, 'active' => true]);
+        Product::query()->create(['name' => 'Healthy', 'price' => 20, 'stock' => 11, 'active' => true]);
+        Product::query()->create(['name' => 'Inactive Low', 'price' => 20, 'stock' => 1, 'active' => false]);
+
+        $html = $this->actingAs($superAdmin)->get('/inventory')->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<b id="low-stock-badge"[^>]*aria-label="2 low-stock products"\s*>2<\/b>/', $html);
+    }
+
+    public function test_admin_sidebar_hides_low_stock_badge_when_stock_is_healthy(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        Product::query()->create(['name' => 'Healthy', 'price' => 20, 'stock' => 11, 'active' => true]);
+
+        $html = $this->actingAs($superAdmin)->get('/inventory')->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<b id="low-stock-badge"[^>]*\shidden\s*>0<\/b>/', $html);
+    }
+
     public function test_super_admin_stock_adjustment_is_audited(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
