@@ -15,7 +15,6 @@ class InventoryController extends Controller
     {
         return view('inventory.index', [
             'products' => Product::query()->menuOrder()->get(),
-            'movements' => StockMovement::query()->with(['product', 'user'])->latest()->limit(50)->get(),
             'lowStock' => Product::query()->available()->lowStock()->count(),
             'totalUnits' => Product::query()->sum('stock'),
         ]);
