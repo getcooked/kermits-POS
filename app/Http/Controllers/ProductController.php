@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Throwable;
 
@@ -40,6 +41,11 @@ class ProductController extends Controller
                 ->distinct()
                 ->orderBy('category')
                 ->pluck('category'),
+            'categoryCounts' => Product::query()
+                ->whereNotNull('category')
+                ->selectRaw('category, count(*) as total')
+                ->groupBy('category')
+                ->pluck('total', 'category'),
             'searchProducts' => Product::query()
                 ->orderBy('name')
                 ->pluck('name'),
@@ -107,7 +113,7 @@ class ProductController extends Controller
     {
         $request->validate(['active' => ['required', 'boolean']]);
         $product->update(['active' => $request->boolean('active')]);
-        $message = $product->name.($product->active ? ' is now shown on the menu.' : ' is now hidden from the menu.');
+        $message = $product->name.($product->active ? ' is now enabled.' : ' is now disabled.');
 
         return $this->visibilityResponse($request, $message, [$product->getKey()], $product->active);
     }
@@ -122,7 +128,7 @@ class ProductController extends Controller
         $active = $request->boolean('active');
         $ids = array_map('intval', $validated['ids']);
         $updated = Product::query()->whereKey($ids)->update(['active' => $active]);
-        $message = $updated.' '.Str::plural('product', $updated).($active ? ' shown on the menu.' : ' hidden from the menu.');
+        $message = $updated.' '.Str::plural('product', $updated).($active ? ' enabled.' : ' disabled.');
 
         return $this->visibilityResponse($request, $message, $ids, $active);
     }
@@ -139,6 +145,33 @@ class ProductController extends Controller
             'active' => $active,
             'low_stock_count' => Product::query()->available()->lowStock()->count(),
         ]);
+    }
+
+    /**
+     * Categories are just a name on each product, so deleting one moves its products
+     * to another category first; nothing is lost and order history is untouched.
+     */
+    public function destroyCategory(Request $request): RedirectResponse
+    {
+        $request->merge(['move_to' => Str::title(Str::squish((string) $request->input('move_to')))]);
+        $validated = $request->validate([
+            'category' => ['required', 'string', 'max:80', Rule::exists('products', 'category')],
+            'move_to' => ['required', 'string', 'max:80', 'different:category'],
+        ], [
+            'category.exists' => 'That category no longer exists.',
+            'move_to.required' => 'Choose where its products should go.',
+            'move_to.different' => 'Choose a different category to move the products to.',
+        ]);
+
+        $order = $this->categoryOrder($validated['move_to']);
+        $moved = Product::query()
+            ->where('category', $validated['category'])
+            ->update(['category' => $validated['move_to'], 'category_order' => $order]);
+
+        return redirect()->route('products.index')->with(
+            'status',
+            "Deleted the {$validated['category']} category and moved {$moved} ".Str::plural('product', $moved)." to {$validated['move_to']}.",
+        );
     }
 
     private function categoryOrder(string $category, ?Product $except = null): int

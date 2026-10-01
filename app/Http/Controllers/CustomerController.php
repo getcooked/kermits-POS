@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ManagesAccountAccess;
 use App\Http\Requests\UpdateCustomerAccountRequest;
 use App\Models\Reservation;
 use App\Models\User;
@@ -14,6 +15,8 @@ use Illuminate\View\View;
 
 class CustomerController extends Controller
 {
+    use ManagesAccountAccess;
+
     public function index(): View
     {
         $customers = User::query()
@@ -29,6 +32,20 @@ class CustomerController extends Controller
             ->pluck('total', 'email');
 
         return view('customers.index', compact('customers', 'reservationCounts'));
+    }
+
+    public function disable(User $customer): RedirectResponse
+    {
+        abort_unless($customer->hasRole(User::ROLE_CUSTOMER), 404);
+
+        return $this->disableAccount($customer, 'customer');
+    }
+
+    public function enable(User $customer): RedirectResponse
+    {
+        abort_unless($customer->hasRole(User::ROLE_CUSTOMER), 404);
+
+        return $this->enableAccount($customer, 'customer');
     }
 
     public function show(User $customer): View

@@ -14,8 +14,8 @@
         : null;
     $stats = [
         'all' => ['label' => 'All Products', 'count' => $products->count()],
-        'visible' => ['label' => 'On Menu', 'count' => $products->where('active', true)->count()],
-        'hidden' => ['label' => 'Hidden', 'count' => $products->where('active', false)->count()],
+        'enabled' => ['label' => 'Enabled', 'count' => $products->where('active', true)->count()],
+        'disabled' => ['label' => 'Disabled', 'count' => $products->where('active', false)->count()],
         'low' => ['label' => 'Low Stock', 'count' => $products->filter(fn ($product) => $product->stock <= $lowThreshold)->count()],
         'noimage' => ['label' => 'No Picture', 'count' => $imageUrls->filter(fn ($url) => ! $url)->count()],
     ];
@@ -41,19 +41,15 @@
         <div class="product-header-actions">
         <form method="GET" action="{{ route('products.index') }}" class="product-search-form" aria-label="Search products">
             <div class="product-search-control">
-                <div class="product-search-field">
-                    <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-                    <input id="product-search" name="search" type="search" value="{{ $search }}" placeholder="Search products or categories" maxlength="100" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="product-search-options" aria-expanded="false" aria-label="Search products or categories">
+                <x-search-field id="product-search" name="search" :value="$search" placeholder="Search products or categories" maxlength="100" role="combobox" aria-autocomplete="list" aria-controls="product-search-options" aria-expanded="false" submit-on-clear>
                     <button class="product-search-dropdown" type="button" aria-label="Show products and categories" title="Show products and categories" aria-controls="product-search-options" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"></path></svg></button>
-                </div>
+                </x-search-field>
                 <div id="product-search-options" class="product-search-options" role="listbox" hidden>
                     @foreach($categories as $category)<button type="button" class="product-search-option" role="option" data-search-value="{{ $category }}"><span>{{ $category }}</span><small>Category</small></button>@endforeach
                     @foreach($searchProducts as $productName)<button type="button" class="product-search-option" role="option" data-search-value="{{ $productName }}"><span>{{ $productName }}</span><small>Product</small></button>@endforeach
                     <p class="product-search-empty" hidden>No matching products or categories</p>
                 </div>
             </div>
-            <button class="product-search-button" type="submit">Search</button>
-            @if($search !== '')<a class="product-search-clear" href="{{ route('products.index') }}" aria-label="Clear search" title="Clear search"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></a>@endif
         </form>
         @if($canCreate)<button id="product-create-toggle" class="product-create-toggle" type="button" aria-controls="product-create-panel" aria-expanded="{{ $formContext === 'create' ? 'true' : 'false' }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>{{ $formContext === 'create' ? 'Close Form' : 'Add Product' }}</span></button>@endif
         </div>
@@ -63,7 +59,7 @@
     @if($errors->any())<div class="error pm-page-error">{{ $errors->first() }}</div>@endif
 
     @if($canCreate)<section id="product-create-panel" class="welcome product-create-panel" {{ $formContext === 'create' ? '' : 'hidden' }}>
-        <div class="pm-panel-head"><h2>New Product</h2><p class="muted">It appears on the cashier page as soon as it's saved and visible.</p></div>
+        <div class="pm-panel-head"><h2>New Product</h2><p class="muted">It can be sold on the POS, shop and mobile app as soon as it's saved and enabled.</p></div>
         <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data" class="product-ajax-form pm-create-layout" data-action-label="Adding product...">@csrf
             <input type="hidden" name="form_context" value="create">
             <div class="pm-photo-field">
@@ -81,7 +77,7 @@
                 <div class="field"><label for="stock">Stock</label><input class="control" id="stock" name="stock" type="number" min="0" max="{{ $maxStock }}" step="1" inputmode="numeric" value="{{ old('stock', 0) }}" data-stock-limit required><small class="pm-hint">0–{{ $maxStock }} units</small></div>
                 <div class="field pm-span"><label for="description">Description</label><textarea class="control" id="description" name="description" rows="2" maxlength="500">{{ old('description') }}</textarea></div>
                 <div class="pm-span pm-form-actions">
-                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $formContext !== 'create' || old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Show on cashier page</strong><small>Hidden products can't be ordered.</small></span></label>
+                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $formContext !== 'create' || old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Enabled</strong><small>Disabled products can't be sold anywhere.</small></span></label>
                     <button class="button pm-primary" type="submit">Add Product</button>
                 </div>
             </div>
@@ -102,6 +98,7 @@
         </div>
         <div class="pm-toolbar-end">
         <label class="pm-sort"><span class="pm-sr">Sort products</span><select class="control" data-pm-sort>@foreach($sortOptions as $sort => $label)<option value="{{ $sort }}">{{ $label }}</option>@endforeach</select></label>
+        @if($canDelete && $categoryCounts->isNotEmpty())<button type="button" class="pm-select-toggle" data-pm-categories-open aria-haspopup="dialog" aria-controls="pm-categories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg><span>Categories</span></button>@endif
         <button type="button" class="pm-select-toggle" data-pm-select-mode aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>Select</span></button>
         <div class="pm-view-toggle" role="group" aria-label="Layout">
             <button type="button" data-pm-view="grid" aria-pressed="true" aria-label="Grid view" title="Grid view"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"></rect></svg></button>
@@ -141,7 +138,7 @@
                     <label class="pm-select"><input type="checkbox" data-pm-select value="{{ $product->getKey() }}"><span class="pm-sr">Select {{ $product->name }}</span></label>
                     <div class="pm-media">
                         @if($imageUrl)<img class="product-image" src="{{ $imageUrl }}" alt="" loading="lazy">@else<span class="pm-placeholder" aria-hidden="true">{{ $placeholder($product->name) }}</span>@endif
-                        <span class="pm-flag" data-pm-flag @if($product->active) hidden @endif>Hidden</span>
+                        <span class="pm-flag" data-pm-flag @if($product->active) hidden @endif>Disabled</span>
                     </div>
                     <div class="pm-body">
                         <h3>{{ $product->name }}</h3>
@@ -152,7 +149,7 @@
                         <span class="pm-stock {{ $stock['class'] }}">{{ $stock['label'] }}</span>
                     </div>
                     <div class="pm-actions">
-                        <button type="button" class="pm-toggle" role="switch" aria-checked="{{ $product->active ? 'true' : 'false' }}" data-pm-visibility title="Show on cashier page"><span class="pm-toggle-track" aria-hidden="true"></span><span class="pm-toggle-label" data-pm-toggle-label>{{ $product->active ? 'On menu' : 'Hidden' }}</span><span class="pm-sr"> – {{ $product->name }}</span></button>
+                        <button type="button" class="pm-toggle" role="switch" aria-checked="{{ $product->active ? 'true' : 'false' }}" data-pm-visibility title="Enable or disable this product"><span class="pm-toggle-track" aria-hidden="true"></span><span class="pm-toggle-label" data-pm-toggle-label>{{ $product->active ? 'Enabled' : 'Disabled' }}</span><span class="pm-sr"> – {{ $product->name }}</span></button>
                         <button type="button" class="pm-edit" data-pm-open aria-haspopup="dialog" aria-controls="product-editor"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg><span>Edit<span class="pm-sr"> {{ $product->name }}</span></span></button>
                     </div>
                 </article>
@@ -180,8 +177,8 @@
         <button type="button" class="pm-link" data-pm-select-all>Select all shown</button>
         <button type="button" class="pm-link" data-pm-select-none>Clear</button>
         <span class="pm-bulk-spacer"></span>
-        <button type="button" class="pm-bulk-button" data-pm-bulk="1" disabled>Show on menu</button>
-        <button type="button" class="pm-bulk-button" data-pm-bulk="0" disabled>Hide</button>
+        <button type="button" class="pm-bulk-button" data-pm-bulk="1" disabled>Enable</button>
+        <button type="button" class="pm-bulk-button" data-pm-bulk="0" disabled>Disable</button>
         <button type="button" class="pm-bulk-done" data-pm-select-mode>Done</button>
     </div>
     <p class="pm-sr" role="status" aria-live="polite" data-pm-live></p>
@@ -217,10 +214,10 @@
                         <div class="field pm-span"><label for="name-edit">Name</label><input class="control" id="name-edit" name="name" value="{{ $value('name', $editingProduct?->name) }}" required></div>
                         <div class="field pm-span"><label for="category-edit">Category</label>@include('products.partials.category-picker', ['id' => 'category-edit', 'value' => $value('category', $editingProduct?->category), 'placeholder' => 'Select or type a category'])</div>
                         <div class="field"><label for="price-edit">Price (₱)</label><input class="control" id="price-edit" name="price" type="number" min="0.01" step="0.01" value="{{ $value('price', $editingProduct?->price) }}" required></div>
-                        <div class="field"><label for="stock-edit">Stock</label><input class="control" id="stock-edit" name="stock" type="number" min="0" max="{{ $maxStock }}" step="1" inputmode="numeric" value="{{ $value('stock', $editingProduct?->stock) }}" data-stock-limit required><small class="pm-hint">0–{{ $maxStock }} units</small></div>
+                        <div class="field"><span class="pm-field-label">Stock</span><div class="pm-stock-readonly"><strong data-pm-editor-stock>{{ $editingProduct?->stock ?? 0 }} units</strong><a href="{{ route('inventory.index', $editing ? ['search' => $editingProduct->name] : []) }}" data-pm-inventory-link data-base-url="{{ route('inventory.index') }}">Adjust in Inventory</a></div><small class="pm-hint">Stock changes are made in Inventory so each one is recorded.</small></div>
                         <div class="field pm-span"><label for="description-edit">Description</label><textarea class="control" id="description-edit" name="description" rows="3" maxlength="500">{{ $value('description', $editingProduct?->description) }}</textarea></div>
                     </div>
-                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $editing && old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Show on cashier page</strong><small>Hidden products stay in your records but can't be ordered.</small></span></label>
+                    <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $editing && old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Enabled</strong><small>Disabled products can't be sold on the POS, shop, mobile app or reservations. Their sales history is kept.</small></span></label>
                 </form>
                 @if($canDelete)
                 <form method="POST" @if($editing) action="{{ route('products.destroy', $editingProduct) }}" @endif class="product-ajax-form pm-danger" data-pm-delete-form data-action-label="Deleting..." data-confirm="Permanently delete this product?" data-confirm-title="Delete product?">@csrf @method('DELETE')
@@ -233,6 +230,37 @@
                 <button type="button" class="logout" data-pm-close>Cancel</button>
                 <button class="button pm-primary" type="submit" form="product-edit-form">Save Changes</button>
             </footer>
+        </div>
+    </div>
+    @endif
+
+    @if($canDelete && $categoryCounts->isNotEmpty())
+    <div id="pm-categories" class="pm-cropper pm-categories" data-pm-categories role="dialog" aria-modal="true" aria-labelledby="pm-categories-title" hidden>
+        <div class="pm-cropper-backdrop" data-pm-categories-close></div>
+        <div class="pm-cropper-panel">
+            <header class="pm-cropper-head">
+                <div><h2 id="pm-categories-title">Categories</h2><p>Deleting a category moves its products to another category first, so no product or sales record is lost.</p></div>
+                <button type="button" class="pm-icon-button" data-pm-categories-close aria-label="Close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+            </header>
+            <ul class="pm-category-list">
+                @foreach($categoryCounts as $category => $total)
+                <li class="pm-category-row">
+                    <div class="pm-category-summary">
+                        <div><strong>{{ $category }}</strong><small>{{ $total }} {{ Str::plural('product', $total) }}</small></div>
+                        <button type="button" class="pm-category-delete-toggle" data-pm-category-delete aria-expanded="false">Delete</button>
+                    </div>
+                    <form method="POST" action="{{ route('products.categories.destroy') }}" class="product-ajax-form pm-category-delete" data-action-label="Deleting..." data-confirm="Delete the {{ $category }} category? Its {{ $total }} {{ Str::plural('product', $total) }} will move to the category you chose." data-confirm-title="Delete category?" hidden>@csrf @method('DELETE')
+                        <input type="hidden" name="category" value="{{ $category }}">
+                        <label for="move-{{ $loop->index }}">Move its {{ $total }} {{ Str::plural('product', $total) }} to</label>
+                        <select class="control" id="move-{{ $loop->index }}" name="move_to" required>
+                            @foreach($categoryCounts->keys()->reject(fn ($other) => $other === $category) as $other)<option value="{{ $other }}">{{ $other }}</option>@endforeach
+                            @unless($category === 'Uncategorized' || $categoryCounts->has('Uncategorized'))<option value="Uncategorized">Uncategorized</option>@endunless
+                        </select>
+                        <div class="pm-category-actions"><button type="button" class="logout" data-pm-category-cancel>Cancel</button><button type="submit" class="pm-delete">Delete category</button></div>
+                    </form>
+                </li>
+                @endforeach
+            </ul>
         </div>
     </div>
     @endif
@@ -280,25 +308,16 @@
 .product-header-actions{min-width:0;flex:1;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .product-search-form{width:min(560px,100%);min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .product-search-control{position:relative;min-width:0;flex:1}
-.product-search-field{position:relative;min-width:0;flex:1;height:44px;display:flex;align-items:center;gap:10px;padding:0 42px 0 14px;border:1px solid #d2d5cb;border-radius:10px;background:#fff;transition:border-color .15s,box-shadow .15s}
-.product-search-field:focus-within{border-color:#737d00;box-shadow:0 0 0 3px rgba(175,185,26,.17)}
-.product-search-field svg{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
-#product-search{min-width:0;flex:1;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:0;outline:0;box-shadow:none;background:transparent;color:#171817;font-family:inherit;font-size:14px;font-weight:400;appearance:none}
-#product-search::placeholder{color:#858a82;opacity:1}
-.product-search-dropdown{position:absolute;z-index:2;top:5px;right:5px;width:32px;height:32px;padding:0;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:#62675f;cursor:pointer}
+.product-search-dropdown{width:32px;height:32px;flex:0 0 32px;padding:0;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:#62675f;cursor:pointer}
 .product-search-dropdown:hover{background:#eff0ea;color:#171817}
 .product-search-dropdown svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .product-search-dropdown[aria-expanded="true"] svg{transform:rotate(180deg)}
 .product-search-options{position:absolute;z-index:30;top:calc(100% + 7px);left:0;right:0;max-height:310px;overflow-y:auto;padding:7px;border:1px solid #dfe1da;border-radius:8px;background:#fff;box-shadow:0 12px 28px rgba(23,24,23,.14)}
 .product-search-option{width:100%;min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 11px;border:0;border-radius:6px;background:transparent;color:#252724;font-family:inherit;font-size:14px;text-align:left;cursor:pointer}
+.product-search-option[hidden],.product-search-empty[hidden]{display:none}
 .product-search-option:hover,.product-search-option.is-active{background:#eff0ea;color:#171817}
 .product-search-option small{color:#81867e;font-size:11px;white-space:nowrap}
 .product-search-empty{margin:0;padding:14px 11px;color:#777d74;font-size:13px;text-align:center}
-.product-search-button{height:44px;padding:0 18px;border:1px solid #d2d5cb;border-radius:10px;background:#fff;color:#252724;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
-.product-search-button:hover{border-color:#b9beb0;background:#eff0ea}
-.product-search-clear{width:44px;height:44px;display:grid;place-items:center;border-radius:8px;color:#555b52;text-decoration:none}
-.product-search-clear:hover{background:#e8e9e3;color:#171817}
-.product-search-clear svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .product-search-summary{margin:-12px 0 20px;color:#6d736a;font-size:13px;text-align:right}
 .product-create-toggle{height:44px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 18px;border:0;border-radius:10px;background:#171817;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
 .product-create-toggle:hover{background:#30322e}
@@ -318,6 +337,11 @@
 .pm-fields label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
 .pm-fields-wide{grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)}
 .pm-span{grid-column:1/-1}
+.pm-field-label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
+.pm-stock-readonly{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px dashed #cfd2c8;border-radius:11px;background:#f7f7f2}
+.pm-stock-readonly strong{font-size:15px;font-variant-numeric:tabular-nums}
+.pm-stock-readonly a{color:#4e5700;font-size:13px;font-weight:800;text-decoration:none}
+.pm-stock-readonly a:hover{text-decoration:underline}
 .pm-hint{display:block;margin-top:5px;color:#80857c;font-size:12px}
 .pm-form-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:4px}
 .pm-primary{width:auto;padding-inline:26px}
@@ -358,7 +382,7 @@
 .pm-stat strong{font-size:26px;line-height:1.1;letter-spacing:-.03em}
 .pm-stat:hover{border-color:#b9beb0}
 .pm-stat[aria-pressed="true"]{border-color:#171817;box-shadow:inset 0 0 0 1px #171817}
-.pm-stat-hidden strong{color:#6c7068}
+.pm-stat-disabled strong{color:#6c7068}
 .pm-stat-low strong{color:#b42318}
 
 /* Toolbar */
@@ -517,6 +541,20 @@ body.pm-cropper-open .admin-workspace{overflow:hidden!important}
 .pm-cropper-foot .logout,.pm-cropper-foot .button{min-height:44px;width:auto}
 .pm-cropper-foot .button:disabled{opacity:.5}
 @media(max-width:520px){.pm-cropper{padding:0;place-items:end stretch}.pm-cropper-panel{width:100%;max-height:100dvh;border-radius:18px 18px 0 0;padding:16px}.pm-cropper-foot .logout,.pm-cropper-foot .button{flex:1}}
+/* Category management dialog (reuses the cropper's dialog frame) */
+.pm-categories .pm-cropper-panel{width:min(520px,100%)}
+.pm-category-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.pm-category-row{padding:12px 14px;border:1px solid #dfe1d7;border-radius:12px;background:#fff}
+.pm-category-summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pm-category-summary strong{display:block;font-size:15px}
+.pm-category-summary small{color:#6c7068;font-size:12px}
+.pm-category-delete-toggle{height:34px;padding:0 12px;border:1px solid #e3b4b0;border-radius:9px;background:#fff;color:#b42318;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.pm-category-delete-toggle:hover,.pm-category-delete-toggle[aria-expanded="true"]{background:#fff4f2}
+.pm-category-delete{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #f0e0de}
+.pm-category-delete[hidden]{display:none}
+.pm-category-delete label{font-size:13px;font-weight:700;color:#3b3f38}
+.pm-category-actions{display:flex;justify-content:flex-end;gap:8px}
+.pm-category-actions .logout{min-height:38px;width:auto}
 @keyframes pm-slide{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
 @keyframes pm-fade{from{opacity:0}to{opacity:1}}
 
@@ -533,7 +571,7 @@ body.pm-cropper-open .admin-workspace{overflow:hidden!important}
 @media(max-width:900px){.pm-create-layout{grid-template-columns:minmax(0,1fr)}.pm-create-layout>.pm-photo-field{grid-template-columns:120px minmax(0,1fr);align-items:center}.pm-create-layout>.pm-photo-field .pm-photo-preview{grid-row:span 3;aspect-ratio:1}.pm-catalog[data-view="list"] .pm-desc{display:none}}
 @media(max-width:1180px){.pm-toolbar{flex-direction:column;align-items:stretch;gap:12px}.pm-toolbar-end{justify-content:flex-end}}
 @media(max-width:780px){.pm-stats{display:flex;overflow-x:auto;scrollbar-width:none;gap:10px}.pm-stats::-webkit-scrollbar{display:none}.pm-stat{flex:0 0 132px}.pm-toolbar-end{justify-content:stretch}.pm-sort{flex:1;min-width:0}.pm-sort select{width:100%}.pm-bulkbar{bottom:10px;padding:12px}.pm-bulk-spacer{display:none}.pm-bulk-button{flex:1}.pm-catalog[data-view="list"] .pm-actions{grid-column:3;grid-row:1/span 2;flex-direction:column;align-items:stretch;gap:6px}.pm-catalog[data-view="list"] .pm-toggle{min-width:0;height:34px}.pm-catalog[data-view="list"] .pm-edit{height:34px}.pm-chips{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}.pm-chips::-webkit-scrollbar{display:none}.pm-chip{flex:0 0 auto;white-space:nowrap}.pm-catalog[data-view="list"] .pm-card{grid-template-columns:48px minmax(0,1fr) auto;gap:12px}.pm-catalog[data-view="list"] .pm-media{width:48px;height:48px}.pm-catalog[data-view="list"] .pm-meta{grid-column:2;grid-row:2;justify-content:flex-start}.pm-catalog[data-view="list"] .pm-price,.pm-catalog[data-view="list"] .pm-stock{min-width:0;text-align:left}.pm-drawer-foot .logout,.pm-drawer-foot .button{flex:1}}
-@media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}#product-search{font-size:16px}.product-search-button{padding-inline:14px}.product-create-toggle{width:100%;justify-content:center}.pm-drawer-panel{width:100%}.pm-drawer-head,.pm-drawer-scroll,.pm-drawer-foot{padding-inline:16px}}
+@media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}.product-create-toggle{width:100%;justify-content:center}.pm-drawer-panel{width:100%}.pm-drawer-head,.pm-drawer-scroll,.pm-drawer-foot{padding-inline:16px}}
 @media(max-width:520px){.pm-fields,.pm-fields-wide{grid-template-columns:minmax(0,1fr)}.pm-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pm-body{padding:10px 12px 0}.pm-body h3{font-size:14px}.pm-desc{display:none}.pm-meta{padding:8px 12px 10px;gap:6px}.pm-price{font-size:15px}.pm-stock{font-size:11px;padding:3px 7px}.pm-actions{padding:0 12px 12px;gap:6px}.pm-edit{height:36px;font-size:13px}.pm-edit svg{display:none}.pm-toggle{height:36px;padding:0 8px}.pm-catalog[data-view="grid"] .pm-toggle-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.pm-stat{padding:12px 14px}.pm-stat strong{font-size:22px}.pm-photo-row{grid-template-columns:96px minmax(0,1fr)}.pm-danger{flex-direction:column;align-items:stretch}.pm-primary{width:100%}}
 @media(prefers-reduced-motion:reduce){.pm-drawer-panel,.pm-drawer-backdrop{animation:none}}
 </style>
@@ -720,7 +758,7 @@ const initializeCategoryPickers = () => {
 };
 
 // Filters, sorting, layout and selection live outside the replaced markup so they survive the AJAX re-render.
-const productStatuses = ['all', 'visible', 'hidden', 'low', 'noimage'];
+const productStatuses = ['all', 'enabled', 'disabled', 'low', 'noimage'];
 const productSorters = {
     name: (a, b) => a.dataset.name.localeCompare(b.dataset.name, undefined, { sensitivity: 'base' }),
     'price-asc': (a, b) => Number(a.dataset.price) - Number(b.dataset.price),
@@ -740,8 +778,8 @@ const productView = {
 try { productView.view = localStorage.getItem('products.view') === 'list' ? 'list' : 'grid'; } catch (error) {}
 
 const productMatchesStatus = (item, status) => status === 'all'
-    || (status === 'visible' && item.dataset.active === '1')
-    || (status === 'hidden' && item.dataset.active === '0')
+    || (status === 'enabled' && item.dataset.active === '1')
+    || (status === 'disabled' && item.dataset.active === '0')
     || (status === 'low' && item.dataset.low === '1')
     || (status === 'noimage' && item.dataset.image === '0');
 
@@ -850,7 +888,7 @@ const setProductCardActive = (card, active) => {
     if (flag) flag.hidden = active;
     card.querySelector('[data-pm-visibility]')?.setAttribute('aria-checked', String(active));
     const label = card.querySelector('[data-pm-toggle-label]');
-    if (label) label.textContent = active ? 'On menu' : 'Hidden';
+    if (label) label.textContent = active ? 'Enabled' : 'Disabled';
 };
 
 const sendProductVisibility = async (url, fields) => {
@@ -940,7 +978,9 @@ const fillProductEditor = (drawer, card) => {
     field('name').value = data.name;
     field('category').value = data.category;
     field('price').value = data.price;
-    field('stock').value = data.stock;
+    drawer.querySelector('[data-pm-editor-stock]').textContent = `${data.stock} ${Number(data.stock) === 1 ? 'unit' : 'units'}`;
+    const inventoryLink = drawer.querySelector('[data-pm-inventory-link]');
+    inventoryLink.href = `${inventoryLink.dataset.baseUrl}?search=${encodeURIComponent(data.name)}`;
     field('description').value = data.description ?? '';
     field('active').checked = data.active === '1';
     field('remove_image').checked = false;
@@ -1271,6 +1311,55 @@ const trapFocus = (event, container) => {
     }
 };
 
+// Category management: each row reveals a "move its products to" form before the category is deleted.
+let categoriesTrigger = null;
+const closeCategories = () => {
+    const dialog = document.querySelector('[data-pm-categories]');
+    if (!dialog || dialog.hidden) return;
+    dialog.hidden = true;
+    dialog.querySelectorAll('.pm-category-delete').forEach(form => { form.hidden = true; });
+    dialog.querySelectorAll('[data-pm-category-delete]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+    document.body.classList.remove('pm-cropper-open');
+    if (categoriesTrigger?.isConnected) categoriesTrigger.focus({ preventScroll: true });
+    categoriesTrigger = null;
+};
+document.addEventListener('click', event => {
+    const opener = event.target.closest('[data-pm-categories-open]');
+    if (opener) {
+        const dialog = document.querySelector('[data-pm-categories]');
+        if (!dialog) return;
+        categoriesTrigger = opener;
+        dialog.hidden = false;
+        document.body.classList.add('pm-cropper-open');
+        dialog.querySelector('.pm-icon-button')?.focus({ preventScroll: true });
+        return;
+    }
+    if (event.target.closest('[data-pm-categories-close]')) {
+        closeCategories();
+        return;
+    }
+    const toggle = event.target.closest('[data-pm-category-delete], [data-pm-category-cancel]');
+    if (!toggle) return;
+    const row = toggle.closest('.pm-category-row');
+    const form = row.querySelector('.pm-category-delete');
+    const opening = toggle.hasAttribute('data-pm-category-delete') && form.hidden;
+    form.hidden = !opening;
+    row.querySelector('[data-pm-category-delete]').setAttribute('aria-expanded', String(opening));
+    if (opening) form.querySelector('select')?.focus();
+});
+document.addEventListener('keydown', event => {
+    const dialog = document.querySelector('[data-pm-categories]:not([hidden])');
+    if (!dialog || document.querySelector('.app-alert-layer')) return;
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeCategories();
+    } else if (event.key === 'Tab') {
+        event.stopImmediatePropagation();
+        trapFocus(event, dialog.querySelector('.pm-cropper-panel'));
+    }
+}, true);
+
 document.addEventListener('click', event => {
     const opener = event.target.closest('[data-pm-crop-open]');
     if (opener) {
@@ -1470,6 +1559,7 @@ const initializeProductPage = () => {
     initializeCategoryPickers();
     applyProductFilters();
     document.body.classList.toggle('pm-drawer-open', Boolean(document.querySelector('[data-pm-drawer]:not([hidden])')));
+    document.body.classList.toggle('pm-cropper-open', Boolean(document.querySelector('[data-pm-cropper]:not([hidden]), [data-pm-categories]:not([hidden])')));
 };
 
 document.addEventListener('input', event => {

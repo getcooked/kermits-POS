@@ -31,7 +31,11 @@ class ProductRequest extends FormRequest
             'category' => ['nullable', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:500'],
             'price' => ['required', 'decimal:0,2', 'min:0.01', 'max:999999.99'],
-            'stock' => ['required', 'integer', 'min:0', 'max:'.Product::MAX_STOCK],
+            // Opening stock is set when a product is created; after that, stock only changes in Inventory,
+            // where every adjustment is recorded, so edits ignore it.
+            'stock' => $this->isMethod('POST')
+                ? ['required', 'integer', 'min:0', 'max:'.Product::MAX_STOCK]
+                : ['exclude'],
             'active' => ['nullable', 'boolean'],
             'image' => [
                 'nullable',

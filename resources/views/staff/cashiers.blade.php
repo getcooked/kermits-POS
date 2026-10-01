@@ -1,25 +1,100 @@
 @extends('layouts.app')
 @section('title','Cashier Accounts')
 @section('content')
-<div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard cashier-accounts">
-    <header class="topbar"><div><h1>Cashier Accounts</h1><span>Create secure staff access for the point of sale.</span></div></header>
+@php
+    $createOpen = $errors->any() && (filled(old('name')) || filled(old('email')));
+    $activeCount = $cashiers->whereNull('disabled_at')->count();
+    $disabledCount = $cashiers->whereNotNull('disabled_at')->count();
+@endphp
+<div class="admin-shell">@include('partials.admin-sidebar')<main class="admin-workspace"><div class="dashboard ad-page" data-ad-page>
+    <header class="topbar ad-head">
+        <div><h1>Cashier Accounts</h1><p>Create and manage staff access to the point of sale.</p></div>
+        <div class="ad-head-actions">
+            <x-search-field id="cashier-search" placeholder="Search cashiers by name, email or phone" data-ad-search />
+            <button type="button" class="ad-primary" data-ad-create-toggle data-label="Add Cashier" aria-controls="cashier-create-panel" aria-expanded="{{ $createOpen ? 'true' : 'false' }}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>{{ $createOpen ? 'Close Form' : 'Add Cashier' }}</span></button>
+        </div>
+    </header>
     @include('partials.account-tabs')
-    @if(session('status'))<div class="notice account-notice">{{ session('status') }}</div>@endif
-    @if($errors->any())<div class="error account-notice">{{ $errors->first() }}</div>@endif
-    <section class="cashier-summary-cards"><div class="welcome"><span>Cashier Accounts</span><h2>{{ $cashiers->count() }}</h2></div><div class="welcome"><span>Active Cashier Accounts</span><h2>{{ $cashiers->whereNull('disabled_at')->count() }}</h2></div><div class="welcome"><span>Disabled Cashier Accounts</span><h2>{{ $cashiers->whereNotNull('disabled_at')->count() }}</h2></div></section>
-    <div class="cashier-account-grid">
-        <section class="welcome create-cashier"><p>NEW CASHIER</p><h2>Create Cashier Account</h2><form method="POST" action="{{ route('cashiers.store') }}" data-ajax-form data-ajax-target=".cashier-accounts" data-ajax-loading="Creating...">@csrf
-            <div class="field"><label for="name">Full Name</label><input class="control" id="name" name="name" value="{{ old('name') }}" maxlength="100" required><small>Maximum 100 characters.</small></div>
-            <div class="field"><label for="email">Email Address</label><input class="control" id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" required></div>
-            <div class="field"><label for="phone">Phone Number</label><input class="control" id="phone" name="phone" type="tel" inputmode="numeric" minlength="11" maxlength="11" pattern="09[0-9]{9}" value="{{ old('phone') }}" placeholder="09XXXXXXXXX" required><small>11 digits starting with 09.</small></div>
-            <div class="field"><label for="password">Temporary Password</label><input class="control" id="password" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, number, and symbol.</small></div>
-            <div class="field"><label for="password_confirmation">Confirm Password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>
-            <button class="button" type="submit">Create Cashier Account</button>
-        </form></section>
-        <section class="welcome cashier-list"><div class="list-head"><div><p>CURRENT STAFF</p><h2>Cashier Accounts</h2></div><strong>{{ $cashiers->count() }}</strong></div><div>@forelse($cashiers as $cashier)<article class="cashier-record"><div class="cashier-summary"><span>{{ strtoupper(substr($cashier->name,0,1)) }}</span><div><strong>{{ $cashier->name }}</strong><small>{{ $cashier->email }}</small><small>{{ $cashier->phone ?: 'No phone' }} · Created {{ $cashier->created_at->format('M d, Y') }}</small></div><b>Cashier</b></div><details><summary>Edit Account</summary><form class="edit-cashier" method="POST" action="{{ route('cashiers.update',$cashier) }}" data-ajax-form data-ajax-target=".cashier-accounts" data-ajax-loading="Saving...">@csrf @method('PUT')<div class="field"><label>Full Name</label><input class="control" name="name" value="{{ $cashier->name }}" maxlength="100" required></div><div class="field"><label>Email</label><input class="control" name="email" type="email" value="{{ $cashier->email }}" required></div><div class="field"><label>Phone</label><input class="control" name="phone" type="tel" inputmode="numeric" minlength="11" maxlength="11" pattern="09[0-9]{9}" value="{{ $cashier->phone }}" required></div><div class="field"><label>New Password <small>(optional)</small></label><input class="control" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div><div class="field"><label>Confirm Password</label><input class="control" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div><button class="button" type="submit">Save Changes</button></form><form class="delete-cashier" method="POST" action="{{ route('cashiers.destroy',$cashier) }}" data-ajax-form data-ajax-target=".cashier-accounts" data-ajax-loading="Deleting..." data-confirm="Delete this cashier account? Login access will be removed, but sales records will remain." data-confirm-title="Delete Cashier Account?">@csrf @method('DELETE')<button type="submit">Delete Cashier Account</button></form></details></article>@empty<div class="empty">No cashier accounts yet.</div>@endforelse</div></section>
+
+    @if(session('status'))<div class="notice ad-message">{{ session('status') }}</div>@endif
+    @if($errors->any())<div class="error ad-message">{{ $errors->first() }}</div>@endif
+
+    <section id="cashier-create-panel" class="welcome ad-create" @unless($createOpen) hidden @endunless>
+        <h2>Create Cashier Account</h2>
+        <p>The cashier signs in with this email and temporary password.</p>
+        <form method="POST" action="{{ route('cashiers.store') }}" data-ajax-form data-ajax-target="[data-ad-page]" data-ajax-loading="Creating...">@csrf
+            <div class="ad-form-grid">
+                <div class="field"><label for="name">Full Name</label><input class="control" id="name" name="name" value="{{ old('name') }}" maxlength="100" required><small>Maximum 100 characters.</small></div>
+                <div class="field"><label for="email">Email Address</label><input class="control" id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" required></div>
+                <div class="field"><label for="phone">Phone Number</label><input class="control" id="phone" name="phone" type="tel" inputmode="numeric" minlength="11" maxlength="11" pattern="09[0-9]{9}" value="{{ old('phone') }}" placeholder="09XXXXXXXXX" required><small>11 digits starting with 09.</small></div>
+                <div class="field"><label for="password">Temporary Password</label><input class="control" id="password" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password" required><small>8-23 characters with uppercase, lowercase, number, and symbol.</small></div>
+                <div class="field"><label for="password_confirmation">Confirm Password</label><input class="control" id="password_confirmation" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password" required></div>
+                <div class="ad-span ad-form-actions"><button class="button" type="submit">Create Cashier Account</button></div>
+            </div>
+        </form>
+    </section>
+
+    <section class="ad-stats" aria-label="Filter by status">
+        <button type="button" class="ad-stat" data-ad-status="all" aria-pressed="true"><span>Cashier Accounts</span><strong>{{ $cashiers->count() }}</strong></button>
+        <button type="button" class="ad-stat" data-ad-status="active" aria-pressed="false"><span>Active Cashier Accounts</span><strong>{{ $activeCount }}</strong></button>
+        <button type="button" @class(["ad-stat", "ad-stat-disabled" => $disabledCount > 0]) data-ad-status="disabled" aria-pressed="false"><span>Disabled Cashier Accounts</span><strong>{{ $disabledCount }}</strong></button>
+    </section>
+
+    <section class="ad-list" aria-label="Cashier accounts">
+        @forelse($cashiers as $cashier)
+            <article @class(['ad-row', 'is-disabled' => $cashier->isDisabled()]) data-ad-row data-status="{{ $cashier->isDisabled() ? 'disabled' : 'active' }}" data-search="{{ Str::lower(implode(' ', array_filter([$cashier->name, $cashier->email, $cashier->phone]))) }}">
+                <span class="ad-avatar" aria-hidden="true">{{ Str::upper(Str::substr($cashier->name, 0, 1)) }}</span>
+                <div class="ad-identity">
+                    <strong>{{ $cashier->name }}</strong>
+                    <small>{{ $cashier->email }}</small>
+                    <small>{{ $cashier->phone ?: 'No phone' }} · Created {{ $cashier->created_at?->format('M d, Y') ?? '—' }}</small>
+                </div>
+                <div class="ad-chips">
+                    <span class="ad-chip">{{ $cashier->paid_sales_count }} {{ Str::plural('sale', $cashier->paid_sales_count) }}</span>
+                    <span class="ad-chip is-money">₱{{ number_format((float) ($cashier->paid_sales_total ?? 0), 2) }}</span>
+                </div>
+                <div class="ad-actions">
+                    @if($cashier->isDisabled())
+                        <form method="POST" action="{{ route('cashiers.enable', $cashier) }}" data-ajax-form data-ajax-target="[data-ad-page]" data-ajax-loading="Enabling...">@csrf @method('PATCH')<button class="ad-status" type="submit" role="switch" aria-checked="false" aria-label="Enable {{ $cashier->name }}"><span class="ad-status-track" aria-hidden="true"></span>Disabled</button></form>
+                    @else
+                        <form method="POST" action="{{ route('cashiers.disable', $cashier) }}" data-ajax-form data-ajax-target="[data-ad-page]" data-ajax-loading="Disabling..." data-confirm="Disable {{ $cashier->name }}'s cashier account? They will be signed out of the POS and cannot log in until it is enabled again." data-confirm-title="Disable cashier account?">@csrf @method('PATCH')<button class="ad-status" type="submit" role="switch" aria-checked="true" aria-label="Disable {{ $cashier->name }}"><span class="ad-status-track" aria-hidden="true"></span>Active</button></form>
+                    @endif
+                    <button type="button" class="ad-edit" data-ad-open="cashier-editor-{{ $cashier->id }}" aria-haspopup="dialog"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit Account</button>
+                </div>
+            </article>
+        @empty
+            <div class="ad-empty">No cashier accounts yet.</div>
+        @endforelse
+        <div class="ad-empty" data-ad-empty hidden>No cashier accounts match your search.</div>
+    </section>
+
+    @foreach($cashiers as $cashier)
+    <div id="cashier-editor-{{ $cashier->id }}" class="ad-drawer" role="dialog" aria-modal="true" aria-labelledby="cashier-editor-{{ $cashier->id }}-title" hidden>
+        <div class="ad-drawer-backdrop" data-ad-close></div>
+        <div class="ad-drawer-panel">
+            <header class="ad-drawer-head">
+                <div><small>Edit cashier account</small><h2 id="cashier-editor-{{ $cashier->id }}-title">{{ $cashier->name }}</h2></div>
+                <button type="button" class="ad-close" data-ad-close aria-label="Close"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+            </header>
+            <div class="ad-drawer-body">
+                <form method="POST" action="{{ route('cashiers.update', $cashier) }}" data-ajax-form data-ajax-target="[data-ad-page]" data-ajax-loading="Saving...">@csrf @method('PUT')
+                    <div class="ad-form-grid">
+                        <div class="field"><label for="cashier-name-{{ $cashier->id }}">Full Name</label><input class="control" id="cashier-name-{{ $cashier->id }}" name="name" value="{{ $cashier->name }}" maxlength="100" required></div>
+                        <div class="field"><label for="cashier-email-{{ $cashier->id }}">Email</label><input class="control" id="cashier-email-{{ $cashier->id }}" name="email" type="email" value="{{ $cashier->email }}" required></div>
+                        <div class="field"><label for="cashier-phone-{{ $cashier->id }}">Phone</label><input class="control" id="cashier-phone-{{ $cashier->id }}" name="phone" type="tel" inputmode="numeric" minlength="11" maxlength="11" pattern="09[0-9]{9}" value="{{ $cashier->phone }}" required></div>
+                        <div class="field"><label for="cashier-password-{{ $cashier->id }}">New Password <small>(optional)</small></label><input class="control" id="cashier-password-{{ $cashier->id }}" name="password" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div>
+                        <div class="field"><label for="cashier-password-confirmation-{{ $cashier->id }}">Confirm Password</label><input class="control" id="cashier-password-confirmation-{{ $cashier->id }}" name="password_confirmation" type="password" minlength="8" maxlength="23" autocomplete="new-password"></div>
+                        <button class="button" type="submit">Save Changes</button>
+                    </div>
+                </form>
+                <form class="ad-danger" method="POST" action="{{ route('cashiers.destroy', $cashier) }}" data-ajax-form data-ajax-target="[data-ad-page]" data-ajax-loading="Deleting..." data-confirm="Delete this cashier account? Login access will be removed, but sales records will remain." data-confirm-title="Delete Cashier Account?">@csrf @method('DELETE')
+                    <div><strong>Delete cashier account</strong><small>Prefer Disable if they may return. Sales records are kept either way.</small></div>
+                    <button type="submit">Delete Cashier Account</button>
+                </form>
+            </div>
+        </div>
     </div>
+    @endforeach
 </div></main></div>
-@push('styles')
-<style>.cashier-accounts .topbar{margin-bottom:20px}.cashier-accounts .topbar p,.create-cashier>p,.list-head p{margin:0;color:#7a8300;font-size:11px;letter-spacing:.16em}.cashier-accounts .topbar h1{margin:5px 0;font-size:30px}.cashier-accounts .topbar span{color:#687286}.account-notice{padding:12px;margin-bottom:14px;border-radius:10px}.cashier-summary-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}.cashier-summary-cards>.welcome{padding:20px}.cashier-summary-cards span{color:#687286}.cashier-summary-cards h2{margin:6px 0 0;font-size:27px}.cashier-account-grid{display:grid;grid-template-columns:minmax(320px,.8fr) minmax(0,1.2fr);gap:20px}.create-cashier,.cashier-list{padding:24px;border-radius:15px!important}.create-cashier h2,.list-head h2{margin:5px 0 18px;font-size:20px}.create-cashier .field{margin-bottom:13px}.create-cashier small{display:block;color:#687286;margin-top:5px}.list-head{display:flex;justify-content:space-between;align-items:start}.list-head>strong{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:#e9ecd4;color:#667000}.cashier-record{padding:14px 0;border-top:1px solid #e7eaf0}.cashier-summary{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center}.cashier-summary>span{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#e9ecd4;color:#667000;font-weight:800}.cashier-summary>div{display:grid;min-width:0}.cashier-list small{color:#687286;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cashier-summary>b{font-size:11px;padding:5px 8px;border-radius:999px;background:#f0f1ed}.cashier-record details{margin:11px 0 0 56px}.cashier-record summary{width:max-content;color:#596100;font-weight:800;font-size:13px;cursor:pointer}.edit-cashier{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;margin-top:13px;padding:15px;background:#f5f6ef;border-radius:11px}.edit-cashier .field{margin:0}.edit-cashier .button{grid-column:1/-1}.delete-cashier{margin-top:10px;text-align:right}.delete-cashier button{border:1px solid #b42318;border-radius:9px;background:#fff7f7;color:#b42318;padding:9px 12px;font-weight:800;cursor:pointer}@media(max-width:950px){.cashier-account-grid{grid-template-columns:1fr}}@media(max-width:700px){.cashier-summary-cards{grid-template-columns:1fr}}@media(max-width:600px){.edit-cashier{grid-template-columns:1fr}.edit-cashier .button{grid-column:auto}.cashier-record details{margin-left:0}}@media(max-width:520px){.cashier-summary{grid-template-columns:40px minmax(0,1fr)}.cashier-summary>b{grid-column:2;width:max-content}}</style>
-@endpush
+@include('partials.account-directory')
 @endsection

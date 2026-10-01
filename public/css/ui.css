@@ -1,0 +1,15 @@
+/* Shared search field (resources/views/components/search-field.blade.php). */
+.k-search{position:relative;width:100%;min-width:0;height:46px;display:flex;align-items:center;gap:10px;padding:0 8px 0 14px;border:1px solid #d2d5cb;border-radius:12px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.k-search:hover{border-color:#b9beb0}
+.k-search:focus-within{border-color:#8d960f;box-shadow:0 0 0 3px rgba(174,187,25,.18)}
+.k-search-icon{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
+.k-search>input{flex:1;min-width:0;height:100%;margin:0;padding:0!important;border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:#171817;font:inherit;font-size:15px;font-weight:500;appearance:none}
+.k-search>input::placeholder{color:#858a82;opacity:1}
+.k-search>input::-webkit-search-cancel-button,.k-search>input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
+.k-search-clear{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:#eff0ea;color:#4d524a;cursor:pointer}
+.k-search-clear[hidden]{display:none}
+.k-search-clear:hover{background:#e2e4db;color:#171817}
+.k-search-clear svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.k-search-key{min-width:24px;height:24px;display:grid;place-items:center;padding:0 6px;border:1px solid #dcded5;border-radius:6px;background:#f7f7f3;color:#6c7068;font-family:inherit;font-size:12px;font-weight:600;line-height:1}
+.k-search.has-value .k-search-key,.k-search:focus-within .k-search-key{display:none}
+@media(hover:none),(max-width:640px){.k-search-key{display:none}.k-search>input{font-size:16px}}

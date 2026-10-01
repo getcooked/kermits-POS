@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ManagesAccountAccess;
 use App\Http\Requests\StoreCashierAccountRequest;
 use App\Http\Requests\UpdateCashierAccountRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class CashierAccountController extends Controller
 {
+    use ManagesAccountAccess;
+
     public function index(): View
     {
         return view('staff.cashiers', [
@@ -45,13 +47,24 @@ class CashierAccountController extends Controller
         $cashier->update($data);
 
         if ($request->filled('password')) {
-            $cashier->forceFill(['remember_token' => Str::random(60)])->save();
-            DB::table(config('session.table', 'sessions'))->where('user_id', $cashier->id)->delete();
-            DB::table('mobile_api_tokens')->where('user_id', $cashier->id)->delete();
-            DB::table('password_reset_tokens')->where('email', $cashier->email)->delete();
+            $this->revokeAccess($cashier);
         }
 
         return back()->with('status', 'Cashier account updated successfully.');
+    }
+
+    public function disable(User $cashier): RedirectResponse
+    {
+        abort_unless($cashier->hasRole(User::ROLE_CASHIER), 404);
+
+        return $this->disableAccount($cashier, 'cashier');
+    }
+
+    public function enable(User $cashier): RedirectResponse
+    {
+        abort_unless($cashier->hasRole(User::ROLE_CASHIER), 404);
+
+        return $this->enableAccount($cashier, 'cashier');
     }
 
     public function destroy(User $cashier): RedirectResponse

@@ -44,6 +44,9 @@ class MobileAuthController extends Controller
         if (! $user->email_verified_at) {
             return response()->json(['message' => 'Please verify your Gmail address before signing in.'], 422);
         }
+        if ($user->isDisabled()) {
+            return response()->json(['message' => "This account has been disabled. Please contact Kermit's for help."], 422);
+        }
 
         MobileApiToken::query()->where('expires_at', '<=', now())->delete();
         $plainToken = bin2hex(random_bytes(32));

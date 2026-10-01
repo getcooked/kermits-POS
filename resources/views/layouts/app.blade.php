@@ -289,6 +289,7 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
     <link rel="stylesheet" href="{{ asset('css/kermits-motion.css') }}">
     <link rel="stylesheet" href="{{ asset('css/product-images.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/ui.css') }}">
     @stack('styles')
 </head>
 <body data-feedback="{{ $errors->any() ? 'error' : (session('status') ? 'success' : '') }}">
@@ -308,6 +309,7 @@ button,a,[role="button"],.button,.logout,.checkout-button,.booking-button,.book-
 
 <script nonce="{{ Vite::cspNonce() }}" src="{{ asset('js/kermits-motion.js') }}" defer></script>
 <script nonce="{{ Vite::cspNonce() }}" src="{{ asset('js/ajax-forms.js') }}" defer></script>
+<script nonce="{{ Vite::cspNonce() }}" src="{{ asset('js/ui-search.js') }}" defer></script>
 @stack('scripts')
 </body>
 </html>

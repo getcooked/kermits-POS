@@ -133,6 +133,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('/products/categories', [ProductController::class, 'destroyCategory'])->name('products.categories.destroy');
         Route::patch('/products/visibility', [ProductController::class, 'bulkVisibility'])->name('products.visibility.bulk');
         Route::patch('/products/{product}/visibility', [ProductController::class, 'updateVisibility'])->name('products.visibility');
     });
@@ -163,8 +164,12 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/staff/cashiers', [CashierAccountController::class, 'store'])->name('cashiers.store');
         Route::put('/staff/cashiers/{cashier}', [CashierAccountController::class, 'update'])->name('cashiers.update');
         Route::delete('/staff/cashiers/{cashier}', [CashierAccountController::class, 'destroy'])->name('cashiers.destroy');
+        Route::patch('/staff/cashiers/{cashier}/disable', [CashierAccountController::class, 'disable'])->name('cashiers.disable');
+        Route::patch('/staff/cashiers/{cashier}/enable', [CashierAccountController::class, 'enable'])->name('cashiers.enable');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        Route::patch('/customers/{customer}/disable', [CustomerController::class, 'disable'])->name('customers.disable');
+        Route::patch('/customers/{customer}/enable', [CustomerController::class, 'enable'])->name('customers.enable');
         Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::get('/settings/payment', [PaymentSettingsController::class, 'edit'])->name('settings.payment.edit');
         Route::put('/settings/payment', [PaymentSettingsController::class, 'update'])->name('settings.payment.update');

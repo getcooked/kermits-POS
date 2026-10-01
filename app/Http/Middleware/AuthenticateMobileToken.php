@@ -22,7 +22,7 @@ class AuthenticateMobileToken
             ->where('token_hash', hash('sha256', $plainToken))
             ->where('expires_at', '>', now())->first();
 
-        if (! $token?->user?->hasRole(User::ROLE_CUSTOMER)) {
+        if (! $token?->user?->hasRole(User::ROLE_CUSTOMER) || $token->user->isDisabled()) {
             return $this->unauthorized();
         }
 

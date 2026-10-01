@@ -16,7 +16,7 @@
                 <h1>Menu</h1>
             </div>
             <div class="shop-header-tools">
-                <div class="shop-search"><button type="button" aria-label="Search products"><span></span></button><input id="shop-search" type="search" placeholder="Search products"></div>
+                <x-search-field id="shop-search" placeholder="Search products" class="shop-search" />
                 <a class="shop-notification-button" href="{{ route('customer.notifications') }}" aria-label="Order notifications" title="Order notifications" data-order-notification-button>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
                     <b data-order-notification-count hidden></b>
@@ -2196,6 +2196,34 @@
     .shop-price span.low-stock {
         color: #c62828 !important;
         font-weight: 850 !important
+    }
+    /* The search uses the shared field (ui.css); undo the older header search overrides. */
+    .customer-shop .k-search.shop-search {
+        height: 46px !important;
+        gap: 10px !important;
+        padding: 0 8px 0 14px !important;
+        border: 1px solid #d2d5cb !important;
+        border-radius: 12px !important;
+        box-shadow: none !important
+    }
+    .customer-shop .k-search.shop-search:focus-within {
+        border-color: #8d960f !important;
+        box-shadow: 0 0 0 3px rgba(174, 187, 25, .18) !important
+    }
+    .customer-shop .k-search.shop-search .k-search-clear {
+        width: 30px !important;
+        height: 30px !important;
+        flex: 0 0 30px !important;
+        border-radius: 8px !important;
+        background: #eff0ea !important
+    }
+    .customer-shop .k-search.shop-search .k-search-clear[hidden] {
+        display: none !important
+    }
+    .customer-shop .k-search.shop-search > input {
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        color: #171817 !important
     }
 </style>
 @endpush

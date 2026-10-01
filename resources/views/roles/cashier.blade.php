@@ -20,10 +20,7 @@
                     <h1>Menu</h1>
                     <p>{{ $canSell ? 'Tap a product to add it to the order.' : 'View only — sign in as a cashier to take orders.' }}</p>
                 </div>
-                <label class="pos-search">
-                    <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-                    <input id="pos-search" type="search" placeholder="Search products" aria-label="Search products" autocomplete="off">
-                </label>
+                <x-search-field id="pos-search" placeholder="Search products" class="pos-search" />
             </header>
             @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
             @if($errors->any())<div class="error pos-error">{{ $errors->first() }}</div>@endif
@@ -120,10 +117,7 @@
 .pos-catalog-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
 .pos-catalog-head h1{margin:0;font-size:30px;letter-spacing:-.04em}
 .pos-catalog-head p{margin:4px 0 0;color:var(--pos-muted);font-size:14px}
-.pos-search{width:min(380px,100%);height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;border:1px solid #d2d5cb;border-radius:12px;background:#fff;cursor:text}
-.pos-search:focus-within{border-color:#8d960f;box-shadow:0 0 0 3px rgba(174,187,25,.18)}
-.pos-search svg{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:#62675f;stroke-width:2;stroke-linecap:round}
-.pos-search input{flex:1;min-width:0;height:100%;padding:0!important;border:0!important;box-shadow:none!important;background:transparent!important;font:inherit;font-size:15px}
+.pos-search{width:min(380px,100%)!important}
 .pos-error{background:#fff0f0;padding:12px;border-radius:9px;margin-bottom:16px}
 
 .pos-category-row{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;align-items:center;gap:8px;margin-bottom:18px}
@@ -251,8 +245,7 @@
 @media(max-width:640px){
     .pos-catalog-head{flex-direction:column;align-items:stretch;gap:12px}
     .pos-catalog-head h1{font-size:26px}
-    .pos-search{width:100%}
-    .pos-search input{font-size:16px}
+    .pos-search{width:100%!important}
     .pos-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     .pos-item{padding:8px;border-radius:14px}
     .pos-item-desc{display:none}

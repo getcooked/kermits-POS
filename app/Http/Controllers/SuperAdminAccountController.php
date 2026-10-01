@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ManagesAccountAccess;
 use App\Http\Requests\StoreAdminAccountRequest;
 use App\Http\Requests\UpdateAdminAccountRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -18,6 +18,8 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class SuperAdminAccountController extends Controller
 {
+    use ManagesAccountAccess;
+
     private const VERIFICATION_SESSION_KEY = 'admin_email_verification';
 
     private const VERIFICATION_MINUTES = 10;
@@ -111,27 +113,18 @@ class SuperAdminAccountController extends Controller
         return back()->with('status', 'Admin account updated successfully.');
     }
 
-    public function disable(Request $request, User $admin): RedirectResponse
+    public function disable(User $admin): RedirectResponse
     {
         abort_unless($admin->hasRole(User::ROLE_SUPER_ADMIN), 404);
 
-        if ($admin->is($request->user())) {
-            return back()->withErrors(['admin' => 'You cannot disable your own account.']);
-        }
-
-        $admin->forceFill(['disabled_at' => now()])->save();
-        $this->revokeAccess($admin);
-
-        return back()->with('status', "{$admin->name}'s admin account was disabled.");
+        return $this->disableAccount($admin, 'admin', 'admin');
     }
 
     public function enable(User $admin): RedirectResponse
     {
         abort_unless($admin->hasRole(User::ROLE_SUPER_ADMIN), 404);
 
-        $admin->forceFill(['disabled_at' => null])->save();
-
-        return back()->with('status', "{$admin->name}'s admin account was enabled.");
+        return $this->enableAccount($admin, 'admin');
     }
 
     private function ensureEmailVerified(StoreAdminAccountRequest $request): void
@@ -158,16 +151,6 @@ class SuperAdminAccountController extends Controller
     /**
      * Signs the admin out everywhere, except the current browser when they changed their own password.
      */
-    private function revokeAccess(User $admin, ?string $keepSessionId = null): void
-    {
-        $admin->forceFill(['remember_token' => Str::random(60)])->save();
-        DB::table(config('session.table', 'sessions'))
-            ->where('user_id', $admin->id)
-            ->when($keepSessionId, fn ($query) => $query->where('id', '!=', $keepSessionId))
-            ->delete();
-        DB::table('mobile_api_tokens')->where('user_id', $admin->id)->delete();
-        DB::table('password_reset_tokens')->where('email', $admin->email)->delete();
-    }
 
     private function safeInput(Request $request): array
     {

@@ -196,9 +196,94 @@ class InventoryAndProductsTest extends TestCase
         $product = Product::query()->where('name', 'Overstocked')->firstOrFail();
         $this->assertSame(50, $product->stock);
 
+        // Editing never changes stock; Inventory does that, so the edit's stock value is ignored.
         $this->actingAs($superAdmin)->put(route('products.update', $product), [...$payload, 'stock' => 51])
-            ->assertSessionHasErrors(['stock' => 'Stock cannot be more than 50.']);
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/products');
         $this->assertSame(50, $product->fresh()->stock);
+    }
+
+    public function test_editing_a_product_never_changes_its_stock(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $product = Product::query()->create(['name' => 'Stocked Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 12, 'active' => true]);
+
+        $this->actingAs($superAdmin)->put(route('products.update', $product), [
+            'name' => 'Stocked Latte Grande',
+            'category' => 'Drinks',
+            'price' => 140,
+            'stock' => 3,
+            'active' => 1,
+        ])->assertRedirect('/products');
+
+        $product->refresh();
+        $this->assertSame('Stocked Latte Grande', $product->name);
+        $this->assertSame(12, $product->stock);
+
+        // Updates without any stock field are accepted too.
+        $this->actingAs($superAdmin)->put(route('products.update', $product), [
+            'name' => 'Stocked Latte',
+            'category' => 'Drinks',
+            'price' => 140,
+            'active' => 1,
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(12, $product->fresh()->stock);
+
+        $this->actingAs($superAdmin)->get('/products')
+            ->assertOk()
+            ->assertSee('data-pm-editor-stock', false)
+            ->assertSee('Adjust in Inventory')
+            ->assertDontSee('id="stock-edit"', false);
+    }
+
+    public function test_deleting_a_category_moves_its_products_to_the_chosen_category(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $target = Product::query()->create(['name' => 'Pasta Dish', 'category' => 'Pasta', 'category_order' => 3, 'price' => 200, 'stock' => 5]);
+        $first = Product::query()->create(['name' => 'Old One', 'category' => 'Old Specials', 'category_order' => 9, 'price' => 100, 'stock' => 5]);
+        $second = Product::query()->create(['name' => 'Old Two', 'category' => 'Old Specials', 'category_order' => 9, 'price' => 100, 'stock' => 5]);
+
+        $this->actingAs($superAdmin)->get('/products')
+            ->assertOk()
+            ->assertSee('data-pm-categories-open', false)
+            ->assertSee('name="move_to"', false);
+
+        $this->actingAs($superAdmin)
+            ->delete(route('products.categories.destroy'), ['category' => 'Old Specials', 'move_to' => 'pasta'])
+            ->assertRedirect('/products')
+            ->assertSessionHas('status', 'Deleted the Old Specials category and moved 2 products to Pasta.');
+
+        foreach ([$first, $second] as $product) {
+            $this->assertSame('Pasta', $product->fresh()->category);
+            $this->assertSame(3, $product->fresh()->category_order);
+        }
+        $this->assertSame('Pasta', $target->fresh()->category);
+        $this->assertDatabaseMissing('products', ['category' => 'Old Specials']);
+
+        // Moving to a brand-new name such as Uncategorized works too.
+        $this->actingAs($superAdmin)
+            ->delete(route('products.categories.destroy'), ['category' => 'Pasta', 'move_to' => 'Uncategorized'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(3, Product::query()->where('category', 'Uncategorized')->count());
+    }
+
+    public function test_deleting_a_category_is_validated_and_limited_to_super_admins(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        Product::query()->create(['name' => 'Latte', 'category' => 'Drinks', 'price' => 120, 'stock' => 5]);
+
+        $this->actingAs($superAdmin)
+            ->delete(route('products.categories.destroy'), ['category' => 'Drinks', 'move_to' => 'Drinks'])
+            ->assertSessionHasErrors(['move_to' => 'Choose a different category to move the products to.']);
+        $this->actingAs($superAdmin)
+            ->delete(route('products.categories.destroy'), ['category' => 'Missing', 'move_to' => 'Drinks'])
+            ->assertSessionHasErrors(['category' => 'That category no longer exists.']);
+        $this->actingAs($admin)
+            ->delete(route('products.categories.destroy'), ['category' => 'Drinks', 'move_to' => 'Cakes'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('products', ['name' => 'Latte', 'category' => 'Drinks']);
     }
 
     public function test_product_categories_are_saved_in_pascal_case(): void
@@ -376,7 +461,7 @@ class InventoryAndProductsTest extends TestCase
         $this->actingAs($superAdmin)
             ->patch(route('products.visibility', $product), ['active' => 0])
             ->assertRedirect()
-            ->assertSessionHas('status', 'Low Latte is now hidden from the menu.');
+            ->assertSessionHas('status', 'Low Latte is now disabled.');
 
         $this->assertFalse($product->fresh()->active);
     }
@@ -391,7 +476,7 @@ class InventoryAndProductsTest extends TestCase
         $this->actingAs($superAdmin)
             ->patchJson(route('products.visibility.bulk'), ['ids' => [$first->id, $second->id], 'active' => 1])
             ->assertOk()
-            ->assertJson(['message' => '2 products shown on the menu.', 'active' => true]);
+            ->assertJson(['message' => '2 products enabled.', 'active' => true]);
 
         $this->assertTrue($first->fresh()->active);
         $this->assertTrue($second->fresh()->active);
@@ -437,8 +522,7 @@ class InventoryAndProductsTest extends TestCase
                 'form_context' => 'edit-'.$nachos->id,
                 'name' => 'Loaded Nachos',
                 'category' => 'Starters',
-                'price' => 180,
-                'stock' => 51,
+                'price' => 0,
             ])
             ->assertOk();
 
