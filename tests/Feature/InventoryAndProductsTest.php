@@ -427,7 +427,7 @@ class InventoryAndProductsTest extends TestCase
         $nachos = Product::query()->create(['name' => 'Nachos', 'category' => 'Starters', 'price' => 180, 'stock' => 10]);
 
         $page = $this->actingAs($superAdmin)->get('/products')->assertOk()->getContent();
-        $this->assertSame(1, substr_count($page, 'role="dialog"'));
+        $this->assertSame(1, substr_count($page, 'id="product-editor"'));
         $this->assertSame(1, substr_count($page, 'id="product-edit-form"'));
         $this->assertMatchesRegularExpression('/<div id="product-editor"[^>]*\shidden\s*>/', $page);
 
@@ -572,6 +572,73 @@ class InventoryAndProductsTest extends TestCase
         $besideCup = imagecolorsforindex($result, imagecolorat($result, 300, 400));
         $this->assertLessThan(140, $top['red'], 'The cup is scaled up to fill the standard height.');
         $this->assertGreaterThanOrEqual(250, min($besideCup['red'], $besideCup['green'], $besideCup['blue']), 'The grey backdrop becomes pure white.');
+    }
+
+    public function test_pictures_framed_in_the_cropper_keep_the_admins_framing(): void
+    {
+        // The admin deliberately placed the dish in the top-left corner of the square.
+        $image = imagecreatetruecolor(1200, 1200);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        imagefilledrectangle($image, 50, 50, 549, 549, imagecolorallocate($image, 120, 40, 20));
+        ob_start();
+        imagejpeg($image, null, 92);
+        $contents = (string) ob_get_clean();
+        $images = app(ProductImageProcessor::class);
+
+        $framed = imagecreatefromstring($images->processContents($contents, framed: true));
+        $this->assertSame([ProductImageProcessor::SIZE, ProductImageProcessor::SIZE], [imagesx($framed), imagesy($framed)]);
+        $this->assertLessThan(160, imagecolorsforindex($framed, imagecolorat($framed, 100, 100))['red']);
+        $this->assertGreaterThan(240, imagecolorsforindex($framed, imagecolorat($framed, 600, 600))['green']);
+
+        // Without the flag the automatic standard would re-center it.
+        $automatic = imagecreatefromstring($images->processContents($contents));
+        $this->assertLessThan(160, imagecolorsforindex($automatic, imagecolorat($automatic, 400, 400))['red']);
+    }
+
+    public function test_sideways_phone_photos_are_turned_upright(): void
+    {
+        // Stored as 400x200 (red left, blue right) with an EXIF note to turn it 90 degrees clockwise.
+        $image = imagecreatetruecolor(400, 200);
+        imagefilledrectangle($image, 0, 0, 199, 199, imagecolorallocate($image, 220, 20, 20));
+        imagefilledrectangle($image, 200, 0, 399, 199, imagecolorallocate($image, 20, 20, 220));
+        ob_start();
+        imagejpeg($image, null, 95);
+        $tiff = "MM\x00\x2A\x00\x00\x00\x08"."\x00\x01"."\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00"."\x00\x00\x00\x00";
+        $exif = "Exif\x00\x00".$tiff;
+        $jpeg = substr_replace((string) ob_get_clean(), "\xFF\xE1".pack('n', strlen($exif) + 2).$exif, 2, 0);
+
+        $result = imagecreatefromstring(app(ProductImageProcessor::class)->processContents($jpeg, framed: true));
+        $top = imagecolorsforindex($result, imagecolorat($result, 600, 150));
+        $bottom = imagecolorsforindex($result, imagecolorat($result, 200, 650));
+
+        // Upright, the picture is 200x400 with red on top and blue below.
+        $this->assertGreaterThan($top['blue'], $top['red']);
+        $this->assertGreaterThan($bottom['red'], $bottom['blue']);
+    }
+
+    public function test_framed_uploads_are_saved_as_the_admin_framed_them(): void
+    {
+        Storage::fake('public');
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $image = imagecreatetruecolor(1200, 1200);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        imagefilledrectangle($image, 50, 50, 549, 549, imagecolorallocate($image, 120, 40, 20));
+        ob_start();
+        imagejpeg($image, null, 92);
+
+        $this->actingAs($superAdmin)->post('/products', [
+            'name' => 'Corner Cake',
+            'category' => 'Cakes',
+            'price' => 100,
+            'stock' => 5,
+            'active' => 1,
+            'image' => UploadedFile::fake()->createWithContent('corner-framed.jpg', (string) ob_get_clean()),
+            'image_framed' => 1,
+        ])->assertRedirect('/products');
+
+        $stored = imagecreatefromstring(Storage::disk('public')->get(Product::query()->where('name', 'Corner Cake')->value('image_path')));
+        $this->assertLessThan(160, imagecolorsforindex($stored, imagecolorat($stored, 100, 100))['red']);
+        $this->assertGreaterThan(240, imagecolorsforindex($stored, imagecolorat($stored, 600, 600))['green']);
     }
 
     public function test_the_brand_logo_is_recognised_but_dish_photos_are_not(): void

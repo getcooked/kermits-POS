@@ -53,7 +53,7 @@ class ProductController extends Controller
         $newImage = null;
 
         if ($request->hasFile('image')) {
-            $newImage = $images->store($request->file('image'));
+            $newImage = $images->store($request->file('image'), framed: $request->boolean('image_framed'));
             $data['image_path'] = $newImage;
         }
 
@@ -82,7 +82,7 @@ class ProductController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            $newImage = $images->store($request->file('image'));
+            $newImage = $images->store($request->file('image'), framed: $request->boolean('image_framed'));
             $data['image_path'] = $newImage;
         }
 

@@ -31,9 +31,12 @@ class ProductImageProcessor
 
     private static ?string $brandLogoFingerprint = null;
 
-    public function store(UploadedFile $file, string $directory = 'products'): string
+    /**
+     * @param  bool  $framed  The admin already framed the picture in the cropper, so keep their framing as-is.
+     */
+    public function store(UploadedFile $file, string $directory = 'products', bool $framed = false): string
     {
-        $processed = $this->processContents((string) file_get_contents($file->getRealPath()));
+        $processed = $this->processContents((string) file_get_contents($file->getRealPath()), $framed);
 
         if ($processed === null) {
             return $file->store($directory, 'public');
@@ -56,9 +59,9 @@ class ProductImageProcessor
     /**
      * Returns the standardized WebP bytes, or null when GD is unavailable or the image cannot be read.
      */
-    public function processContents(string $contents): ?string
+    public function processContents(string $contents, bool $framed = false): ?string
     {
-        $image = $this->normalize($contents);
+        $image = $this->normalize($contents, $framed);
 
         if ($image === null) {
             return null;
@@ -115,7 +118,7 @@ class ProductImageProcessor
         return count(array_diff_assoc(str_split($a), str_split($b)));
     }
 
-    private function normalize(string $contents): ?GdImage
+    private function normalize(string $contents, bool $framed = false): ?GdImage
     {
         if (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
             return null;
@@ -128,9 +131,10 @@ class ProductImageProcessor
         }
 
         imagepalettetotruecolor($source);
+        $source = $this->applyExifOrientation($source, $contents);
         $canvas = imagecreatetruecolor(self::SIZE, self::SIZE);
         imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
-        $background = $this->backgroundColor($source);
+        $background = $framed ? null : $this->backgroundColor($source);
 
         if ($background === null) {
             [$x, $y, $side] = $this->centerSquare($source);
@@ -174,6 +178,32 @@ class ProductImageProcessor
                 imagesetpixel($image, $x, $y, ($red[($color >> 16) & 255] << 16) | ($green[($color >> 8) & 255] << 8) | $blue[$color & 255]);
             }
         }
+    }
+
+    /**
+     * Phone photos are often stored sideways with an EXIF note saying how to turn them; GD ignores that note.
+     */
+    private function applyExifOrientation(GdImage $image, string $contents): GdImage
+    {
+        if (! function_exists('exif_read_data') || ! str_starts_with($contents, "\xFF\xD8")) {
+            return $image;
+        }
+
+        $exif = @exif_read_data('data://image/jpeg;base64,'.base64_encode($contents));
+        $angle = match ((int) ($exif['Orientation'] ?? 1)) {
+            3 => 180,
+            6 => -90,
+            8 => 90,
+            default => 0,
+        };
+
+        if ($angle === 0) {
+            return $image;
+        }
+
+        $rotated = imagerotate($image, $angle, 0);
+
+        return $rotated instanceof GdImage ? $rotated : $image;
     }
 
     private function brandLogoFingerprint(): ?string

@@ -44,6 +44,7 @@ class ProductRequest extends FormRequest
                     }
                 },
             ],
+            'image_framed' => ['nullable', 'boolean'],
             'remove_image' => ['nullable', 'boolean'],
         ];
     }
