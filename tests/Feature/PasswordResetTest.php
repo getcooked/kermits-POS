@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Notifications\CustomerPasswordResetCode;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ class PasswordResetTest extends TestCase
     use RefreshDatabase;
 
     private const GENERIC_RESET_MESSAGE = 'If an eligible account exists, a password reset link has been sent.';
+
+    private const MOBILE_RESET_MESSAGE = 'If an eligible account exists, a 6-digit password reset code has been sent.';
 
     public function test_forgot_password_page_is_available_to_guests(): void
     {
@@ -96,19 +99,6 @@ class PasswordResetTest extends TestCase
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
     }
 
-    public function test_mobile_reset_does_not_reveal_when_the_broker_throttles_delivery(): void
-    {
-        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
-        Password::shouldReceive('sendResetLink')
-            ->once()
-            ->with(['email' => $user->email])
-            ->andReturn(Password::RESET_THROTTLED);
-
-        $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
-            ->assertOk()
-            ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
-    }
-
     public function test_mobile_password_recovery_sends_only_to_a_customer_account(): void
     {
         Notification::fake();
@@ -117,13 +107,13 @@ class PasswordResetTest extends TestCase
 
         $this->postJson('/api/v1/password/forgot', ['email' => $customer->email])
             ->assertOk()
-            ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
+            ->assertJsonPath('message', self::MOBILE_RESET_MESSAGE);
         $this->postJson('/api/v1/password/forgot', ['email' => $admin->email])
             ->assertOk()
-            ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
+            ->assertJsonPath('message', self::MOBILE_RESET_MESSAGE);
 
-        Notification::assertSentTo($customer, ResetPassword::class);
-        Notification::assertNotSentTo($admin, ResetPassword::class);
+        Notification::assertSentTo($customer, CustomerPasswordResetCode::class);
+        Notification::assertNotSentTo($admin, CustomerPasswordResetCode::class);
     }
 
     public function test_mobile_password_recovery_hides_unregistered_or_deleted_customer_status(): void
@@ -135,7 +125,7 @@ class PasswordResetTest extends TestCase
         foreach (['not-registered@example.com', $deletedCustomer->email] as $email) {
             $this->postJson('/api/v1/password/forgot', ['email' => $email])
                 ->assertOk()
-                ->assertJsonPath('message', self::GENERIC_RESET_MESSAGE);
+                ->assertJsonPath('message', self::MOBILE_RESET_MESSAGE);
         }
 
         Notification::assertNothingSent();

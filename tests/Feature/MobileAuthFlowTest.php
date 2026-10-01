@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\CustomerPasswordResetCode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
@@ -43,40 +43,70 @@ class MobileAuthFlowTest extends TestCase
             ->assertOk()->assertJsonStructure(['data' => ['token', 'user']]);
     }
 
-    public function test_registration_requests_do_not_block_password_recovery_and_reset_allows_mobile_login(): void
+    public function test_registration_requests_do_not_block_password_recovery_and_in_app_reset_allows_mobile_login(): void
     {
         Notification::fake();
-        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $user = User::factory()->create(['role' => User::ROLE_CUSTOMER, 'password' => 'OldSecurePass123!']);
+        $oldToken = $this->postJson('/api/v1/login', ['login' => $user->email, 'password' => 'OldSecurePass123!'])
+            ->assertOk()->json('data.token');
         for ($attempt = 0; $attempt < 3; $attempt++) {
             $this->postJson('/api/v1/register/email', [])->assertUnprocessable();
         }
         $this->postJson('/api/v1/register/email', [])->assertTooManyRequests();
-        $this->postJson('/api/v1/password/forgot', ['email' => $user->email])->assertOk();
+        $challenge = $this->postJson('/api/v1/password/forgot', ['email' => strtoupper($user->email)])
+            ->assertOk()->assertJsonPath('data.email', strtolower($user->email))->json('data.challenge');
 
-        Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user): bool {
-            $this->get(route('password.reset', ['token' => $notification->token, 'email' => $user->email]))->assertOk();
-            $this->post(route('password.update'), [
-                'token' => $notification->token, 'email' => $user->email,
-                'password' => 'NewSecurePass123!', 'password_confirmation' => 'NewSecurePass123!',
-            ])->assertRedirect(route('login'));
+        $code = null;
+        Notification::assertSentTo($user, CustomerPasswordResetCode::class, function (CustomerPasswordResetCode $notification) use (&$code): bool {
+            $code = $notification->code;
 
             return true;
         });
+        $reset = fn (string $code) => $this->postJson('/api/v1/password/reset', [
+            'challenge' => $challenge, 'email' => $user->email, 'code' => $code,
+            'password' => 'NewSecurePass123!', 'password_confirmation' => 'NewSecurePass123!',
+        ]);
+        $reset($code === '000000' ? '111111' : '000000')->assertUnprocessable()->assertJsonPath('message', 'The reset code is incorrect.');
+        $reset($code)->assertOk();
+        $reset($code)->assertUnprocessable()->assertJsonPath('code', 'verification_expired');
+
+        $this->withToken($oldToken)->getJson('/api/v1/me')->assertUnauthorized();
         $this->postJson('/api/v1/login', ['login' => $user->email, 'password' => 'NewSecurePass123!'])
             ->assertOk()->assertJsonStructure(['data' => ['token']]);
     }
 
-    public function test_mail_failure_cleans_up_reset_token_so_an_immediate_retry_can_send(): void
+    public function test_unknown_email_gets_an_indistinguishable_challenge_that_never_resets(): void
+    {
+        Notification::fake();
+        $challenge = $this->postJson('/api/v1/password/forgot', ['email' => 'nobody@gmail.com'])
+            ->assertOk()->assertJsonPath('message', 'If an eligible account exists, a 6-digit password reset code has been sent.')
+            ->json('data.challenge');
+        Notification::assertNothingSent();
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/v1/password/reset', [
+                'challenge' => $challenge, 'email' => 'nobody@gmail.com', 'code' => sprintf('%06d', $attempt),
+                'password' => 'NewSecurePass123!', 'password_confirmation' => 'NewSecurePass123!',
+            ])->assertUnprocessable()->assertJsonPath('message', 'The reset code is incorrect.');
+        }
+        $this->postJson('/api/v1/password/reset', [
+            'challenge' => $challenge, 'email' => 'nobody@gmail.com', 'code' => '999999',
+            'password' => 'NewSecurePass123!', 'password_confirmation' => 'NewSecurePass123!',
+        ])->assertUnprocessable()->assertJsonPath('code', 'verification_attempts_exceeded');
+    }
+
+    public function test_mail_failure_discards_the_reset_code_so_an_immediate_retry_can_send(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
         Notification::shouldReceive('send')->once()->andThrow(new TransportException('SMTP unavailable'));
-        $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
-            ->assertOk()->assertJsonPath('message', 'If an eligible account exists, a password reset link has been sent.');
-        $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
+        $challenge = $this->postJson('/api/v1/password/forgot', ['email' => $user->email])
+            ->assertOk()->assertJsonPath('message', 'If an eligible account exists, a 6-digit password reset code has been sent.')
+            ->json('data.challenge');
+        $this->assertNull(Cache::get('mobile-password-reset-challenge:'.hash('sha256', $challenge)));
 
         Notification::fake();
         $this->postJson('/api/v1/password/forgot', ['email' => $user->email])->assertOk();
-        Notification::assertSentTo($user, ResetPassword::class);
+        Notification::assertSentTo($user, CustomerPasswordResetCode::class);
     }
 
     public function test_registration_mail_failure_is_an_actionable_error(): void

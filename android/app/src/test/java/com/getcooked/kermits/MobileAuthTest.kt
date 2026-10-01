@@ -27,7 +27,7 @@ class MobileAuthTest {
                 }
                 "forgotPassword" -> {
                     assertEquals("reset-token", (request as ForgotPasswordRequest).recaptcha_token)
-                    Response.success(ApiError(message = "Sent."))
+                    Response.success(ForgotPasswordResponse("Sent.", SendCodeData("reset-challenge", "customer@gmail.com", 600)))
                 }
                 else -> throw AssertionError("Unexpected API call: $method")
             }
@@ -78,12 +78,31 @@ class MobileAuthTest {
         auth.register(registration().copy(email = " Customer@Gmail.com "))
     }
 
-    @Test fun passwordResetDisplaysConfirmedServerResponse() = runBlocking {
+    @Test fun passwordResetRequestReturnsTheChallengeForTheInAppCodeStep() = runBlocking {
         val auth = MobileAuth(api { _, request ->
             assertEquals(ForgotPasswordRequest("customer@gmail.com"), request)
-            Response.success(ApiError(message = "A password reset link was sent to your registered email address."))
+            Response.success(ForgotPasswordResponse("A reset code was sent.", SendCodeData("reset-challenge", "customer@gmail.com", 600)))
         })
-        assertEquals("A password reset link was sent to your registered email address.", auth.requestPasswordReset(" Customer@Gmail.com "))
+        assertEquals("reset-challenge", auth.requestPasswordReset(" Customer@Gmail.com ").challenge)
+    }
+
+    @Test fun passwordResetSendsCodeAndNewPasswordAndReturnsServerMessage() = runBlocking {
+        val auth = MobileAuth(api { method, request ->
+            assertEquals("resetPassword", method)
+            assertEquals(ResetPasswordRequest("reset-challenge", "customer@gmail.com", "012345", "NewPass123!", "NewPass123!"), request)
+            Response.success(ApiError(message = "Your password has been reset."))
+        })
+        assertEquals("Your password has been reset.", auth.resetPassword("reset-challenge", " Customer@Gmail.com ", "012345", "NewPass123!", "NewPass123!"))
+    }
+
+    @Test fun wrongResetCodeKeepsTheCodeStepButExpiredCodeRestartsIt() = runBlocking {
+        val wrong = MobileAuth(api { _, _ -> failure(422, """{"message":"The reset code is incorrect."}""") })
+        val wrongError = failureOf { wrong.resetPassword("reset-challenge", "customer@gmail.com", "111111", "NewPass123!", "NewPass123!") }
+        assertEquals("The reset code is incorrect.", wrongError.message)
+        assertFalse(wrongError.restartVerification)
+
+        val expired = MobileAuth(api { _, _ -> failure(422, """{"code":"verification_expired","message":"The reset code has expired. Please request a new code."}""") })
+        assertTrue(failureOf { expired.resetPassword("reset-challenge", "customer@gmail.com", "111111", "NewPass123!", "NewPass123!") }.restartVerification)
     }
 
     @Test fun unregisteredCustomerCannotRequestAPasswordReset() = runBlocking {
@@ -105,7 +124,7 @@ class MobileAuthTest {
     }
 
     @Test fun emptySuccessfulResetResponseDoesNotClaimEmailWasSent() = runBlocking {
-        val auth = MobileAuth(api { _, _ -> Response.success<ApiError>(null) })
+        val auth = MobileAuth(api { _, _ -> Response.success(ForgotPasswordResponse(message = "Sent.")) })
         assertEquals("Could not confirm the reset request. Please try again.", failureOf { auth.requestPasswordReset("customer@gmail.com") }.message)
     }
 

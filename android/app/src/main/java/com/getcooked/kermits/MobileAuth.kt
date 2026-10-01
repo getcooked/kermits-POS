@@ -29,11 +29,18 @@ internal class MobileAuth(private val api: KermitsApi) {
         }
     }
 
-    suspend fun requestPasswordReset(email: String, recaptchaToken: String? = null): String {
+    suspend fun requestPasswordReset(email: String, recaptchaToken: String? = null): SendCodeData {
         val response = api.forgotPassword(ForgotPasswordRequest(email.trim().lowercase(), recaptchaToken))
         checkResponse(response, "The reset request could not be sent. Please try again.")
-        return response.body()?.message?.takeIf { it.isNotBlank() }
+        return response.body()?.data?.takeIf { it.challenge.isNotBlank() }
             ?: throw AuthRequestException("Could not confirm the reset request. Please try again.")
+    }
+
+    suspend fun resetPassword(challenge: String, email: String, code: String, password: String, confirmation: String): String {
+        val response = api.resetPassword(ResetPasswordRequest(challenge, email.trim().lowercase(), code.trim(), password, confirmation))
+        checkResponse(response, "Your password could not be reset. Please try again.")
+        return response.body()?.message?.takeIf { it.isNotBlank() }
+            ?: "Your password has been reset. You can now log in with your new password."
     }
 
     private fun checkResponse(response: Response<*>, fallback: String) {

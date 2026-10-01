@@ -20,6 +20,7 @@ Route::prefix('v1')->group(function (): void {
     ]]));
     Route::post('/login', [MobileAuthController::class, 'login']);
     Route::post('/password/forgot', [MobilePasswordResetController::class, 'store'])->middleware('throttle:3,1,mobile-password-forgot');
+    Route::post('/password/reset', [MobilePasswordResetController::class, 'update'])->middleware('throttle:6,1,mobile-password-reset');
     Route::post('/register/email', [MobileRegistrationController::class, 'sendCode'])->middleware('throttle:3,1,mobile-registration-email');
     Route::post('/register/email/verify', [MobileRegistrationController::class, 'verifyCode'])->middleware('throttle:6,1,mobile-registration-verify');
     Route::post('/register', [MobileRegistrationController::class, 'register'])->middleware('throttle:3,1,mobile-registration-create');

@@ -79,6 +79,10 @@ data class SendCodeData(val challenge: String, val email: String, val expires_in
 @JsonClass(generateAdapter = true)
 data class SendCodeResponse(val data: SendCodeData)
 @JsonClass(generateAdapter = true)
+data class ForgotPasswordResponse(val message: String? = null, val data: SendCodeData? = null)
+@JsonClass(generateAdapter = true)
+data class ResetPasswordRequest(val challenge: String, val email: String, val code: String, val password: String, val password_confirmation: String)
+@JsonClass(generateAdapter = true)
 data class VerifyCodeData(val registration_token: String, val email: String, val expires_in: Int)
 @JsonClass(generateAdapter = true)
 data class VerifyCodeResponse(val data: VerifyCodeData)
@@ -102,7 +106,8 @@ interface KermitsApi {
     @GET("recaptcha/config") suspend fun recaptchaConfig(): RecaptchaConfigResponse
     @GET("reservation-availability") suspend fun reservationSlots(@Query("date") date: String, @Query("type") type: String, @Query("guests") guests: Int, @Query("table") table: Int? = null): ReservationSlotsResponse
     @POST("login") suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
-    @POST("password/forgot") suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ApiError>
+    @POST("password/forgot") suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ForgotPasswordResponse>
+    @POST("password/reset") suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<ApiError>
     @POST("register/email") suspend fun sendRegistrationCode(@Body request: SendCodeRequest): Response<SendCodeResponse>
     @POST("register/email/verify") suspend fun verifyRegistrationCode(@Body request: VerifyCodeRequest): Response<VerifyCodeResponse>
     @POST("register") suspend fun register(@Body request: RegisterRequest): Response<Map<String, User>>

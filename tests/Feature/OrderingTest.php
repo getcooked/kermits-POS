@@ -406,9 +406,10 @@ class OrderingTest extends TestCase
             ->assertSee('data-pos-stock', false)
             ->assertSee('data-pos-stock class="low-stock">Low stock · 9 in stock', false)
             ->assertSee('data-pos-stock class="">10 in stock', false)
-            ->assertSee('product.stock-(+product.input.value||0)', false)
-            ->assertSee("classList.toggle('low-stock',remaining<10)", false)
-            ->assertSee('color:#c62828!important', false);
+            ->assertSee('data-stock="9"', false)
+            ->assertSee('const LOW_STOCK_BELOW = 10;', false)
+            ->assertSee("classList.toggle('low-stock', remaining < LOW_STOCK_BELOW)", false)
+            ->assertSee('color:#c62828', false);
     }
 
     public function test_customer_gcash_checkout_requires_a_thirteen_digit_reference_and_image_proof(): void

@@ -46,8 +46,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
@@ -55,6 +66,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
@@ -207,6 +219,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var cart by mutableStateOf<Map<Int, Int>>(emptyMap()); private set
     var readOrderNotificationKeys by mutableStateOf<Set<String>>(emptySet()); private set
     var busy by mutableStateOf(false); private set
+    var refreshing by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
     var registrationNeedsVerification by mutableStateOf(false); private set
@@ -333,8 +346,14 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         readOrderNotificationKeys = emptySet()
         signedIn = false
     }
-    fun refresh() = viewModelScope.launch {
-        busy = true
+    /** [pulled] refreshes from a pull-down gesture, which shows its own spinner instead of blocking the screen. */
+    fun refresh(pulled: Boolean = false) = viewModelScope.launch {
+        if (pulled) {
+            if (refreshing || busy) return@launch
+            refreshing = true
+        } else {
+            busy = true
+        }
         error = null
         try {
             // Validate a persisted token first. Previously an expired token kept the
@@ -362,7 +381,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             // Parsing/adapter failures are app bugs, not connectivity problems.
             error = "Could not load the latest menu."
         } finally {
-            busy = false
+            if (pulled) refreshing = false else busy = false
         }
     }
     private suspend fun load() = coroutineScope {
@@ -389,8 +408,22 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             data.challenge
         }, done)
     }
-    fun requestPasswordReset(email: String, done: (String?) -> Unit) =
-        withRecaptcha { token -> runAuthRequest({ mobileAuth.requestPasswordReset(email, token) }, done) }
+    fun requestPasswordReset(email: String, done: (String?) -> Unit) {
+        registrationMessage = null
+        withRecaptcha { token ->
+            runAuthRequest({
+                val data = mobileAuth.requestPasswordReset(email, token)
+                registrationMessage = "If ${data.email} belongs to a customer account, a 6-digit reset code was sent. Check your inbox and spam folder."
+                data.challenge
+            }, done)
+        }
+    }
+
+    fun resetPassword(challenge: String, email: String, code: String, password: String, confirmation: String, done: (Boolean) -> Unit) =
+        runAuthRequest({
+            registrationMessage = mobileAuth.resetPassword(challenge, email, code, password, confirmation)
+            true
+        }, { done(it == true) })
 
     private fun withRecaptcha(done: (String?) -> Unit) {
         if (busy || recaptchaUrl != null) return
@@ -477,7 +510,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         try {
             val response = api.updateProfile(UpdateProfileRequest(name.trim(), phone.trim(), address.trim()))
             if (!response.isSuccessful) {
-                error = apiError(response.errorBody()?.string()) ?: "Your personal information could not be updated."
+                error = responseError(response, "Your personal information could not be updated.")
                 done(null)
                 return@launch
             }
@@ -497,7 +530,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         try {
             val response = api.sendPasswordVerificationCode()
             if (!response.isSuccessful) {
-                error = apiError(response.errorBody()?.string()) ?: "The verification code could not be sent."
+                error = responseError(response, "The verification code could not be sent.")
                 done(null)
                 return@launch
             }
@@ -516,7 +549,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         try {
             val response = api.updatePassword(ChangePasswordRequest(code.trim(), newPassword, confirmation))
             if (!response.isSuccessful) {
-                error = apiError(response.errorBody()?.string()) ?: "Your password could not be changed."
+                error = responseError(response, "Your password could not be changed.")
                 done(false)
                 return@launch
             }
@@ -562,7 +595,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             try {
                 val response = api.payMongoCheckout(orderId)
                 if (!response.isSuccessful) {
-                    error = apiError(response.errorBody()?.string()) ?: "PayMongo checkout is unavailable right now. Please try again."
+                    error = responseError(response, "PayMongo checkout is unavailable right now. Please try again.")
                     return@launch
                 }
                 response.body()?.get("data")?.checkout_url
@@ -627,7 +660,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             val proof = if (details.paymentMethod == "gcash") details.proofUri?.toMultipart(context, "payment_proof") else null
             val response = api.createOrder(parts, proof)
             if (!response.isSuccessful) {
-                error = apiError(response.errorBody()?.string()) ?: "Order details are invalid."
+                error = responseError(response, "Order details are invalid.")
                 done(null)
                 return@launch
             }
@@ -678,7 +711,7 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
                 diningTableId = if (type == "table") diningTableId?.toString()?.formPart() else null,
                 paymentPlan = if (type == "exclusive") paymentPlan.formPart() else null,
             )
-            if (!response.isSuccessful) { error = apiError(response.errorBody()?.string()) ?: "Reservation details are invalid"; done(false); return@launch }
+            if (!response.isSuccessful) { error = responseError(response, "Reservation details are invalid"); done(false); return@launch }
             val created = response.body()?.get("data")
             reservations = api.reservations().data
             done(true)
@@ -692,6 +725,11 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         private fun parseApiError(body: String?): ApiError? = body?.let { runCatching { API_ERROR_ADAPTER.fromJson(it) }.getOrNull() }
         private fun apiErrorMessage(apiError: ApiError?): String? = apiError?.message ?: apiError?.errors?.values?.flatten()?.firstOrNull()
         private fun apiError(body: String?): String? = apiErrorMessage(parseApiError(body))
+        // A server fault's message can be a raw SQL or stack detail when the server runs in debug mode,
+        // so customers only ever see a plain explanation for it.
+        private fun responseError(response: retrofit2.Response<*>, fallback: String): String =
+            if (response.code() >= 500) "Kermit's server ran into a problem, so your request was not completed. Please try again later."
+            else apiError(response.errorBody()?.string()) ?: fallback
         fun factory(api: KermitsApi, store: SessionStore) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -702,8 +740,6 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         }
     }
 }
-
-@Composable fun KermitsTheme(content: @Composable () -> Unit) { MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF737D00), onPrimary = Color.White, background = Color(0xFFEFEFEF), surface = Color.White, onSurface = Color(0xFF171817), surfaceVariant = Color(0xFFF4F5EE), onSurfaceVariant = Color(0xFF687064), outline = Color(0xFFD7DACF)), typography = Typography().copy(headlineLarge = Typography().headlineLarge.copy(fontWeight = FontWeight.Bold), headlineMedium = Typography().headlineMedium.copy(fontWeight = FontWeight.Bold)), content = content) }
 
 @Composable
 private fun BrandLogo(modifier: Modifier = Modifier) {
@@ -718,6 +754,7 @@ private fun BrandLogo(modifier: Modifier = Modifier) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KermitsApp(
     vm: AppViewModel,
@@ -809,46 +846,53 @@ fun KermitsApp(
     }
     BackHandler(enabled = tab != 0) { tab = 0 }
     Scaffold(
-        containerColor = Color(0xFFEFEFEF),
+        containerColor = KColors.Canvas,
         bottomBar = { CustomerBottomBar(tab) { tab = it } },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp)) {
-            AnimatedVisibility(vm.busy, enter = fadeIn(tween(120)) + expandVertically(tween(140)), exit = fadeOut(tween(100)) + shrinkVertically(tween(140))) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = Color(0xFFB5C019), trackColor = Color.Transparent)
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            AnimatedVisibility(vm.busy && !vm.refreshing, enter = fadeIn(tween(120)) + expandVertically(tween(140)), exit = fadeOut(tween(100)) + shrinkVertically(tween(140))) {
+                LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = KColors.Lime, trackColor = Color.Transparent)
             }
-            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
-            Spacer(Modifier.height(8.dp))
-            AnimatedContent(
-                targetState = tab,
+            AnimatedVisibility(vm.error != null, enter = fadeIn(tween(150)) + expandVertically(tween(160)), exit = fadeOut(tween(100)) + shrinkVertically(tween(140))) {
+                vm.error?.let { ErrorBanner(it, onDismiss = vm::clearError, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)) }
+            }
+            PullToRefreshBox(
+                isRefreshing = vm.refreshing,
+                onRefresh = { vm.refresh(pulled = true) },
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                transitionSpec = {
-                    val direction = if (targetState > initialState) 1 else -1
-                    (fadeIn(tween(210)) + slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { direction * (it / 18) }) togetherWith
-                        (fadeOut(tween(110)) + slideOutHorizontally(tween(190)) { -direction * (it / 24) })
-                },
-                label = "customerDestination",
-            ) { destination ->
-                when (destination) {
-                    0 -> MenuScreen(
-                        vm = vm,
-                        payment = payment,
-                        setPayment = { payment = it },
-                        onOrderSubmitted = { order ->
-                            selectedOrderWasJustSubmitted = true
-                            selectedOrder = order
-                            if (order.payment_method == "paymongo") vm.openPayMongo(context, order.id, order.paymongo_checkout_url)
-                        },
-                        onNotificationOrder = { id ->
+            ) {
+                AnimatedContent(
+                    targetState = tab,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        val direction = if (targetState > initialState) 1 else -1
+                        (fadeIn(tween(210)) + slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { direction * (it / 18) }) togetherWith
+                            (fadeOut(tween(110)) + slideOutHorizontally(tween(190)) { -direction * (it / 24) })
+                    },
+                    label = "customerDestination",
+                ) { destination ->
+                    when (destination) {
+                        0 -> MenuScreen(
+                            vm = vm,
+                            payment = payment,
+                            setPayment = { payment = it },
+                            onOrderSubmitted = { order ->
+                                selectedOrderWasJustSubmitted = true
+                                selectedOrder = order
+                                if (order.payment_method == "paymongo") vm.openPayMongo(context, order.id, order.paymongo_checkout_url)
+                            },
+                            onNotificationOrder = { id ->
+                                selectedOrderWasJustSubmitted = false
+                                vm.loadOrder(id) { order -> selectedOrder = order }
+                            },
+                        )
+                        1 -> CustomerHistoryScreen(vm, onOrder = {
                             selectedOrderWasJustSubmitted = false
-                            vm.loadOrder(id) { order -> selectedOrder = order }
-                        },
-                    )
-                    1 -> CustomerHistoryScreen(vm, onOrder = {
-                        selectedOrderWasJustSubmitted = false
-                        vm.loadOrder(it) { order -> selectedOrder = order }
-                    }, onReservation = { vm.loadReservation(it) { selectedReservation = it } }, onReserve = { tab = 2 })
-                    2 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { ReservationScreen(vm) { message -> submissionMessage = message } }
-                    else -> AccountScreen(vm)
+                            vm.loadOrder(it) { order -> selectedOrder = order }
+                        }, onReservation = { vm.loadReservation(it) { selectedReservation = it } }, onReserve = { tab = 2 })
+                        2 -> ReservationScreen(vm) { message -> submissionMessage = message }
+                        else -> AccountScreen(vm)
+                    }
                 }
             }
         }
@@ -865,12 +909,20 @@ fun KermitsApp(
             },
         )
     }
-    selectedReservation?.let { reservation -> DetailDialog("Reservation ${reservation.reference}", "${reservation.status} · ${money(reservation.total_amount)}", listOf("${reservation.type} · ${reservation.guests ?: reservation.table_size} guest(s)${reservation.table_label?.takeIf { reservation.type == "table" }?.let { " · $it" }.orEmpty()}", reservationScheduleLabel(reservation), "Payment: ${paymentMethodLabel(reservation.payment_method)} · ${reservation.payment_status}${reservation.payment_reference?.let { " · Ref $it" } ?: ""}", "Reservation fee: ${money(reservation.reservation_fee)}", "Food total: ${money(reservation.food_total)}") + reservation.items.map { item -> "${item.quantity} × ${item.name}  ${money(item.subtotal)}" }, action = reservation.order_id?.takeIf { reservation.payment_method == "paymongo" && reservation.payment_status == "pending" && reservation.status in setOf("pending", "confirmed") }?.let { orderId -> "Pay with PayMongo" to { vm.openPayMongo(context, orderId, reservation.paymongo_checkout_url) } }) { selectedReservation = null } }
+    selectedReservation?.let { reservation ->
+        ReservationDetailDialog(
+            reservation = reservation,
+            onPayMongo = reservation.order_id
+                ?.takeIf { reservation.payment_method == "paymongo" && reservation.payment_status == "pending" && reservation.status in setOf("pending", "confirmed") }
+                ?.let { orderId -> { vm.openPayMongo(context, orderId, reservation.paymongo_checkout_url); Unit } },
+            close = { selectedReservation = null },
+        )
+    }
 }
 
 @Composable
 private fun LoginScreen(vm: AppViewModel, login: String, setLogin: (String) -> Unit, password: String, setPassword: (String) -> Unit, onRegister: () -> Unit, onForgotPassword: () -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFF5F5EF))) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(KColors.Canvas)) {
         val wide = maxWidth >= 600.dp
         if (wide) Row(Modifier.fillMaxSize()) {
             BrandPanel(Modifier.weight(0.96f).fillMaxHeight())
@@ -889,12 +941,12 @@ private fun BrandPanel(modifier: Modifier) {
         Column(Modifier.fillMaxSize().padding(horizontal = if (compact) 22.dp else 28.dp, vertical = if (compact) 18.dp else 30.dp)) {
         BrandLogo(Modifier.size(if (compact) 58.dp else 84.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-            Text("RESTAURANT POS", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+            Text("KERMIT'S", color = KColors.Lime, fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(if (compact) 4.dp else 10.dp))
-            Text("Simple tools for\nbetter service.", color = Color.White, fontSize = if (compact) 25.sp else 34.sp, lineHeight = if (compact) 27.sp else 37.sp, fontWeight = FontWeight.Bold)
+            Text("Good food,\nreserved for you.", color = Color.White, fontSize = if (compact) 25.sp else 34.sp, lineHeight = if (compact) 27.sp else 37.sp, fontWeight = FontWeight.Bold)
             if (!compact) {
                 Spacer(Modifier.height(14.dp))
-                Text("Manage sales, products, inventory, reports, and receipts from one reliable system.", color = Color(0xFFB9BCB5), fontSize = 15.sp, lineHeight = 23.sp)
+                Text("Order your favorites, reserve the venue, and follow every request in one place.", color = Color(0xFFB9BCB5), fontSize = 15.sp, lineHeight = 23.sp)
             }
         }
         if (!compact) Text("Time-honored recipes since 2000", color = Color(0xFF858982), fontSize = 12.sp)
@@ -915,19 +967,19 @@ private fun LoginForm(vm: AppViewModel, login: String, setLogin: (String) -> Uni
     }
     val canLogIn = !vm.busy && cooldownSeconds == 0 && login.isNotBlank() && password.isNotBlank()
     val submitLogin = { if (canLogIn) vm.login(login, password, keepSignedIn) }
-    Column(modifier.background(Color(0xFFF7F7F1)).padding(horizontal = 26.dp, vertical = 34.dp), verticalArrangement = Arrangement.Center) {
+    Column(modifier.background(KColors.Canvas).padding(horizontal = 26.dp, vertical = 34.dp), verticalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).align(Alignment.CenterHorizontally)) {
-            Text("WELCOME BACK", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp)); Text("Log in to your account", color = Color(0xFF202124), fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(7.dp)); Text("Enter your details to continue to Kermit’s.", color = Color(0xFF687286), fontSize = 15.sp)
+            Text("WELCOME BACK", color = KColors.Lime, fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp)); Text("Log in to your account", color = KColors.Ink, fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp)); Text("Enter your details to continue to Kermit’s.", color = KColors.Muted, fontSize = 15.sp)
             Spacer(Modifier.height(28.dp))
             OutlinedTextField(login, setLogin, label = { Text("Email Address") }, placeholder = { Text("name@gmail.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp)); OutlinedTextField(password, setPassword, label = { Text("Password") }, placeholder = { Text("Enter your password") }, singleLine = true, visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submitLogin() }), trailingIcon = { IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (passwordVisible) "Hide password" else "Show password") } }, colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
-            vm.registrationMessage?.let { Text(it, color = Color(0xFF626B00), fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
+            vm.registrationMessage?.let { Text(it, color = KColors.Olive, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             loginError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
-            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it }); Text("Keep me signed in", color = Color(0xFF687286), fontSize = 13.sp) }; TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Forgot password?", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
-            Spacer(Modifier.height(15.dp)); Button(onClick = submitLogin, enabled = canLogIn, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(when { vm.busy -> "Signing in..."; cooldownSeconds > 0 -> "Try again in ${cooldownSeconds}s"; else -> "Log in" }, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
-            Spacer(Modifier.height(18.dp)); TextButton(onClick = onRegister, modifier = Modifier.fillMaxWidth()) { Text("New customer? Create an account", color = Color(0xFF626B00), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(18.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it }); Text("Keep me signed in", color = KColors.Muted, fontSize = 13.sp) }; TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("Forgot password?", color = KColors.Olive, fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
+            Spacer(Modifier.height(15.dp)); Button(onClick = submitLogin, enabled = canLogIn, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(56.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(when { vm.busy -> "Signing in..."; cooldownSeconds > 0 -> "Try again in ${cooldownSeconds}s"; else -> "Log in" }, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("→", fontSize = 22.sp) } }
+            Spacer(Modifier.height(18.dp)); TextButton(onClick = onRegister, modifier = Modifier.fillMaxWidth()) { Text("New customer? Create an account", color = KColors.Olive, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -941,26 +993,28 @@ private fun CustomerBottomBar(selected: Int, select: (Int) -> Unit) {
         Triple("Account", Icons.Default.Person, 3),
     )
 
-    NavigationBar(
-        containerColor = Color(0xFF202124),
-        contentColor = Color.White,
-        tonalElevation = 10.dp,
-    ) {
-        destinations.forEach { (label, icon, index) ->
-            NavigationBarItem(
-                selected = selected == index,
-                onClick = { select(index) },
-                icon = { Icon(icon, contentDescription = null) },
-                label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                alwaysShowLabel = true,
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color(0xFF202124),
-                    selectedTextColor = Color.White,
-                    indicatorColor = Color(0xFFB5C019),
-                    unselectedIconColor = Color(0xFFB7BAB5),
-                    unselectedTextColor = Color(0xFFB7BAB5),
-                ),
-            )
+    Surface(color = KColors.Ink, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), shadowElevation = 12.dp) {
+        NavigationBar(
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            tonalElevation = 0.dp,
+        ) {
+            destinations.forEach { (label, icon, index) ->
+                NavigationBarItem(
+                    selected = selected == index,
+                    onClick = { select(index) },
+                    icon = { Icon(icon, contentDescription = null) },
+                    label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    alwaysShowLabel = true,
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = KColors.Ink,
+                        selectedTextColor = KColors.Lime,
+                        indicatorColor = KColors.Lime,
+                        unselectedIconColor = Color(0xFFA9ADA4),
+                        unselectedTextColor = Color(0xFFA9ADA4),
+                    ),
+                )
+            }
         }
     }
 }
@@ -973,36 +1027,66 @@ private fun AccountScreen(vm: AppViewModel) {
     when (section) {
         "personal" -> PersonalInformationScreen(vm) { section = "account"; vm.clearError() }
         "password" -> ChangePasswordScreen(vm) { section = "account"; vm.clearError() }
-        else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Text("Account", fontSize = 30.sp, fontWeight = FontWeight.Black)
-            Text("Manage your customer account", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
-                Column(Modifier.padding(18.dp)) {
-                    Text(vm.user?.name.orEmpty(), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text(vm.user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp, bottom = 18.dp))
-                    AccountOption(Icons.Default.Person, "Personal Information", "Update your name and phone number") { vm.clearError(); section = "personal" }
-                    Spacer(Modifier.height(10.dp))
-                    AccountOption(Icons.Default.Lock, "Change Password", "Verify your email before choosing a new password") { vm.clearError(); section = "password" }
-                    Spacer(Modifier.height(20.dp))
-                    Button(onClick = vm::logout, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(7.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Log out", fontWeight = FontWeight.Bold) }
+        else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 18.dp)) {
+            val user = vm.user
+            ScreenHeader("Your profile", "Account", subtitle = "Manage your details and security.")
+            Spacer(Modifier.height(18.dp))
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = KColors.Ink) {
+                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(60.dp).background(KColors.Lime, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                        Text(initials(user?.name.orEmpty()), color = KColors.Ink, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                    }
+                    Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                        Text(user?.name.orEmpty(), color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(user?.email.orEmpty(), color = Color(0xFFC5C8BF), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
+                        user?.phone?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color(0xFFC5C8BF), fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp)) }
+                    }
                 }
             }
+            Spacer(Modifier.height(22.dp))
+            Eyebrow("Settings", color = KColors.Muted)
+            Spacer(Modifier.height(10.dp))
+            KCard(Modifier.fillMaxWidth(), contentPadding = 6.dp) {
+                AccountOption(Icons.Default.Person, "Personal information", "Name, phone number, and address") { vm.clearError(); section = "personal" }
+                HorizontalDivider(color = KColors.Line, modifier = Modifier.padding(horizontal = 12.dp))
+                AccountOption(Icons.Default.Lock, "Change password", "Verify your email, then choose a new password") { vm.clearError(); section = "password" }
+            }
+            Spacer(Modifier.height(22.dp))
+            SecondaryButton("Log out", onClick = { vm.logout() }, contentColor = KColors.Danger)
+            Text("Kermit's app ${BuildConfig.VERSION_NAME}", color = KColors.Faint, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
         }
     }
 }
 
+private fun initials(name: String): String =
+    name.split(' ').filter(String::isNotBlank).take(2).joinToString("") { it.take(1).uppercase() }.ifEmpty { "K" }
+
 @Composable
 private fun AccountOption(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(9.dp), color = Color(0xFFF4F5EE), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDDE0D5))) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = Color(0xFF202124), modifier = Modifier.size(42.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = Color(0xFFB5C019), modifier = Modifier.size(21.dp)) }
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.Transparent) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).background(KColors.LimeSoft, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = KColors.Olive, modifier = Modifier.size(21.dp))
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 3.dp))
+                Text(subtitle, color = KColors.Muted, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 2.dp))
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF777D72))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = KColors.Faint)
+        }
+    }
+}
+
+/** Header for screens opened from Account, with a back arrow in place of the tab title. */
+@Composable
+private fun SubScreenHeader(title: String, subtitle: String, enabled: Boolean, onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        FilledIconButton(onClick = onBack, enabled = enabled, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = KColors.Ink)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Account")
+        }
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(title, fontSize = 24.sp, fontWeight = FontWeight.Black, modifier = Modifier.semantics { heading() })
+            Text(subtitle, color = KColors.Muted, fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
 }
@@ -1155,12 +1239,11 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
     var status by rememberSaveable { mutableStateOf<String?>(null) }
     val canSave = name.isNotBlank() && name.length <= 100 && Regex("^09\\d{9}$").matches(phone) && address.isNotBlank() && address.length <= 500
 
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
-        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
-        Text("Personal Information", fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 8.dp))
-        Text("Update the details used to identify and contact you.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
-            Column(Modifier.padding(18.dp)) {
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 18.dp)) {
+        SubScreenHeader("Personal information", "The details used to identify and contact you.", enabled = !vm.busy, onBack = onBack)
+        Spacer(Modifier.height(18.dp))
+        KCard(Modifier.fillMaxWidth()) {
+            Column {
                 RegistrationField("Full name", name, "Maximum 100 characters") { name = it.take(100); status = null; vm.clearError() }
                 RegistrationField("Phone number", phone, "11 digits starting with 09", keyboardType = KeyboardType.Number) { phone = it.filter(Char::isDigit).take(11); status = null; vm.clearError() }
                 OutlinedTextField(
@@ -1187,15 +1270,13 @@ private fun PersonalInformationScreen(vm: AppViewModel, onBack: () -> Unit) {
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                status?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp)) }
+                status?.let { Text(it, color = KColors.Success, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp)) }
                 Spacer(Modifier.height(16.dp))
-                Button(
+                PrimaryButton(
+                    if (vm.busy) "Saving..." else "Save changes",
                     onClick = { status = null; vm.updateProfile(name, phone, address) { status = it } },
                     enabled = canSave && !vm.busy,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                ) { Text(if (vm.busy) "Saving..." else "Save Personal Information", fontWeight = FontWeight.Bold) }
+                )
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -1211,34 +1292,20 @@ private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
     val passwordIsStrong = newPassword.length in 8..23 && newPassword.any(Char::isUpperCase) && newPassword.any(Char::isLowerCase) && newPassword.any(Char::isDigit) && Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(newPassword)
     val canChange = code.length == 6 && passwordIsStrong && confirmation == newPassword
 
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())) {
-        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("< Back to Account", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
-        Text("Change Password", fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 8.dp))
-        Text("Verify your email before choosing a new password.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 4.dp, bottom = 18.dp))
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
-            Column(Modifier.padding(18.dp)) {
-                Text("Email verification", fontWeight = FontWeight.Bold)
-                Text("Send a one-time code to ${vm.user?.email.orEmpty()}. The code expires after 10 minutes.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
-                OutlinedButton(
-                    onClick = { sentMessage = null; vm.sendPasswordVerificationCode { sentMessage = it } },
-                    enabled = !vm.busy,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text(if (vm.busy) "Sending..." else "Send verification code", fontWeight = FontWeight.Bold) }
-                sentMessage?.let { Text(it, color = Color(0xFF267444), fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 10.dp)) }
-                Spacer(Modifier.height(14.dp))
-                RegistrationField("Email verification code", code, "Enter the 6-digit code", keyboardType = KeyboardType.NumberPassword) { code = it.filter(Char::isDigit).take(6); vm.clearError() }
-                RegistrationField("New password", newPassword, "8-23 characters with uppercase, lowercase, number, and symbol", password = true, keyboardType = KeyboardType.Password) { newPassword = it.take(23); vm.clearError() }
-                RegistrationField("Confirm new password", confirmation, "Enter the new password again", password = true, keyboardType = KeyboardType.Password, imeAction = ImeAction.Done) { confirmation = it.take(23); vm.clearError() }
-                Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = { vm.changePassword(code, newPassword, confirmation) {} },
-                    enabled = canChange && !vm.busy,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                ) { Text(if (vm.busy) "Changing password..." else "Change Password", fontWeight = FontWeight.Bold) }
-            }
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 18.dp)) {
+        SubScreenHeader("Change password", "Verify your email before choosing a new password.", enabled = !vm.busy, onBack = onBack)
+        Spacer(Modifier.height(18.dp))
+        SectionCard("Verify your email", step = 1, subtitle = "We'll send a one-time code to ${vm.user?.email.orEmpty()}. It expires after 10 minutes.") {
+            SecondaryButton(if (vm.busy) "Sending..." else "Send verification code", onClick = { sentMessage = null; vm.sendPasswordVerificationCode { sentMessage = it } }, enabled = !vm.busy)
+            sentMessage?.let { Text(it, color = KColors.Success, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 10.dp)) }
+        }
+        Spacer(Modifier.height(14.dp))
+        SectionCard("Choose a new password", step = 2) {
+            RegistrationField("Email verification code", code, "Enter the 6-digit code", keyboardType = KeyboardType.NumberPassword) { code = it.filter(Char::isDigit).take(6); vm.clearError() }
+            RegistrationField("New password", newPassword, "8-23 characters with uppercase, lowercase, number, and symbol", password = true, keyboardType = KeyboardType.Password) { newPassword = it.take(23); vm.clearError() }
+            RegistrationField("Confirm new password", confirmation, "Enter the new password again", password = true, keyboardType = KeyboardType.Password, imeAction = ImeAction.Done) { confirmation = it.take(23); vm.clearError() }
+            Spacer(Modifier.height(10.dp))
+            PrimaryButton(if (vm.busy) "Changing password..." else "Change password", onClick = { vm.changePassword(code, newPassword, confirmation) {} }, enabled = canChange && !vm.busy)
         }
         Spacer(Modifier.height(20.dp))
     }
@@ -1247,27 +1314,106 @@ private fun ChangePasswordScreen(vm: AppViewModel, onBack: () -> Unit) {
 @Composable
 private fun PasswordRecoveryScreen(vm: AppViewModel, onBack: () -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }
-    var message by rememberSaveable { mutableStateOf<String?>(null) }
+    var challenge by rememberSaveable { mutableStateOf<String?>(null) }
+    var code by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var showErrors by remember { mutableStateOf(false) }
+    var resendSeconds by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(resendSeconds) {
+        if (resendSeconds > 0) { delay(1000); resendSeconds-- }
+    }
+    LaunchedEffect(vm.registrationNeedsVerification) {
+        if (vm.registrationNeedsVerification) { challenge = null; code = ""; resendSeconds = 0 }
+    }
     val validEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+    val passwordError = passwordRuleError(password)
+    val confirmationError = passwordConfirmationError(password, confirmation)
+    val sendCode = {
+        vm.requestPasswordReset(email) { issuedChallenge ->
+            if (issuedChallenge != null) { challenge = issuedChallenge; code = ""; resendSeconds = 60 }
+        }
+    }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).imePadding().padding(horizontal = 26.dp, vertical = 28.dp)) {
-        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
+    Column(Modifier.fillMaxSize().background(KColors.Canvas).imePadding().padding(horizontal = 26.dp, vertical = 28.dp)) {
+        TextButton(onClick = { vm.clearRegistrationFeedback(); onBack() }, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = KColors.Olive, fontWeight = FontWeight.Bold) }
         Column(Modifier.fillMaxWidth().widthIn(max = 520.dp).weight(1f).align(Alignment.CenterHorizontally).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.Center) {
             BrandLogo(Modifier.size(72.dp).align(Alignment.CenterHorizontally).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
             Spacer(Modifier.height(22.dp))
-            Text("RESET PASSWORD", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+            Text("RESET PASSWORD", color = KColors.Lime, fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text("Recover your account", color = Color(0xFF202124), fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
+            Text("Recover your account", color = KColors.Ink, fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(7.dp))
-            Text("Enter the email address used by your customer account. We’ll email you a secure reset link.", color = Color(0xFF687286), fontSize = 14.sp, lineHeight = 21.sp)
+            Text(
+                if (challenge == null) "Enter the email address used by your customer account. We’ll email you a 6-digit reset code."
+                else "Enter the 6-digit code from your email, then choose a new password.",
+                color = KColors.Muted, fontSize = 14.sp, lineHeight = 21.sp,
+            )
             Spacer(Modifier.height(24.dp))
-            OutlinedTextField(email, { email = it; message = null; vm.clearError() }, label = { Text("Email address") }, placeholder = { Text("name@gmail.com") }, enabled = !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { if (validEmail && !vm.busy) { message = null; vm.requestPasswordReset(email) { message = it } } }), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(email, { email = it; vm.clearError() }, label = { Text("Email address") }, placeholder = { Text("name@gmail.com") }, enabled = challenge == null && !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { if (validEmail && !vm.busy && challenge == null) sendCode() }), colors = loginFieldColors(), shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth())
+            if (challenge == null) {
+                Spacer(Modifier.height(18.dp))
+                Button(onClick = sendCode, enabled = validEmail && !vm.busy, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Text(if (vm.busy) "Sending..." else "Send reset code", fontWeight = FontWeight.Bold) }
+            } else {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(code, { code = it.filter { digit -> digit in '0'..'9' }.take(6); vm.clearError() }, label = { Text("6-digit reset code") }, enabled = !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Next), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                RegistrationField(
+                    label = "New password",
+                    value = password,
+                    helperText = "8-23 characters with uppercase, lowercase, a number, and a symbol (${password.length}/23)",
+                    errorText = passwordError.takeIf { showErrors },
+                    password = true,
+                    keyboardType = KeyboardType.Password,
+                ) { input -> password = input.take(23); vm.clearError() }
+                RegistrationField(
+                    label = "Confirm new password",
+                    value = confirmation,
+                    helperText = "Must exactly match your new password (${confirmation.length}/23)",
+                    errorText = confirmationError.takeIf { showErrors },
+                    password = true,
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ) { input -> confirmation = input.take(23); vm.clearError() }
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        showErrors = true
+                        vm.clearError()
+                        if (passwordError == null && confirmationError == null) {
+                            challenge?.let { vm.resetPassword(it, email, code, password, confirmation) { ok -> if (ok) onBack() } }
+                        }
+                    },
+                    enabled = code.length == 6 && !vm.busy,
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                ) { Text(if (vm.busy) "Resetting password..." else "Reset password", fontWeight = FontWeight.Bold) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { challenge = null; code = ""; resendSeconds = 0; vm.clearRegistrationFeedback() }, enabled = !vm.busy) { Text("Change email") }
+                    TextButton(onClick = sendCode, enabled = !vm.busy && resendSeconds == 0) { Text(if (resendSeconds > 0) "Resend in ${resendSeconds}s" else "Resend code") }
+                }
+            }
             vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
-            message?.let { Text("$it\n\nCheck your inbox and spam folder. Open the link to choose a new password, then return to the app to log in.", color = Color(0xFF626B00), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 12.dp)) }
-            Spacer(Modifier.height(18.dp))
-            Button(onClick = { message = null; vm.requestPasswordReset(email) { message = it } }, enabled = validEmail && !vm.busy, shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White), modifier = Modifier.fillMaxWidth().height(54.dp)) { Text(if (vm.busy) "Sending..." else "Send reset link", fontWeight = FontWeight.Bold) }
+            vm.registrationMessage?.let { Text(it, color = KColors.Olive, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 12.dp)) }
         }
     }
+}
+
+private fun passwordRuleError(password: String): String? = when {
+    password.isBlank() -> "Enter a password."
+    password.length !in 8..23 ||
+        password.none(Char::isUpperCase) ||
+        password.none(Char::isLowerCase) ||
+        !Regex("\\p{N}").containsMatchIn(password) ||
+        !Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(password) ->
+        "Password must be 8-23 characters with uppercase, lowercase, a number, and a symbol."
+    else -> null
+}
+
+private fun passwordConfirmationError(password: String, confirmation: String): String? = when {
+    confirmation.isBlank() -> "Confirm your password."
+    confirmation != password -> "Passwords do not match."
+    else -> null
 }
 
 @Composable
@@ -1304,28 +1450,15 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
         address.length > 500 -> "Address must not be more than 500 characters."
         else -> null
     }
-    val passwordError = when {
-        password.isBlank() -> "Enter a password."
-        password.length !in 8..23 ||
-            password.none(Char::isUpperCase) ||
-            password.none(Char::isLowerCase) ||
-            !Regex("\\p{N}").containsMatchIn(password) ||
-            !Regex("[\\p{Z}\\p{S}\\p{P}]").containsMatchIn(password) ->
-            "Password must be 8-23 characters with uppercase, lowercase, a number, and a symbol."
-        else -> null
-    }
-    val confirmationError = when {
-        confirmation.isBlank() -> "Confirm your password."
-        confirmation != password -> "Passwords do not match."
-        else -> null
-    }
+    val passwordError = passwordRuleError(password)
+    val confirmationError = passwordConfirmationError(password, confirmation)
     val firstRegistrationError = nameError ?: phoneError ?: birthdayError ?: sexError ?: addressError ?: passwordError ?: confirmationError
-    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F1)).imePadding()) {
+    Column(Modifier.fillMaxSize().background(KColors.Canvas).imePadding()) {
         RegistrationBrandPanel(Modifier.fillMaxWidth().height(170.dp))
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp)) {
-        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = Color(0xFF626B00), fontWeight = FontWeight.Bold) }
-        Spacer(Modifier.height(12.dp)); Text("SIGN UP", color = Color(0xFFAAB514), fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold); Text("Create your account", fontSize = 30.sp, fontWeight = FontWeight.Bold); Text("Verify your Gmail first, then create your customer account securely.", color = Color(0xFF687286), modifier = Modifier.padding(top = 7.dp))
-        Spacer(Modifier.height(22.dp)); Text("Step 1  Gmail verification", fontWeight = FontWeight.Bold); Text("Use a Gmail address you can open now.", color = Color(0xFF687286), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)); Spacer(Modifier.height(10.dp))
+        TextButton(onClick = onBack, enabled = !vm.busy, contentPadding = PaddingValues(0.dp)) { Text("← Back to log in", color = KColors.Olive, fontWeight = FontWeight.Bold) }
+        Spacer(Modifier.height(12.dp)); Text("SIGN UP", color = KColors.Lime, fontSize = 12.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold); Text("Create your account", fontSize = 30.sp, fontWeight = FontWeight.Bold); Text("Verify your Gmail first, then create your customer account securely.", color = KColors.Muted, modifier = Modifier.padding(top = 7.dp))
+        Spacer(Modifier.height(22.dp)); Text("Step 1  Gmail verification", fontWeight = FontWeight.Bold); Text("Use a Gmail address you can open now.", color = KColors.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)); Spacer(Modifier.height(10.dp))
         OutlinedTextField(email, { email = it; vm.clearError() }, label = { Text("Gmail address") }, placeholder = { Text("name@gmail.com") }, enabled = challenge == null && !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
         if (token == null) {
             Spacer(Modifier.height(8.dp))
@@ -1341,7 +1474,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(code, { code = it.filter { digit -> digit in '0'..'9' }.take(6); vm.clearError() }, label = { Text("6-digit verification code") }, enabled = !vm.busy, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            Button(onClick = { challenge?.let { vm.verifyCode(it, email, code) { verified -> token = verified } } }, enabled = code.length == 6 && !vm.busy, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(if (vm.busy) "Please wait..." else "Verify Gmail", fontWeight = FontWeight.Bold) }
+            Button(onClick = { challenge?.let { vm.verifyCode(it, email, code) { verified -> token = verified } } }, enabled = code.length == 6 && !vm.busy, colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(if (vm.busy) "Please wait..." else "Verify Gmail", fontWeight = FontWeight.Bold) }
         }
         if (challenge != null || token != null) {
             TextButton(onClick = { challenge = null; token = null; code = ""; resendSeconds = 0; vm.clearRegistrationFeedback() }, enabled = !vm.busy) { Text("Change email / verify again") }
@@ -1379,7 +1512,7 @@ private fun RegistrationScreen(vm: AppViewModel, onBack: () -> Unit) {
             Text("Sex", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 5.dp, bottom = 5.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                 listOf("male" to "Male", "female" to "Female").forEach { (value, label) ->
-                    FilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.padding(end = 7.dp))
+                    KChip(selected = sex == value, label = label, onClick = { sex = value })
                 }
             }
             if (showRegistrationErrors && sexError != null) Text(sexError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(bottom = 5.dp))
@@ -1487,7 +1620,7 @@ private fun RegistrationBrandPanel(modifier: Modifier = Modifier) {
         BrandLogo(Modifier.size(62.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape).padding(5.dp))
         Spacer(Modifier.width(18.dp))
         Column {
-            Text("CUSTOMER ACCOUNT", color = Color(0xFFAAB514), fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
+            Text("CUSTOMER ACCOUNT", color = KColors.Lime, fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
             Text("Order your\nfavorites.", color = Color.White, fontSize = 27.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp))
         }
     }
@@ -1521,10 +1654,11 @@ private fun RegistrationField(
 
 @Composable
 private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Color(0xFF8C960C), unfocusedBorderColor = Color(0xFFD5D7CC),
-    focusedLabelColor = Color(0xFF737D00), unfocusedLabelColor = Color(0xFF687286),
-    focusedTextColor = Color(0xFF202124), unfocusedTextColor = Color(0xFF202124),
-    cursorColor = Color(0xFF737D00), focusedContainerColor = Color.White, unfocusedContainerColor = Color.White
+    focusedBorderColor = KColors.Olive, unfocusedBorderColor = KColors.Line,
+    focusedLabelColor = KColors.Olive, unfocusedLabelColor = KColors.Muted,
+    focusedTextColor = KColors.Ink, unfocusedTextColor = KColors.Ink,
+    cursorColor = KColors.Olive, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White,
+    disabledContainerColor = KColors.Canvas, disabledBorderColor = KColors.Line,
 )
 
 @Composable
@@ -1633,134 +1767,131 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
         if (notificationsOpen) vm.markOrderNotificationsRead(decisionKeys)
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Menu", fontSize = 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-            BadgedBox(
-                badge = {
-                    if (unreadNotificationCount > 0) {
-                        Badge(
-                            modifier = Modifier.clearAndSetSemantics { },
-                            containerColor = Color(0xFFB5C019),
-                            contentColor = Color(0xFF171817),
-                        ) { Text(if (unreadNotificationCount > 99) "99+" else unreadNotificationCount.toString()) }
-                    }
-                },
-            ) {
-                FilledIconButton(
-                    onClick = { notificationsOpen = true },
-                    modifier = Modifier.semantics {
-                        contentDescription = if (unreadNotificationCount == 0) "Order notifications" else "Order notifications, $unreadNotificationCount unread"
-                    },
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color(0xFF202124)),
-                ) { Icon(Icons.Default.Notifications, contentDescription = null) }
-            }
-            Spacer(Modifier.width(10.dp))
-            BadgedBox(
-                badge = {
-                    if (cartItemCount > 0) {
-                        Badge(
-                            modifier = Modifier.clearAndSetSemantics { },
-                            containerColor = Color(0xFFB5C019),
-                            contentColor = Color(0xFF171817),
-                        ) {
-                            Text(if (cartItemCount > 99) "99+" else cartItemCount.toString())
-                        }
-                    }
-                },
-            ) {
-                FilledIconButton(
-                    onClick = { cartOpen = true },
-                    modifier = Modifier.semantics {
-                        contentDescription = when (cartItemCount) {
-                            0 -> "Cart, empty"
-                            1 -> "Cart, 1 item"
-                            else -> "Cart, $cartItemCount items"
-                        }
-                    },
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Color(0xFF5800F0),
-                        contentColor = Color.White,
-                    ),
-                ) {
-                    Icon(Icons.Default.ShoppingCart, contentDescription = null)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
-            item(key = "menu-filters") {
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 18.dp, bottom = if (cartItemCount > 0) 100.dp else 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "menu-header", span = { GridItemSpan(maxLineSpan) }) {
                 Column {
+                    ScreenHeader(
+                        eyebrow = vm.user?.name?.substringBefore(' ')?.takeIf { it.isNotBlank() }?.let { "Hi, $it" } ?: "Kermit's menu",
+                        title = "What are you craving?",
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (unreadNotificationCount > 0) {
+                                    Badge(modifier = Modifier.clearAndSetSemantics { }, containerColor = KColors.Lime, contentColor = KColors.Ink) {
+                                        Text(if (unreadNotificationCount > 99) "99+" else unreadNotificationCount.toString())
+                                    }
+                                }
+                            },
+                        ) {
+                            FilledIconButton(
+                                onClick = { notificationsOpen = true },
+                                modifier = Modifier.semantics {
+                                    contentDescription = if (unreadNotificationCount == 0) "Order notifications" else "Order notifications, $unreadNotificationCount unread"
+                                },
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = KColors.Ink),
+                            ) { Icon(Icons.Default.Notifications, contentDescription = null) }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        BadgedBox(
+                            badge = {
+                                if (cartItemCount > 0) {
+                                    Badge(modifier = Modifier.clearAndSetSemantics { }, containerColor = KColors.Lime, contentColor = KColors.Ink) {
+                                        Text(if (cartItemCount > 99) "99+" else cartItemCount.toString())
+                                    }
+                                }
+                            },
+                        ) {
+                            FilledIconButton(
+                                onClick = { cartOpen = true },
+                                modifier = Modifier.semantics {
+                                    contentDescription = when (cartItemCount) {
+                                        0 -> "Cart, empty"
+                                        1 -> "Cart, 1 item"
+                                        else -> "Cart, $cartItemCount items"
+                                    }
+                                },
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = KColors.Ink, contentColor = Color.White),
+                            ) { Icon(Icons.Default.ShoppingCart, contentDescription = null) }
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
                         query,
                         { query = it },
-                        placeholder = { Text("Search products", fontWeight = FontWeight.SemiBold) },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF5E5968)) },
+                        placeholder = { Text("Search dishes and drinks") },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = KColors.Muted) },
+                        trailingIcon = if (query.isNotEmpty()) {
+                            { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear search", tint = KColors.Muted) } }
+                        } else null,
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White,
-                            focusedBorderColor = Color(0xFFB5C019),
-                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = KColors.Olive,
+                            unfocusedBorderColor = KColors.Line,
+                            cursorColor = KColors.Olive,
                         ),
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(50.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(50),
                     )
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(12.dp))
                     Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        categories.forEach { value ->
-                            MenuCategoryButton(selected = category == value, label = value, onClick = { category = value })
-                        }
+                        categories.forEach { value -> KChip(selected = category == value, label = value, onClick = { category = value }) }
                     }
-                    Spacer(Modifier.height(10.dp))
+                }
+            }
+            if (filtered.isEmpty()) {
+                item(key = "menu-empty", span = { GridItemSpan(maxLineSpan) }) {
+                    EmptyState(
+                        Icons.Default.Search,
+                        if (vm.products.isEmpty()) "The menu is not available yet" else "No dishes match \"$query\"",
+                        if (vm.products.isEmpty()) "Pull down to refresh, or check your internet connection." else "Try another name or choose a different category.",
+                    )
                 }
             }
             filtered.groupBy { it.category ?: "Favorites" }.forEach { (categoryName, categoryProducts) ->
-                item(key = "category-$categoryName") {
-                    Text(categoryName, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color(0xFF171817), modifier = Modifier.padding(vertical = 10.dp))
+                item(key = "category-$categoryName", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.Bottom) {
+                        Text(categoryName, fontSize = 19.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).semantics { heading() })
+                        Text("${categoryProducts.size} ${if (categoryProducts.size == 1) "item" else "items"}", color = KColors.Muted, fontSize = 12.sp)
+                    }
                 }
                 items(categoryProducts, key = Product::id) { product ->
-                    Surface(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(12.dp), color = Color.White) {
-                        Column {
-                            if (product.image_url != null) {
-                                AsyncImage(
-                                    remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).size(900, 426).crossfade(true).build() },
-                                    product.name,
-                                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp).height(128.dp).clip(RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop,
-                                )
-                            } else {
-                                Box(
-                                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp).height(128.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFE9ECD4)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(product.name.take(1), color = Color(0xFF747D00), fontSize = 42.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Column(Modifier.padding(12.dp)) {
-                                Text(product.name, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                                Text(product.description.orEmpty(), maxLines = 2, color = Color(0xFF6D746B), fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 5.dp))
-                                val quantity = vm.cart[product.id] ?: 0
-                                // Same as the web menu: stock already in the cart is no longer available.
-                                val remaining = (product.stock - quantity).coerceAtLeast(0)
-                                val lowStock = remaining < 10
-                                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Column {
-                                        Text(money(product.price), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                                        Text(if (lowStock) "Low stock · $remaining available" else "$remaining available", color = if (lowStock) Color(0xFFC62828) else Color(0xFF596273), fontSize = 11.sp, fontWeight = if (lowStock) FontWeight.ExtraBold else FontWeight.SemiBold)
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (quantity > 0) {
-                                            IconButton(onClick = { vm.remove(product) }, Modifier.size(34.dp)) { Icon(Icons.Default.Remove, "Remove", Modifier.size(18.dp)) }
-                                            Text(quantity.toString(), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
-                                        }
-                                        IconButton(onClick = { vm.add(product) }, enabled = quantity < product.stock, modifier = Modifier.size(34.dp)) { Icon(Icons.Default.Add, "Add", Modifier.size(19.dp)) }
-                                    }
-                                }
-                            }
-                        }
+                    val quantity = vm.cart[product.id] ?: 0
+                    MenuProductCard(product, quantity) { target -> if (target > quantity) vm.add(product) else vm.remove(product) }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = cartItemCount > 0,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+        ) {
+            Surface(
+                onClick = { cartOpen = true },
+                shape = RoundedCornerShape(20.dp),
+                color = KColors.Ink,
+                shadowElevation = 10.dp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(36.dp).background(KColors.Lime, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                        Text(if (cartItemCount > 99) "99+" else cartItemCount.toString(), color = KColors.Ink, fontSize = 13.sp, fontWeight = FontWeight.Black)
                     }
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text("View cart", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("$cartItemCount ${if (cartItemCount == 1) "item" else "items"} ready to order", color = Color(0xFFC5C8BF), fontSize = 12.sp)
+                    }
+                    Text(money(cartTotal), color = KColors.Lime, fontSize = 17.sp, fontWeight = FontWeight.Black)
                 }
             }
         }
@@ -1770,7 +1901,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
         ModalBottomSheet(
             onDismissRequest = { notificationsOpen = false },
             sheetState = notificationSheetState,
-            containerColor = Color(0xFFF8F7F1),
+            containerColor = KColors.Canvas,
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().fillMaxHeight(0.78f),
@@ -1779,20 +1910,20 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                 item(key = "notification-title") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            Text("NOTIFICATIONS", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("NOTIFICATIONS", color = KColors.Olive, fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
                             Text("Order updates", fontSize = 25.sp, fontWeight = FontWeight.Bold)
                         }
                         TextButton(onClick = { notificationsOpen = false }) { Text("Close") }
                     }
-                    Text("Accepted and rejected orders appear here.", color = Color(0xFF6E746B), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 14.dp))
+                    Text("Accepted and rejected orders appear here.", color = KColors.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 14.dp))
                 }
                 if (decisionOrders.isEmpty()) {
                     item(key = "empty-notifications") {
                         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color.White) {
                             Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFF747D00), modifier = Modifier.size(36.dp))
+                                Icon(Icons.Default.Notifications, contentDescription = null, tint = KColors.Olive, modifier = Modifier.size(36.dp))
                                 Text("No order notifications yet", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                                Text("You will see an update when the cashier accepts or rejects an order.", color = Color(0xFF6E746B), fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 5.dp))
+                                Text("You will see an update when the cashier accepts or rejects an order.", color = KColors.Muted, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 5.dp))
                             }
                         }
                     }
@@ -1804,12 +1935,12 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                             shape = RoundedCornerShape(11.dp),
                             color = Color.White,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, KColors.Line),
                         ) {
                             Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Surface(shape = androidx.compose.foundation.shape.CircleShape, color = if (accepted) Color(0xFFE5F4E9) else Color(0xFFFDEAEA), modifier = Modifier.size(44.dp)) {
+                                Surface(shape = androidx.compose.foundation.shape.CircleShape, color = if (accepted) KColors.SuccessSoft else KColors.DangerSoft, modifier = Modifier.size(44.dp)) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(if (accepted) Icons.Default.CheckCircle else Icons.Default.Close, contentDescription = null, tint = if (accepted) Color(0xFF257342) else Color(0xFFB72C2C), modifier = Modifier.size(23.dp))
+                                        Icon(if (accepted) Icons.Default.CheckCircle else Icons.Default.Close, contentDescription = null, tint = if (accepted) KColors.Success else KColors.Danger, modifier = Modifier.size(23.dp))
                                     }
                                 }
                                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
@@ -1830,7 +1961,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
         ModalBottomSheet(
             onDismissRequest = { cartOpen = false },
             sheetState = cartSheetState,
-            containerColor = Color(0xFFF8F7F1),
+            containerColor = KColors.Canvas,
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f),
@@ -1839,7 +1970,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                 item(key = "cart-title") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            Text("YOUR CART", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("YOUR CART", color = KColors.Olive, fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.ExtraBold)
                             AnimatedContent(checkingOut, transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(90)) }, label = "checkoutHeading") { checkout ->
                                 Text(if (checkout) "Checkout" else "Your order", fontSize = 25.sp, fontWeight = FontWeight.Bold)
                             }
@@ -1853,9 +1984,9 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                     item(key = "empty-cart") {
                         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White) {
                             Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFF747D00), modifier = Modifier.size(36.dp))
+                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = KColors.Olive, modifier = Modifier.size(36.dp))
                                 Text("Your cart is empty", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                                Text("Add an item from the menu to start an order.", color = Color(0xFF6E746B), fontSize = 13.sp, modifier = Modifier.padding(top = 5.dp))
+                                Text("Add an item from the menu to start an order.", color = KColors.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 5.dp))
                                 OutlinedButton(onClick = { cartOpen = false }, modifier = Modifier.padding(top = 16.dp)) { Text("Browse menu") }
                             }
                         }
@@ -1867,7 +1998,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text(product.name, fontWeight = FontWeight.ExtraBold)
-                                    Text("${money(product.price)} each · ${money(product.price * quantity)}", color = Color(0xFF6E746B), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                                    Text("${money(product.price)} each · ${money(product.price * quantity)}", color = KColors.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
                                 }
                                 IconButton(
                                     onClick = { vm.remove(product) },
@@ -1883,7 +2014,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         }
                     }
                     item(key = "cart-summary") {
-                        HorizontalDivider(color = Color(0xFFDDE0D6), modifier = Modifier.padding(vertical = 6.dp))
+                        HorizontalDivider(color = KColors.Line, modifier = Modifier.padding(vertical = 6.dp))
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("$cartItemCount ${if (cartItemCount == 1) "item" else "items"}", fontWeight = FontWeight.Bold)
                             CartAmount(cartTotal)
@@ -1892,14 +2023,14 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             onClick = { checkingOut = true },
                             shape = RoundedCornerShape(50.dp),
                             modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5800F0), contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White),
                         ) { Text("Place Order", fontWeight = FontWeight.ExtraBold) }
                     }
                 } else {
                     item(key = "checkout-form") {
                         TextButton(onClick = { checkingOut = false }, contentPadding = PaddingValues(0.dp)) { Text("← Back to cart") }
                         Text("Reserve a table", fontSize = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp, bottom = 3.dp))
-                        Text("Your selected food is already in the order, so only the table details are needed here.", color = Color(0xFF6E746B), fontSize = 12.sp, lineHeight = 18.sp)
+                        Text("Your selected food is already in the order, so only the table details are needed here.", color = KColors.Muted, fontSize = 12.sp, lineHeight = 18.sp)
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Order total", fontWeight = FontWeight.Bold)
                             CartAmount(cartTotal)
@@ -1912,7 +2043,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.horizontalScroll(rememberScrollState())) {
                             vm.tableSizes.forEach { value ->
-                                FilterChip(selected = tableSize == value, onClick = { tableSize = value }, label = { Text("Up to $value guests · ${money(vm.tableFees[value] ?: 0.0)}") }, modifier = Modifier.padding(end = 6.dp))
+                                KChip(selected = tableSize == value, label = "Up to $value guests · ${money(vm.tableFees[value] ?: 0.0)}", onClick = { tableSize = value })
                             }
                         }
                         TableChoice(vm, tableSize.toIntOrNull() ?: 1, diningTableId) { diningTableId = it }
@@ -1922,12 +2053,12 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                         Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                             Text("Payment:")
                             Spacer(Modifier.width(8.dp))
-                            FilterChip(selected = payment == "cash", onClick = { setPayment("cash") }, label = { Text("Cash") })
+                            KChip(selected = payment == "cash", label = "Cash", onClick = { setPayment("cash") })
                             Spacer(Modifier.width(6.dp))
-                            FilterChip(selected = payment == "gcash", onClick = { setPayment("gcash") }, label = { Text("GCash") })
+                            KChip(selected = payment == "gcash", label = "GCash", onClick = { setPayment("gcash") })
                             if (vm.payMongoEnabled) {
                                 Spacer(Modifier.width(6.dp))
-                                FilterChip(selected = payment == "paymongo", onClick = { setPayment("paymongo") }, label = { Text("PayMongo") })
+                                KChip(selected = payment == "paymongo", label = "PayMongo", onClick = { setPayment("paymongo") })
                             }
                         }
                         if (payment == "paymongo") PayMongoNote()
@@ -1957,7 +2088,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
                             enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && canPay,
                             shape = RoundedCornerShape(11.dp),
                             modifier = Modifier.fillMaxWidth().height(50.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White),
                         ) { Text(if (vm.busy) "Submitting..." else if (payment == "paymongo") "Continue to PayMongo" else "Confirm payment & view receipt", fontWeight = FontWeight.Bold) }
                     }
                 }
@@ -1970,7 +2101,7 @@ private fun MenuScreen(vm: AppViewModel, payment: String, setPayment: (String) -
 private fun PayMongoNote() {
     Text(
         "You will be sent to PayMongo's secure checkout page to pay. Your receipt shows Paid once PayMongo confirms the payment.",
-        color = Color(0xFF6E746B),
+        color = KColors.Muted,
         fontSize = 12.sp,
         lineHeight = 18.sp,
         modifier = Modifier.padding(top = 6.dp),
@@ -1994,13 +2125,13 @@ private fun PaymentProofAttachment(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8DCD2)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, KColors.Line),
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Text("Attached payment proof", fontWeight = FontWeight.ExtraBold)
             Text(
                 "Check the image before submitting. You can replace or remove it if it is incorrect.",
-                color = Color(0xFF6E746B),
+                color = KColors.Muted,
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
                 modifier = Modifier.padding(top = 3.dp, bottom = 10.dp),
@@ -2032,13 +2163,40 @@ private fun PaymentProofAttachment(
 }
 
 @Composable
-private fun MenuCategoryButton(selected: Boolean, label: String, onClick: () -> Unit) {
-    Button(onClick = onClick, shape = RoundedCornerShape(11.dp), colors = ButtonDefaults.buttonColors(containerColor = if (selected) Color(0xFF202124) else Color.White, contentColor = if (selected) Color.White else Color(0xFF171817)), contentPadding = PaddingValues(horizontal = 20.dp), modifier = Modifier.padding(end = 10.dp).height(44.dp)) { Text(label, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold) }
+private fun MenuProductCard(product: Product, quantity: Int, onQuantity: (Int) -> Unit) {
+    // Same as the web menu: stock already in the cart is no longer available.
+    val remaining = (product.stock - quantity).coerceAtLeast(0)
+    val lowStock = remaining < 10
+    val selected = quantity > 0
+    KCard(
+        Modifier.fillMaxWidth(),
+        contentPadding = 0.dp,
+        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) KColors.Lime else KColors.Line),
+    ) {
+        ProductImage(product, Modifier.fillMaxWidth().height(116.dp), widthPx = 480, heightPx = 348)
+        Column(Modifier.padding(12.dp)) {
+            Text(product.name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(product.description.orEmpty(), color = KColors.Muted, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
+            Text(money(product.price), fontSize = 15.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                when {
+                    product.stock <= 0 -> "Sold out"
+                    lowStock -> "Only $remaining left"
+                    else -> "$remaining available"
+                },
+                color = if (lowStock) KColors.Danger else KColors.Muted,
+                fontSize = 11.sp,
+                fontWeight = if (lowStock) FontWeight.ExtraBold else FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(10.dp))
+            QuantityStepper(product.name, quantity, canIncrease = quantity < product.stock, onChange = onQuantity, modifier = Modifier.fillMaxWidth())
+        }
+    }
 }
 
 @Composable
 private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onReservation: (Int) -> Unit, onReserve: () -> Unit) {
-    var activityTab by remember { mutableIntStateOf(0) }
+    var activityTab by rememberSaveable { mutableIntStateOf(0) }
     val activeReservations = remember(vm.reservations) { vm.reservations.count { it.status in listOf("pending", "confirmed") } }
     val paidOrders = remember(vm.orders) { vm.orders.count { it.payment_status == "paid" } }
     val reservationGroups = remember(vm.reservations) {
@@ -2046,79 +2204,125 @@ private fun CustomerHistoryScreen(vm: AppViewModel, onOrder: (Int) -> Unit, onRe
             .sortedByDescending { reservationHistorySortKey(it.reservation_at) }
             .groupBy { reservationHistoryDay(it.reservation_at) }
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 28.dp)) {
         item(key = "history-head") {
-            Text("MY ACTIVITY", color = Color(0xFF777F00), fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.ExtraBold)
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Reservations and\npurchases", fontSize = 30.sp, lineHeight = 33.sp, fontWeight = FontWeight.Black)
-                Button(onClick = onReserve, shape = RoundedCornerShape(7.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817)), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("New reservation", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            ScreenHeader("My activity", "History", subtitle = "Your reservations and purchases.") {
+                Button(
+                    onClick = onReserve,
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Reserve", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
             }
-            Surface(Modifier.fillMaxWidth().padding(top = 18.dp), shape = RoundedCornerShape(8.dp), color = Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD6D9CE))) {
-                Column {
-                    Row(Modifier.fillMaxWidth()) {
-                        HistoryMetric("Reservations", vm.reservations.size, Modifier.weight(1f))
-                        HistoryMetric("Active requests", activeReservations, Modifier.weight(1f))
-                    }
-                    HorizontalDivider(color = Color(0xFFD6D9CE))
-                    Row(Modifier.fillMaxWidth()) {
-                        HistoryMetric("Purchases", vm.orders.size, Modifier.weight(1f))
-                        HistoryMetric("Paid orders", paidOrders, Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HistoryMetric("Reservations", vm.reservations.size, "$activeReservations active", Modifier.weight(1f), dark = true)
+                HistoryMetric("Purchases", vm.orders.size, "$paidOrders paid", Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 20.dp).background(Color(0xFFE9EBE3), RoundedCornerShape(50)).padding(4.dp)) {
+                listOf("Reservations" to vm.reservations.size, "Purchases" to vm.orders.size).forEachIndexed { index, (label, count) ->
+                    val chosen = activityTab == index
+                    Surface(
+                        onClick = { activityTab = index },
+                        shape = RoundedCornerShape(50),
+                        color = if (chosen) Color.White else Color.Transparent,
+                        shadowElevation = if (chosen) 1.dp else 0.dp,
+                        modifier = Modifier.weight(1f).semantics { selected = chosen },
+                    ) {
+                        Text("$label · $count", color = if (chosen) KColors.Ink else KColors.Muted, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 10.dp))
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(top = 22.dp).background(Color(0xFFE9EBE3), RoundedCornerShape(8.dp)).padding(4.dp)) {
-                listOf("Reservations" to vm.reservations.size, "Purchases" to vm.orders.size).forEachIndexed { index, value ->
-                    TextButton(onClick = { activityTab = index }, colors = ButtonDefaults.textButtonColors(contentColor = if (activityTab == index) Color(0xFF171817) else Color(0xFF5C6259)), modifier = Modifier.weight(1f).background(if (activityTab == index) Color.White else Color.Transparent, RoundedCornerShape(5.dp))) {
-                        Text("${value.first}  ${value.second}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                }
-            }
-            Text(if (activityTab == 0) "Reservation history" else "Purchase history", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp, bottom = 11.dp))
+            Spacer(Modifier.height(14.dp))
         }
         if (activityTab == 0) {
-            if (vm.reservations.isEmpty()) item(key = "empty-reservations") { HistoryEmpty("No reservations yet.", "Start a reservation from the menu or Reserve page.") }
+            if (vm.reservations.isEmpty()) {
+                item(key = "empty-reservations") {
+                    EmptyState(Icons.Default.CalendarMonth, "No reservations yet", "Book the Exclusive Venue from Reserve, or add a table request when you order.") {
+                        SecondaryButton("Make a reservation", onClick = onReserve)
+                    }
+                }
+            }
             reservationGroups.forEach { (date, reservations) ->
                 item(key = "reservation-date-$date") {
-                    Text(
-                        date,
-                        color = Color(0xFF34382D),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 7.dp, bottom = 9.dp)
-                            .background(Color(0xFFE8EADF), RoundedCornerShape(7.dp))
-                            .padding(horizontal = 12.dp, vertical = 9.dp),
-                    )
+                    Eyebrow(date, color = KColors.Muted, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
                 }
                 items(reservations, key = { "reservation-${it.id}" }) { reservation ->
-                    ActivityCard(title = reservation.reference, kind = "Reservation", status = reservation.status, details = listOf("SCHEDULE" to reservationScheduleLabel(reservation), "PARTY" to if (reservation.type == "table") "${reservation.table_size} guests" else "${reservation.guests} guests · Exclusive Venue", "TOTAL" to money(reservation.total_amount)), onClick = { onReservation(reservation.id) })
+                    ActivityCard(
+                        title = reservation.reference,
+                        kind = "Reservation",
+                        status = reservation.status,
+                        details = listOf(
+                            "Schedule" to reservationScheduleLabel(reservation),
+                            "Party" to if (reservation.type == "table") "${reservation.table_size} guests" else "${reservation.guests} guests · Exclusive Venue",
+                            "Total" to money(reservation.total_amount),
+                        ),
+                        onClick = { onReservation(reservation.id) },
+                    )
                 }
             }
         } else {
-            if (vm.orders.isEmpty()) item(key = "empty-orders") { HistoryEmpty("No purchases yet.", "Your completed menu orders will appear here.") }
+            if (vm.orders.isEmpty()) {
+                item(key = "empty-orders") {
+                    EmptyState(Icons.AutoMirrored.Filled.ReceiptLong, "No purchases yet", "Your menu orders and receipts will appear here.")
+                }
+            }
             items(vm.orders, key = { "order-${it.id}" }) { order ->
-                ActivityCard(title = "Order #${order.id}", kind = "Purchase", status = order.payment_status, details = listOf("DATE" to receiptDate(order.created_at), "PAYMENT" to order.payment_method.uppercase(), "TOTAL DUE" to money(order.total_due)), actionLabel = if (order.payment_status.equals("rejected", ignoreCase = true)) "View order" else "View receipt", onClick = { onOrder(order.id) })
+                ActivityCard(
+                    title = "Order #${order.id}",
+                    kind = "Purchase",
+                    status = order.payment_status,
+                    details = listOf("Date" to receiptDate(order.created_at), "Payment" to paymentMethodLabel(order.payment_method), "Total due" to money(order.total_due)),
+                    actionLabel = if (order.payment_status.equals("rejected", ignoreCase = true)) "View order" else "View receipt",
+                    onClick = { onOrder(order.id) },
+                )
             }
         }
     }
 }
 
-@Composable private fun HistoryMetric(label: String, value: Int, modifier: Modifier = Modifier) { Row(modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(label, color = Color(0xFF687064), fontSize = 12.sp); Text(value.toString(), fontSize = 20.sp, fontWeight = FontWeight.Black) } }
+@Composable
+private fun HistoryMetric(label: String, value: Int, detail: String, modifier: Modifier = Modifier, dark: Boolean = false) {
+    Surface(
+        modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = if (dark) KColors.Ink else Color.White,
+        border = if (dark) null else androidx.compose.foundation.BorderStroke(1.dp, KColors.Line),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(label, color = if (dark) Color(0xFFC5C8BF) else KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(value.toString(), color = if (dark) Color.White else KColors.Ink, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 2.dp))
+            Text(detail, color = if (dark) KColors.Lime else KColors.Olive, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
 
 @Composable
 private fun ActivityCard(title: String, kind: String, status: String, details: List<Pair<String, String>>, actionLabel: String = "View details", onClick: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onClick), shape = RoundedCornerShape(8.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7DACF))) {
-        Column(Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column { Text(kind, color = Color(0xFF73796F), fontSize = 12.sp, fontWeight = FontWeight.Bold); Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp)) }
-                val statusColor = when (status.lowercase()) { "paid", "confirmed" -> Color(0xFF257342); "cancelled", "rejected" -> Color(0xFFB72C2C); "completed" -> Color(0xFF315EC9); else -> Color(0xFF5D6259) }
-                val statusBackground = when (status.lowercase()) { "paid", "confirmed" -> Color(0xFFE5F4E9); "cancelled", "rejected" -> Color(0xFFFDEAEA); "completed" -> Color(0xFFE9EEFB); else -> Color(0xFFEFF0EC) }
-                Text(status.replaceFirstChar { it.uppercase() }, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.background(statusBackground, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 6.dp))
+    KCard(Modifier.fillMaxWidth().padding(bottom = 10.dp), onClick = onClick) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).background(KColors.LimeSoft, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(if (kind == "Reservation") Icons.Default.CalendarMonth else Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, tint = KColors.Olive, modifier = Modifier.size(21.dp))
             }
-            HorizontalDivider(Modifier.padding(vertical = 13.dp), color = Color(0xFFE3E5DD))
-            details.forEach { (label, value) -> Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = Color(0xFF767C72), fontSize = 10.sp, fontWeight = FontWeight.Bold); Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) } }
-            Text(actionLabel, color = Color(0xFF626B00), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.End).padding(top = 10.dp))
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(kind, color = KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            StatusPill(status)
+        }
+        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = KColors.Line)
+        details.forEach { (label, value) ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(label, color = KColors.Muted, fontSize = 12.sp)
+                Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End, modifier = Modifier.weight(1f).padding(start = 12.dp))
+            }
+        }
+        Row(Modifier.align(Alignment.End).padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(actionLabel, color = KColors.Olive, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = KColors.Olive, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -2160,7 +2364,7 @@ private fun OrderReceiptDialog(
         Surface(
             modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(horizontal = 16.dp).widthIn(max = 560.dp),
             shape = RoundedCornerShape(18.dp),
-            color = Color(0xFFF8F7F1),
+            color = KColors.Canvas,
             shadowElevation = 12.dp,
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -2177,31 +2381,31 @@ private fun OrderReceiptDialog(
                             ) {
                                 Text(
                                     "Order and table request submitted.",
-                                    color = Color(0xFF257342),
+                                    color = KColors.Success,
                                     fontWeight = FontWeight.ExtraBold,
                                     modifier = Modifier.padding(12.dp),
                                 )
                             }
                         }
-                        Text("KERMIT'S", color = Color(0xFF747D00), fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Black)
+                        Text("KERMIT'S", color = KColors.Olive, fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Black)
                         Text(
                             receiptLabel,
                             fontSize = 25.sp,
                             fontWeight = FontWeight.Black,
                             modifier = Modifier.padding(top = 4.dp).semantics { heading() },
                         )
-                        Text("#${String.format(Locale.US, "%06d", order.id)}", color = Color(0xFF687064), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                        Text("#${String.format(Locale.US, "%06d", order.id)}", color = KColors.Muted, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
                             shape = RoundedCornerShape(9.dp),
                             color = when {
-                                isPaid -> Color(0xFFE5F4E9)
-                                isRejected -> Color(0xFFFDEAEA)
-                                else -> Color(0xFFFFF2CC)
+                                isPaid -> KColors.SuccessSoft
+                                isRejected -> KColors.DangerSoft
+                                else -> KColors.WarningSoft
                             },
                         ) {
                             Column(Modifier.padding(12.dp)) {
-                                Text(statusLabel, color = if (isRejected) Color(0xFFB72C2C) else Color.Unspecified, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                Text(statusLabel, color = if (isRejected) KColors.Danger else Color.Unspecified, fontSize = 11.sp, fontWeight = FontWeight.Black)
                                 Text(paymentMessage, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
                             }
                         }
@@ -2212,19 +2416,19 @@ private fun OrderReceiptDialog(
                             ReceiptLine("Payment status", when { isPaid -> "Paid"; isRejected -> "Rejected"; else -> "Pending" })
                             order.payment_reference?.let { ReceiptLine("GCash reference", it) }
                         }
-                        Text("ITEMS", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Black)
-                        HorizontalDivider(color = Color(0xFFCBD0C3), modifier = Modifier.padding(top = 8.dp))
+                        Text("ITEMS", color = KColors.Olive, fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Black)
+                        HorizontalDivider(color = KColors.Line, modifier = Modifier.padding(top = 8.dp))
                     }
 
                     items(order.items, key = { item -> "receipt-item-${item.product_id}" }) { item ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
                             Column(Modifier.weight(1f).padding(end = 12.dp)) {
                                 Text(item.name, fontWeight = FontWeight.ExtraBold)
-                                Text("${item.quantity} × ${money(item.unit_price)}", color = Color(0xFF6E746B), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                                Text("${item.quantity} × ${money(item.unit_price)}", color = KColors.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                             }
                             Text(money(item.subtotal), fontWeight = FontWeight.Bold)
                         }
-                        HorizontalDivider(color = Color(0xFFE1E4DB))
+                        HorizontalDivider(color = KColors.Line)
                     }
 
                     item(key = "receipt-totals") {
@@ -2233,7 +2437,7 @@ private fun OrderReceiptDialog(
                             order.reservation?.let { reservation ->
                                 ReceiptLine("Reservation fee", money(reservation.total_amount))
                             }
-                            HorizontalDivider(color = Color(0xFFCBD0C3), modifier = Modifier.padding(vertical = 8.dp))
+                            HorizontalDivider(color = KColors.Line, modifier = Modifier.padding(vertical = 8.dp))
                             ReceiptLine(when { isPaid -> "Total paid"; isRejected -> "Order total"; else -> "Total due" }, money(order.total_due), emphasized = true)
                             order.cash_received?.let { ReceiptLine("Cash received", money(it)) }
                             order.change_due?.let { ReceiptLine("Change", money(it)) }
@@ -2246,10 +2450,10 @@ private fun OrderReceiptDialog(
                                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                                 shape = RoundedCornerShape(11.dp),
                                 color = Color.White,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8DCD2)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, KColors.Line),
                             ) {
                                 Column(Modifier.padding(13.dp)) {
-                                    Text("TABLE REQUEST", color = Color(0xFF747D00), fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Black)
+                                    Text("TABLE REQUEST", color = KColors.Olive, fontSize = 10.sp, letterSpacing = 1.1.sp, fontWeight = FontWeight.Black)
                                     ReceiptLine("Reference", reservation.reference)
                                     ReceiptLine("Schedule", reservationScheduleLabel(reservation))
                                     reservation.hold_expires_at?.let { ReceiptLine("Approval deadline", receiptDate(it)) }
@@ -2267,20 +2471,20 @@ private fun OrderReceiptDialog(
                                 isRejected -> "This order was rejected and no payment is due."
                                 else -> "This confirms your order request. It becomes an official receipt after payment is verified."
                             },
-                            color = Color(0xFF6E746B),
+                            color = KColors.Muted,
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
                             modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 4.dp),
                         )
                     }
                 }
-                HorizontalDivider(color = Color(0xFFD8DCD2))
+                HorizontalDivider(color = KColors.Line)
                 onPayMongo?.let { pay ->
                     Button(
                         onClick = pay,
                         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp).height(50.dp),
                         shape = RoundedCornerShape(11.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF737D00), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = KColors.Olive, contentColor = Color.White),
                     ) { Text("Pay with PayMongo", fontWeight = FontWeight.ExtraBold) }
                 }
                 Row(
@@ -2296,7 +2500,7 @@ private fun OrderReceiptDialog(
                         onClick = close,
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(11.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF171817), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = KColors.Ink, contentColor = Color.White),
                     ) { Text("Close receipt", fontWeight = FontWeight.ExtraBold) }
                 }
             }
@@ -2437,151 +2641,266 @@ private fun ReceiptLine(label: String, value: String, emphasized: Boolean = fals
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top,
     ) {
-        Text(label, color = if (emphasized) Color(0xFF171817) else Color(0xFF6E746B), fontSize = if (emphasized) 16.sp else 12.sp, fontWeight = if (emphasized) FontWeight.Black else FontWeight.Medium, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        Text(label, color = if (emphasized) KColors.Ink else KColors.Muted, fontSize = if (emphasized) 16.sp else 12.sp, fontWeight = if (emphasized) FontWeight.Black else FontWeight.Medium, modifier = Modifier.weight(1f).padding(end = 12.dp))
         Text(value, fontSize = if (emphasized) 18.sp else 12.sp, fontWeight = if (emphasized) FontWeight.Black else FontWeight.Bold)
     }
 }
 
-@Composable private fun HistoryEmpty(title: String, message: String) { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), color = Color.Transparent, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD0C3))) { Column(Modifier.fillMaxWidth().padding(34.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(title, fontWeight = FontWeight.Bold); Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp)) } } }
-@Composable private fun DetailDialog(title: String, summary: String, lines: List<String>, action: Pair<String, () -> Unit>? = null, close: () -> Unit) { AlertDialog(onDismissRequest = close, confirmButton = { action?.let { (label, onClick) -> Button(onClick = onClick) { Text(label) } } ?: TextButton(onClick = close) { Text("Close") } }, dismissButton = action?.let { { TextButton(onClick = close) { Text("Close") } } }, title = { Text(title) }, text = { Column { Text(summary, fontWeight = FontWeight.Bold); lines.forEach { Text(it, modifier = Modifier.padding(top = 8.dp)) } } }) }
 private const val EXCLUSIVE_MIN_GUESTS = 30
 private const val EXCLUSIVE_MAX_GUESTS = 40
 private const val RESERVATION_FOOD_MAX = 22
 
-@Composable private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
-    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }; var date by remember { mutableStateOf("") }; var guests by remember { mutableIntStateOf(EXCLUSIVE_MIN_GUESTS) }; var notes by remember { mutableStateOf("") }; var foodRequest by remember { mutableStateOf("") }; var reference by remember { mutableStateOf("") }; var proofUri by remember { mutableStateOf<Uri?>(null) }; var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
+@Composable
+private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
+    var phone by remember { mutableStateOf(vm.user?.phone.orEmpty()) }
+    var date by remember { mutableStateOf("") }
+    var guests by remember { mutableIntStateOf(EXCLUSIVE_MIN_GUESTS) }
+    var notes by remember { mutableStateOf("") }
+    var foodRequest by remember { mutableStateOf("") }
+    var reference by remember { mutableStateOf("") }
+    var proofUri by remember { mutableStateOf<Uri?>(null) }
+    var menuItems by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     // The Exclusive Venue is only reserved once part of it is paid online.
     var payment by remember { mutableStateOf(if (vm.payMongoEnabled) "paymongo" else "gcash") }
     LaunchedEffect(vm.payMongoEnabled) { if (payment == "paymongo" && !vm.payMongoEnabled) payment = "gcash" }
-    val context = androidx.compose.ui.platform.LocalContext.current; val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }; val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }; val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
-    val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
     var paymentPlan by remember { mutableStateOf("downpayment") }
+    val context = LocalContext.current
+    val calendar = remember { Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Manila")) }
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Manila") } }
+    val proofPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { proofUri = it } }
+    val foodCategories = remember(vm.products) { vm.products.groupBy { it.category ?: "Favorites" } }
+    val selectedFoodTotal = menuItems.mapNotNull { entry -> vm.products.find { it.id == entry.key }?.price?.times(entry.value) }.sum()
+    val selectedFoodCount = menuItems.values.sum()
     val bookingTotal = vm.exclusiveFee + selectedFoodTotal
     // Same rounding as the server: the downpayment share rounded up to the centavo.
     val payNow = if (paymentPlan == "full") bookingTotal else kotlin.math.ceil(kotlin.math.round(bookingTotal * 100) * vm.exclusiveDownpaymentPercent / 100.0) / 100.0
     val canPay = (payment == "paymongo" && vm.payMongoEnabled) || (payment == "gcash" && reference.length == 13 && proofUri != null)
-    Text("BOOK A RESERVATION", color = Color(0xFF777F00), fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.ExtraBold)
-    Text("Exclusive Venue", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 6.dp))
-    Text("Kermit's is all yours for the whole day · ${money(vm.exclusiveFee)}", color = Color(0xFF70766D), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 5.dp)); Spacer(Modifier.height(18.dp))
-    OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone (09XXXXXXXXX)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp))
-    DateTimePickerField(date, "Choose your schedule", "Select the date", "Open 8 AM-11 PM (Philippine time). Book at least 1 day ahead.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }; ReservationSlotChoices(vm, date, "exclusive", guests) { date = it }; Spacer(Modifier.height(14.dp))
-    Text("Number of guests", fontWeight = FontWeight.Bold)
-    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalIconButton(onClick = { guests-- }, enabled = guests > EXCLUSIVE_MIN_GUESTS, modifier = Modifier.semantics { contentDescription = "Fewer guests" }) { Icon(Icons.Default.Remove, contentDescription = null) }
-        Text(guests.toString(), fontSize = 24.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.width(56.dp))
-        FilledTonalIconButton(onClick = { guests++ }, enabled = guests < EXCLUSIVE_MAX_GUESTS, modifier = Modifier.semantics { contentDescription = "More guests" }) { Icon(Icons.Default.Add, contentDescription = null) }
-        Text("$EXCLUSIVE_MIN_GUESTS-$EXCLUSIVE_MAX_GUESTS guests", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
+    val missing = when {
+        !phone.matches(Regex("09\\d{9}")) -> "Enter an 11-digit phone number starting with 09."
+        date.isBlank() -> "Choose the date of your event."
+        !canPay -> "Enter the 13-digit GCash reference and attach your payment proof."
+        else -> null
     }
-    Spacer(Modifier.height(12.dp))
-    Text("Pay at least ${vm.exclusiveDownpaymentPercent}% online now to secure the date.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-    Row(Modifier.horizontalScroll(rememberScrollState())) {
-        FilterChip(selected = paymentPlan == "downpayment", onClick = { paymentPlan = "downpayment" }, label = { Text("${vm.exclusiveDownpaymentPercent}% downpayment") }, modifier = Modifier.padding(end = 6.dp))
-        FilterChip(selected = paymentPlan == "full", onClick = { paymentPlan = "full" }, label = { Text("Pay in full") })
-    }
-    Spacer(Modifier.height(20.dp))
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text("FOODS", fontSize = 22.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Black, modifier = Modifier.semantics { heading() })
-        if (selectedFoodTotal > 0) Text(money(selectedFoodTotal), color = Color(0xFF747D00), fontWeight = FontWeight.ExtraBold)
-    }
-    if (vm.products.isEmpty()) Text("No foods are available right now.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-    vm.products.groupBy { it.category ?: "Favorites" }.forEach { (category, products) ->
-        Text(category, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF171817), modifier = Modifier.padding(top = 14.dp, bottom = 8.dp))
-        products.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                pair.forEach { product ->
-                    ReservationFoodCard(product, menuItems[product.id] ?: 0, Modifier.weight(1f)) { quantity ->
+
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(top = 18.dp, bottom = 28.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            ScreenHeader("Book a reservation", "Reserve")
+            Spacer(Modifier.height(16.dp))
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = KColors.Ink) {
+                Column(Modifier.padding(20.dp)) {
+                    Eyebrow("Exclusive Venue", color = KColors.Lime)
+                    Text("Kermit's is all yours for the whole day.", color = Color.White, fontSize = 22.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        HeroFact("Venue fee", money(vm.exclusiveFee), Modifier.weight(1.3f))
+                        HeroFact("Guests", "$EXCLUSIVE_MIN_GUESTS–$EXCLUSIVE_MAX_GUESTS", Modifier.weight(1f))
+                        HeroFact("Downpayment", "${vm.exclusiveDownpaymentPercent}%", Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            SectionCard("Contact and date", step = 1, subtitle = "Book at least 1 day ahead. Open 8 AM–11 PM, Philippine time.") {
+                OutlinedTextField(phone, { phone = it.filter(Char::isDigit).take(11) }, label = { Text("Phone number") }, placeholder = { Text("09XXXXXXXXX") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(10.dp))
+                DateTimePickerField(date, "Event date", "Select the date", "The venue is yours from opening to closing.") { showDateTimePicker(context, calendar, dateFormat) { date = it } }
+                ReservationSlotChoices(vm, date, "exclusive", guests) { date = it }
+            }
+            Spacer(Modifier.height(14.dp))
+            SectionCard("Guests", step = 2, subtitle = "The venue fits $EXCLUSIVE_MIN_GUESTS to $EXCLUSIVE_MAX_GUESTS guests.") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    FilledTonalIconButton(onClick = { guests-- }, enabled = guests > EXCLUSIVE_MIN_GUESTS, colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = KColors.LimeSoft, contentColor = KColors.Ink), modifier = Modifier.size(48.dp).semantics { contentDescription = "Fewer guests" }) { Icon(Icons.Default.Remove, contentDescription = null) }
+                    Column(Modifier.width(110.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(guests.toString(), fontSize = 34.sp, fontWeight = FontWeight.Black)
+                        Text("guests", color = KColors.Muted, fontSize = 12.sp)
+                    }
+                    FilledTonalIconButton(onClick = { guests++ }, enabled = guests < EXCLUSIVE_MAX_GUESTS, colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = KColors.LimeSoft, contentColor = KColors.Ink), modifier = Modifier.size(48.dp).semantics { contentDescription = "More guests" }) { Icon(Icons.Default.Add, contentDescription = null) }
+                }
+            }
+            Spacer(Modifier.height(22.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(28.dp).background(KColors.Ink, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                    Text("3", color = KColors.Lime, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                }
+                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    Text("Food", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+                    Text("Optional. Swipe left or right through each category.", color = KColors.Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                }
+                if (selectedFoodCount > 0) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(money(selectedFoodTotal), color = KColors.Olive, fontWeight = FontWeight.Black)
+                        Text("$selectedFoodCount selected", color = KColors.Muted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        if (vm.products.isEmpty()) {
+            Text("No foods are available right now. Pull down to refresh.", color = KColors.Muted, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+        }
+        foodCategories.forEach { (category, products) ->
+            val chosenInCategory = products.sumOf { menuItems[it.id] ?: 0 }
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
+                Text(category, fontSize = 16.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                Text(if (chosenInCategory > 0) "$chosenInCategory selected" else "${products.size} ${if (products.size == 1) "dish" else "dishes"}", color = if (chosenInCategory > 0) KColors.Olive else KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            val rowState = rememberLazyListState()
+            LazyRow(
+                state = rowState,
+                flingBehavior = rememberSnapFlingBehavior(rowState),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                items(products, key = { "reserve-food-${it.id}" }) { product ->
+                    ReservationFoodCard(product, menuItems[product.id] ?: 0, Modifier.width(158.dp)) { quantity ->
                         menuItems = if (quantity <= 0) menuItems - product.id else menuItems + (product.id to quantity.coerceAtMost(RESERVATION_FOOD_MAX))
                     }
                 }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions (optional)") }, placeholder = { Text("Allergies, spice level, serving time…") }, minLines = 2, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes (optional)") }, minLines = 2, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(22.dp))
+            SectionCard("Payment", step = 4, subtitle = "Pay at least ${vm.exclusiveDownpaymentPercent}% online now to secure the date.") {
+                Text("How much to pay now", color = KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState())) {
+                    KChip(paymentPlan == "downpayment", "${vm.exclusiveDownpaymentPercent}% downpayment", onClick = { paymentPlan = "downpayment" })
+                    KChip(paymentPlan == "full", "Pay in full", onClick = { paymentPlan = "full" })
+                }
+                Text("Pay with", color = KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+                Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState())) {
+                    if (vm.payMongoEnabled) KChip(payment == "paymongo", "PayMongo", onClick = { payment = "paymongo" })
+                    KChip(payment == "gcash", "GCash", onClick = { payment = "gcash" })
+                }
+                if (payment == "paymongo") PayMongoNote()
+                if (payment == "gcash") {
+                    vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(160.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
+                    OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    PaymentProofAttachment(proofUri = proofUri, onChoose = { proofPicker.launch("image/*") }, onRemove = { proofUri = null })
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            KCard(Modifier.fillMaxWidth()) {
+                Text("Summary", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
+                ReceiptLine("Venue fee", money(vm.exclusiveFee))
+                ReceiptLine(if (selectedFoodCount > 0) "Food ($selectedFoodCount)" else "Food", money(selectedFoodTotal))
+                HorizontalDivider(color = KColors.Line, modifier = Modifier.padding(vertical = 8.dp))
+                ReceiptLine("Estimated total", money(bookingTotal), emphasized = true)
+                ReceiptLine("Pay now", money(payNow))
+                ReceiptLine("Balance on the event day", money(bookingTotal - payNow))
+                Spacer(Modifier.height(14.dp))
+                PrimaryButton(
+                    if (vm.busy) "Submitting..." else if (payment == "paymongo") "Request & pay ${money(payNow)}" else "Request reservation",
+                    onClick = {
+                        vm.placeReservation(context, "exclusive", phone, date, "", guests.toString(), notes, foodRequest, menuItems, payment, reference, proofUri, paymentPlan = paymentPlan) { ok ->
+                            if (ok) {
+                                menuItems = emptyMap()
+                                reference = ""
+                                proofUri = null
+                                setMessage(if (payment == "paymongo") "Reservation request submitted. Complete your payment on PayMongo." else "Reservation request submitted.")
+                            }
+                        }
+                    },
+                    enabled = !vm.busy && missing == null && guests in EXCLUSIVE_MIN_GUESTS..EXCLUSIVE_MAX_GUESTS,
+                )
+                missing?.let { Text(it, color = KColors.Muted, fontSize = 12.sp, lineHeight = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) }
             }
         }
     }
-    OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-    OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-    Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Estimated total", fontWeight = FontWeight.Bold); Text(money(bookingTotal), fontWeight = FontWeight.Bold) }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Pay now"); Text(money(payNow), fontWeight = FontWeight.Bold) }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Balance on the event day"); Text(money(bookingTotal - payNow)) }
-    Spacer(Modifier.height(8.dp)); Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) { Text("Payment:"); Spacer(Modifier.width(8.dp)); FilterChip(selected = payment == "gcash", onClick = { payment = "gcash" }, label = { Text("GCash") }); if (vm.payMongoEnabled) { Spacer(Modifier.width(6.dp)); FilterChip(selected = payment == "paymongo", onClick = { payment = "paymongo" }, label = { Text("PayMongo") }) } }
-    if (payment == "paymongo") PayMongoNote()
-    if (payment == "gcash") {
-        vm.gcashQrUrl?.let { AsyncImage(it, "GCash QR code", Modifier.fillMaxWidth().height(140.dp).padding(vertical = 8.dp), contentScale = ContentScale.Inside) }
-        OutlinedTextField(reference, { reference = it.filter(Char::isDigit).take(13) }, label = { Text("13-digit GCash reference") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        PaymentProofAttachment(
-            proofUri = proofUri,
-            onChoose = { proofPicker.launch("image/*") },
-            onRemove = { proofUri = null },
-        )
+}
+
+@Composable
+private fun HeroFact(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier.background(KColors.InkSoft, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Text(label, color = Color(0xFFA9ADA4), fontSize = 11.sp, maxLines = 1)
+        Text(value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
     }
-    Spacer(Modifier.height(16.dp))
-    Button(
-        onClick = {
-            vm.placeReservation(context, "exclusive", phone, date, "", guests.toString(), notes, foodRequest, menuItems, payment, reference, proofUri, paymentPlan = paymentPlan) { ok ->
-                if (ok) {
-                    menuItems = emptyMap()
-                    reference = ""
-                    proofUri = null
-                    setMessage(if (payment == "paymongo") "Reservation request submitted. Complete your payment on PayMongo." else "Reservation request submitted.")
-                }
-            }
-        },
-        enabled = !vm.busy && phone.matches(Regex("09\\d{9}")) && date.isNotBlank() && guests in EXCLUSIVE_MIN_GUESTS..EXCLUSIVE_MAX_GUESTS && canPay,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (vm.busy) "Submitting..." else "Request reservation") }
-    Spacer(Modifier.height(26.dp))
 }
 
 @Composable
 private fun ReservationFoodCard(product: Product, quantity: Int, modifier: Modifier = Modifier, onQuantity: (Int) -> Unit) {
-    val context = LocalContext.current
     val selected = quantity > 0
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) Color(0xFFB5C019) else Color(0xFFE1E4D9)),
+    KCard(
+        modifier,
+        contentPadding = 0.dp,
+        border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) KColors.Lime else KColors.Line),
     ) {
-        Column {
-            Box {
-                if (product.image_url != null) {
-                    AsyncImage(
-                        remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).size(480, 360).crossfade(true).build() },
-                        product.name,
-                        Modifier.fillMaxWidth().height(112.dp),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Box(Modifier.fillMaxWidth().height(112.dp).background(Color(0xFFE9ECD4)), contentAlignment = Alignment.Center) {
-                        Text(product.name.take(1), color = Color(0xFF747D00), fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                if (selected) {
-                    Surface(shape = RoundedCornerShape(50.dp), color = Color(0xFF5800F0), modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                        Text("× $quantity", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp))
-                    }
+        Box {
+            ProductImage(product, Modifier.fillMaxWidth().height(108.dp))
+            if (selected) {
+                Surface(shape = RoundedCornerShape(50), color = KColors.Ink, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                    Text("× $quantity", color = KColors.Lime, fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp))
                 }
             }
-            Column(Modifier.padding(10.dp)) {
-                Text(product.name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(money(product.price), color = Color(0xFF747D00), fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
-                if (!selected) {
-                    OutlinedButton(
-                        onClick = { onQuantity(1) },
-                        shape = RoundedCornerShape(50.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.fillMaxWidth().height(34.dp).semantics { contentDescription = "Add ${product.name}" },
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Add", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Column(Modifier.padding(10.dp)) {
+            Text(product.name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(money(product.price), color = KColors.Olive, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+            QuantityStepper(product.name, quantity, canIncrease = quantity < RESERVATION_FOOD_MAX, onChange = onQuantity, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun ReservationDetailDialog(reservation: Reservation, onPayMongo: (() -> Unit)?, close: () -> Unit) {
+    val exclusive = reservation.type == "exclusive"
+    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(horizontal = 16.dp).widthIn(max = 560.dp),
+            shape = RoundedCornerShape(22.dp),
+            color = KColors.Canvas,
+            shadowElevation = 12.dp,
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(20.dp)) {
+                    item(key = "reservation-head") {
+                        Eyebrow(if (exclusive) "Exclusive Venue" else "Table reservation")
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(reservation.reference, fontSize = 24.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).semantics { heading() })
+                            StatusPill(reservation.status)
+                        }
+                        KCard(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                            ReceiptLine("Schedule", reservationScheduleLabel(reservation))
+                            ReceiptLine("Party", "${reservation.guests ?: reservation.table_size ?: 0} guests")
+                            reservation.table_label?.takeIf { !exclusive }?.let { ReceiptLine("Table", it) }
+                            reservation.hold_expires_at?.let { ReceiptLine("Approval deadline", receiptDate(it)) }
+                            ReceiptLine("Payment", paymentMethodLabel(reservation.payment_method))
+                            ReceiptLine("Payment status", reservation.payment_status.replaceFirstChar { it.uppercase() })
+                            reservation.payment_reference?.let { ReceiptLine("GCash reference", it) }
+                        }
+                        if (reservation.items.isNotEmpty()) Eyebrow("Food", modifier = Modifier.padding(top = 18.dp, bottom = 4.dp))
                     }
-                } else {
-                    Row(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(50.dp)).background(Color(0xFFF1F3E4)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { onQuantity(quantity - 1) }, modifier = Modifier.size(34.dp).semantics { contentDescription = "Decrease ${product.name}" }) { Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        Text(quantity.toString(), fontWeight = FontWeight.Bold)
-                        IconButton(onClick = { onQuantity(quantity + 1) }, enabled = quantity < RESERVATION_FOOD_MAX, modifier = Modifier.size(34.dp).semantics { contentDescription = "Increase ${product.name}" }) { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    items(reservation.items, key = { "reservation-item-${it.product_id}" }) { item ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(item.name, fontWeight = FontWeight.Bold)
+                                Text("${item.quantity} × ${money(item.unit_price)}", color = KColors.Muted, fontSize = 12.sp)
+                            }
+                            Text(money(item.subtotal), fontWeight = FontWeight.Bold)
+                        }
+                        HorizontalDivider(color = KColors.Line)
                     }
+                    item(key = "reservation-totals") {
+                        KCard(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                            ReceiptLine(if (exclusive) "Venue fee" else "Reservation fee", money(reservation.reservation_fee))
+                            ReceiptLine("Food total", money(reservation.food_total))
+                            HorizontalDivider(color = KColors.Line, modifier = Modifier.padding(vertical = 8.dp))
+                            ReceiptLine("Total", money(reservation.total_amount), emphasized = true)
+                            reservation.downpayment_amount?.let { ReceiptLine("Due online", money(it)) }
+                            if (reservation.amount_paid > 0) ReceiptLine("Paid", money(reservation.amount_paid))
+                            if (reservation.balance_due > 0) ReceiptLine("Balance on the event day", money(reservation.balance_due))
+                        }
+                    }
+                }
+                HorizontalDivider(color = KColors.Line)
+                Column(Modifier.padding(16.dp)) {
+                    onPayMongo?.let {
+                        PrimaryButton("Pay with PayMongo", onClick = it, container = KColors.Olive)
+                        Spacer(Modifier.height(10.dp))
+                    }
+                    SecondaryButton("Close", onClick = close)
                 }
             }
         }
@@ -2666,7 +2985,7 @@ private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String,
         slots.forEach { slot ->
             val left = slot.tables_left
             val label = if (tableId == null && slot.available && left != null) "${slot.label} · $left left" else slot.label
-            FilterChip(selected = date.replace(' ', 'T') == slot.start, enabled = slot.available, onClick = { onSelect(slot.start.replace('T', ' ')) }, label = { Text(label) }, modifier = Modifier.padding(end = 6.dp))
+            KChip(selected = date.replace(' ', 'T') == slot.start, label = label, enabled = slot.available, onClick = { onSelect(slot.start.replace('T', ' ')) })
         }
     }
 }
@@ -2678,9 +2997,9 @@ private fun TableChoice(vm: AppViewModel, guests: Int, selected: Int?, onSelect:
     if (vm.diningTables.isEmpty()) return
     Text("Table (optional)", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
     Row(Modifier.horizontalScroll(rememberScrollState())) {
-        FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("Any table") }, modifier = Modifier.padding(end = 6.dp))
+        KChip(selected = selected == null, label = "Any table", onClick = { onSelect(null) })
         fitting.forEach { table ->
-            FilterChip(selected = selected == table.id, onClick = { onSelect(table.id) }, label = { Text("Table ${table.number} · ${table.seats} seats") }, modifier = Modifier.padding(end = 6.dp))
+            KChip(selected = selected == table.id, label = "Table ${table.number} · ${table.seats} seats", onClick = { onSelect(table.id) })
         }
     }
 }
