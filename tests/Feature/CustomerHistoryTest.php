@@ -151,7 +151,7 @@ class CustomerHistoryTest extends TestCase
         $this->actingAs($customer)->get('/history')
             ->assertOk()
             ->assertSee('View reservation')
-            ->assertSee('Print receipt');
+            ->assertSee('Download receipt');
 
         $this->actingAs($customer)->get('/reservations/'.$reservation->id.'/receipt')
             ->assertOk()

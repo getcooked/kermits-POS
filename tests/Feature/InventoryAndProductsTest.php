@@ -494,6 +494,53 @@ class InventoryAndProductsTest extends TestCase
             ->assertJsonValidationErrors('ids');
     }
 
+    public function test_super_admin_can_move_selected_products_to_another_category(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $cake = Product::query()->create(['name' => 'Ube Cake', 'category' => 'Cakes', 'category_order' => 3, 'price' => 90, 'stock' => 20, 'active' => true]);
+        $first = Product::query()->create(['name' => 'Cookie', 'category' => 'Snacks', 'category_order' => 1, 'price' => 90, 'stock' => 20, 'active' => true]);
+        $second = Product::query()->create(['name' => 'Brownie', 'category' => 'Snacks', 'category_order' => 1, 'price' => 90, 'stock' => 20, 'active' => true]);
+        $untouched = Product::query()->create(['name' => 'Chips', 'category' => 'Snacks', 'category_order' => 1, 'price' => 90, 'stock' => 20, 'active' => true]);
+
+        $this->actingAs($superAdmin)
+            ->get(route('products.index'))
+            ->assertOk()
+            ->assertSee('data-pm-bulk-move', false)
+            ->assertSee(route('products.category.bulk'), false);
+
+        $this->actingAs($superAdmin)
+            ->patch(route('products.category.bulk'), ['ids' => [$first->id, $second->id], 'category' => 'cakes'])
+            ->assertRedirect(route('products.index'))
+            ->assertSessionHas('status', 'Moved 2 products to Cakes.');
+
+        $this->assertSame(['Cakes', 3], [$first->fresh()->category, $first->fresh()->category_order]);
+        $this->assertSame(['Cakes', 3], [$second->fresh()->category, $second->fresh()->category_order]);
+        $this->assertSame('Snacks', $untouched->fresh()->category);
+        $this->assertSame('Cakes', $cake->fresh()->category);
+        $this->assertDatabaseHas('activity_logs', ['route_name' => 'products.category.bulk']);
+
+        $this->actingAs($superAdmin)
+            ->patch(route('products.category.bulk'), ['ids' => [$untouched->id], 'category' => '  frozen   treats '])
+            ->assertSessionHas('status', 'Moved 1 product to Frozen Treats.');
+        $this->assertSame('Frozen Treats', $untouched->fresh()->category);
+
+        $this->actingAs($superAdmin)
+            ->patchJson(route('products.category.bulk'), ['ids' => [$first->id, 999999], 'category' => 'Snacks'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ids.1');
+        $this->actingAs($superAdmin)
+            ->patchJson(route('products.category.bulk'), ['ids' => [$first->id], 'category' => ' '])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('category');
+        $this->assertSame('Cakes', $first->fresh()->category);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $this->actingAs($admin)
+            ->patchJson(route('products.category.bulk'), ['ids' => [$first->id], 'category' => 'Snacks'])
+            ->assertForbidden();
+        $this->assertSame('Cakes', $first->fresh()->category);
+    }
+
     public function test_admin_cannot_change_product_visibility(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

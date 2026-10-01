@@ -92,14 +92,18 @@
     </section>
 
     <div class="pm-toolbar">
-        <div class="pm-chips" role="group" aria-label="Filter by category">
-            <button type="button" class="pm-chip" data-pm-category="" aria-pressed="true">All <span>{{ $products->count() }}</span></button>
-            @foreach($groups as $category => $items)<button type="button" class="pm-chip" data-pm-category="{{ $category }}" aria-pressed="false">{{ $category }} <span>{{ $items->count() }}</span></button>@endforeach
+        <div class="pm-chip-rail" data-pm-chip-rail data-at-start data-at-end>
+            <button type="button" class="pm-chip-nav pm-chip-nav-prev" data-pm-chip-scroll="-1" aria-label="Scroll categories left" tabindex="-1"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"></path></svg></button>
+            <div class="pm-chips" role="group" aria-label="Filter by category">
+                <button type="button" class="pm-chip" data-pm-category="" aria-pressed="true">All <span>{{ $products->count() }}</span></button>
+                @foreach($groups as $category => $items)<button type="button" class="pm-chip" data-pm-category="{{ $category }}" aria-pressed="false">{{ $category }} <span>{{ $items->count() }}</span></button>@endforeach
+            </div>
+            <button type="button" class="pm-chip-nav pm-chip-nav-next" data-pm-chip-scroll="1" aria-label="Scroll categories right" tabindex="-1"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></button>
         </div>
         <div class="pm-toolbar-end">
         <label class="pm-sort"><span class="pm-sr">Sort products</span><select class="control" data-pm-sort>@foreach($sortOptions as $sort => $label)<option value="{{ $sort }}">{{ $label }}</option>@endforeach</select></label>
         @if($canDelete && $categoryCounts->isNotEmpty())<button type="button" class="pm-select-toggle" data-pm-categories-open aria-haspopup="dialog" aria-controls="pm-categories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg><span>Categories</span></button>@endif
-        <button type="button" class="pm-select-toggle" data-pm-select-mode aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>Select</span></button>
+        <button type="button" class="pm-select-toggle" data-pm-select-mode aria-pressed="false" title="Select products to move to another category, enable or disable"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>Select</span></button>
         <div class="pm-view-toggle" role="group" aria-label="Layout">
             <button type="button" data-pm-view="grid" aria-pressed="true" aria-label="Grid view" title="Grid view"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"></rect></svg></button>
             <button type="button" data-pm-view="list" aria-pressed="false" aria-label="List view" title="List view"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1"></circle><circle cx="4.5" cy="12" r="1"></circle><circle cx="4.5" cy="18" r="1"></circle></svg></button>
@@ -177,6 +181,15 @@
         <button type="button" class="pm-link" data-pm-select-all>Select all shown</button>
         <button type="button" class="pm-link" data-pm-select-none>Clear</button>
         <span class="pm-bulk-spacer"></span>
+        <form method="POST" action="{{ route('products.category.bulk') }}" class="product-ajax-form pm-bulk-move" data-pm-bulk-move data-action-label="Moving...">@csrf @method('PATCH')
+            <span data-pm-move-ids hidden></span>
+            <label class="pm-sr" for="pm-move-category">Move selected products to</label>
+            <select class="pm-bulk-select" id="pm-move-category" name="category" required data-pm-bulk-input disabled>
+                <option value="" selected disabled>Move to category…</option>
+                @foreach($categories as $category)<option value="{{ $category }}">{{ $category }}</option>@endforeach
+            </select>
+            <button type="submit" class="pm-bulk-button" data-pm-bulk-input disabled>Move</button>
+        </form>
         <button type="button" class="pm-bulk-button" data-pm-bulk="1" disabled>Enable</button>
         <button type="button" class="pm-bulk-button" data-pm-bulk="0" disabled>Disable</button>
         <button type="button" class="pm-bulk-done" data-pm-select-mode>Done</button>
@@ -334,7 +347,7 @@
 .pm-create-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:26px;align-items:start}
 .pm-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .pm-fields .field{margin:0;min-width:0}
-.pm-fields label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
+.pm-fields label:not(.pm-switch){display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
 .pm-fields-wide{grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr)}
 .pm-span{grid-column:1/-1}
 .pm-field-label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
@@ -366,7 +379,7 @@
 /* Visibility switch */
 .pm-switch{display:flex;align-items:center;gap:12px;cursor:pointer}
 .pm-switch input{position:absolute;opacity:0;width:1px;height:1px}
-.pm-switch-track{position:relative;flex:0 0 42px;height:24px;border-radius:999px;background:#cfd2c8;transition:background-color .15s}
+.pm-switch-track{position:relative;display:block;flex:0 0 42px;height:24px;border-radius:999px;background:#cfd2c8;transition:background-color .15s}
 .pm-switch-track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
 .pm-switch input:checked+.pm-switch-track{background:#7f8a0c}
 .pm-switch input:checked+.pm-switch-track::after{transform:translateX(18px)}
@@ -386,9 +399,21 @@
 .pm-stat-low strong{color:#b42318}
 
 /* Toolbar */
-.pm-toolbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:6px}
-.pm-chips{display:flex;flex-wrap:wrap;gap:8px}
-.pm-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1px solid #d8d9cf;border-radius:999px;background:#fff;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.pm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:6px}
+.pm-chip-rail{position:relative;flex:1;min-width:0;display:flex;align-items:center}
+.pm-chips{--fade-start:0px;--fade-end:0px;position:relative;flex:1;min-width:0;display:flex;flex-wrap:nowrap;gap:8px;padding:2px 0;overflow-x:auto;overscroll-behavior-x:contain;scroll-behavior:smooth;scroll-snap-type:x proximity;scroll-padding-inline:44px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,transparent,#000 var(--fade-start),#000 calc(100% - var(--fade-end)),transparent);mask-image:linear-gradient(90deg,transparent,#000 var(--fade-start),#000 calc(100% - var(--fade-end)),transparent);cursor:grab;user-select:none}
+.pm-chips::-webkit-scrollbar{display:none}
+.pm-chips.is-dragging{cursor:grabbing;scroll-behavior:auto;scroll-snap-type:none}
+.pm-chips.is-dragging .pm-chip{pointer-events:none}
+.pm-chip-rail:not([data-at-start]) .pm-chips{--fade-start:48px}
+.pm-chip-rail:not([data-at-end]) .pm-chips{--fade-end:48px}
+.pm-chip-nav{position:absolute;z-index:2;top:50%;width:32px;height:32px;display:grid;place-items:center;padding:0;border:1px solid #d8d9cf;border-radius:50%;background:#fff;color:#171817;box-shadow:0 2px 8px rgba(23,24,23,.12);cursor:pointer;transform:translateY(-50%);transition:opacity .15s}
+.pm-chip-nav:hover{background:#eff0ea}
+.pm-chip-nav svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pm-chip-nav-prev{left:0}
+.pm-chip-nav-next{right:0}
+.pm-chip-rail[data-at-start] .pm-chip-nav-prev,.pm-chip-rail[data-at-end] .pm-chip-nav-next{opacity:0;pointer-events:none}
+.pm-chip{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1px solid #d8d9cf;border-radius:999px;background:#fff;color:inherit;font:inherit;font-size:13px;cursor:pointer}
 .pm-chip span{min-width:20px;padding:1px 6px;border-radius:999px;background:#f0f1ea;color:#6c7068;font-size:11px;font-weight:700;text-align:center}
 .pm-chip:hover{border-color:#8d960f}
 .pm-chip[aria-pressed="true"]{background:#171817;border-color:#171817;color:#fff}
@@ -463,6 +488,12 @@
 .pm-bulk-button[data-pm-bulk="1"]:not(:disabled){background:#aebb19;border-color:#aebb19;color:#171817}
 .pm-bulk-button:disabled{opacity:.45;cursor:not-allowed}
 .pm-bulk-done{background:transparent}
+.pm-bulk-move{display:flex;align-items:center;gap:8px;padding-right:10px;margin-right:2px;border-right:1px solid #454840}
+.pm-bulk-select{height:38px;max-width:220px;padding:0 30px 0 12px;border:1px solid #454840;border-radius:10px;background:#292b27 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d9dcc7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 9px center/16px;color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;appearance:none}
+.pm-bulk-select option{background:#fff;color:#171817}
+.pm-bulk-select:disabled{opacity:.45;cursor:not-allowed}
+.pm-bulk-select:focus-visible{outline:2px solid #aebb19;outline-offset:2px}
+.pm-bulk-move .product-ajax-inline-error{display:none}
 .pm-filter-empty{margin:24px 0 0;color:#6c7068;text-align:center}
 .pm-empty-state{text-align:center}
 .pm-empty-state h2{margin:0 0 6px;font-size:20px}
@@ -570,10 +601,11 @@ body.pm-cropper-open .admin-workspace{overflow:hidden!important}
 @media(max-width:1100px){.product-management-header{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.product-header-actions,.product-search-form{width:100%;justify-content:stretch}.product-search-summary{margin-top:-10px;text-align:left}.pm-fields-wide{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.pm-create-layout{grid-template-columns:minmax(0,1fr)}.pm-create-layout>.pm-photo-field{grid-template-columns:120px minmax(0,1fr);align-items:center}.pm-create-layout>.pm-photo-field .pm-photo-preview{grid-row:span 3;aspect-ratio:1}.pm-catalog[data-view="list"] .pm-desc{display:none}}
 @media(max-width:1180px){.pm-toolbar{flex-direction:column;align-items:stretch;gap:12px}.pm-toolbar-end{justify-content:flex-end}}
-@media(max-width:780px){.pm-stats{display:flex;overflow-x:auto;scrollbar-width:none;gap:10px}.pm-stats::-webkit-scrollbar{display:none}.pm-stat{flex:0 0 132px}.pm-toolbar-end{justify-content:stretch}.pm-sort{flex:1;min-width:0}.pm-sort select{width:100%}.pm-bulkbar{bottom:10px;padding:12px}.pm-bulk-spacer{display:none}.pm-bulk-button{flex:1}.pm-catalog[data-view="list"] .pm-actions{grid-column:3;grid-row:1/span 2;flex-direction:column;align-items:stretch;gap:6px}.pm-catalog[data-view="list"] .pm-toggle{min-width:0;height:34px}.pm-catalog[data-view="list"] .pm-edit{height:34px}.pm-chips{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}.pm-chips::-webkit-scrollbar{display:none}.pm-chip{flex:0 0 auto;white-space:nowrap}.pm-catalog[data-view="list"] .pm-card{grid-template-columns:48px minmax(0,1fr) auto;gap:12px}.pm-catalog[data-view="list"] .pm-media{width:48px;height:48px}.pm-catalog[data-view="list"] .pm-meta{grid-column:2;grid-row:2;justify-content:flex-start}.pm-catalog[data-view="list"] .pm-price,.pm-catalog[data-view="list"] .pm-stock{min-width:0;text-align:left}.pm-drawer-foot .logout,.pm-drawer-foot .button{flex:1}}
+@media(max-width:780px){.pm-stats{display:flex;overflow-x:auto;scrollbar-width:none;gap:10px}.pm-stats::-webkit-scrollbar{display:none}.pm-stat{flex:0 0 132px}.pm-toolbar-end{justify-content:stretch}.pm-sort{flex:1;min-width:0}.pm-sort select{width:100%}.pm-bulkbar{bottom:10px;padding:12px}.pm-bulk-spacer{display:none}.pm-bulk-button{flex:1}.pm-catalog[data-view="list"] .pm-actions{grid-column:3;grid-row:1/span 2;flex-direction:column;align-items:stretch;gap:6px}.pm-catalog[data-view="list"] .pm-toggle{min-width:0;height:34px}.pm-catalog[data-view="list"] .pm-edit{height:34px}.pm-chip-nav{display:none}.pm-chips{scroll-padding-inline:0}.pm-catalog[data-view="list"] .pm-card{grid-template-columns:48px minmax(0,1fr) auto;gap:12px}.pm-catalog[data-view="list"] .pm-media{width:48px;height:48px}.pm-catalog[data-view="list"] .pm-meta{grid-column:2;grid-row:2;justify-content:flex-start}.pm-catalog[data-view="list"] .pm-price,.pm-catalog[data-view="list"] .pm-stock{min-width:0;text-align:left}.pm-drawer-foot .logout,.pm-drawer-foot .button{flex:1}}
 @media(max-width:640px){.product-header-actions{display:grid;gap:10px}.product-search-form{width:100%}.product-create-toggle{width:100%;justify-content:center}.pm-drawer-panel{width:100%}.pm-drawer-head,.pm-drawer-scroll,.pm-drawer-foot{padding-inline:16px}}
 @media(max-width:520px){.pm-fields,.pm-fields-wide{grid-template-columns:minmax(0,1fr)}.pm-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pm-body{padding:10px 12px 0}.pm-body h3{font-size:14px}.pm-desc{display:none}.pm-meta{padding:8px 12px 10px;gap:6px}.pm-price{font-size:15px}.pm-stock{font-size:11px;padding:3px 7px}.pm-actions{padding:0 12px 12px;gap:6px}.pm-edit{height:36px;font-size:13px}.pm-edit svg{display:none}.pm-toggle{height:36px;padding:0 8px}.pm-catalog[data-view="grid"] .pm-toggle-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.pm-stat{padding:12px 14px}.pm-stat strong{font-size:22px}.pm-photo-row{grid-template-columns:96px minmax(0,1fr)}.pm-danger{flex-direction:column;align-items:stretch}.pm-primary{width:100%}}
-@media(prefers-reduced-motion:reduce){.pm-drawer-panel,.pm-drawer-backdrop{animation:none}}
+@media(max-width:780px){.pm-bulk-move{flex:1 1 100%;padding-right:0;margin-right:0;border-right:0}.pm-bulk-select{flex:1;min-width:0;max-width:none}.pm-bulk-move .pm-bulk-button{flex:0 0 auto}}
+@media(prefers-reduced-motion:reduce){.pm-drawer-panel,.pm-drawer-backdrop{animation:none}.pm-chips{scroll-behavior:auto}}
 </style>
 @endpush
 @push('scripts')
@@ -823,8 +855,70 @@ const renderProductSelection = () => {
     const count = productView.selected.size;
     bar.hidden = !productView.selecting;
     bar.querySelector('[data-pm-selected-count]').textContent = `${count} selected`;
-    bar.querySelectorAll('[data-pm-bulk]').forEach(button => { button.disabled = count === 0; });
+    bar.querySelectorAll('[data-pm-bulk], [data-pm-bulk-input]').forEach(control => { control.disabled = count === 0; });
+    // The move form posts like the other product forms, so the selected ids ride along as hidden fields.
+    bar.querySelector('[data-pm-move-ids]')?.replaceChildren(...[...productView.selected].map(id => Object.assign(document.createElement('input'), { type: 'hidden', name: 'ids[]', value: id })));
 };
+
+// Category chips sit on one swipeable row: touch swipes natively, a mouse can drag or use the arrows.
+const syncChipRail = rail => {
+    const chips = rail.querySelector('.pm-chips');
+    if (!chips) return;
+    const max = chips.scrollWidth - chips.clientWidth;
+    rail.toggleAttribute('data-at-start', chips.scrollLeft <= 1);
+    rail.toggleAttribute('data-at-end', chips.scrollLeft >= max - 1);
+};
+
+const revealActiveChip = rail => {
+    const chips = rail.querySelector('.pm-chips');
+    const chip = chips?.querySelector('[data-pm-category][aria-pressed="true"]');
+    if (!chip) return;
+    const pad = chips.clientWidth > 300 ? 44 : 0;
+    if (chip.offsetLeft - pad < chips.scrollLeft) chips.scrollTo({ left: chip.offsetLeft - pad });
+    else if (chip.offsetLeft + chip.offsetWidth + pad > chips.scrollLeft + chips.clientWidth) chips.scrollTo({ left: chip.offsetLeft + chip.offsetWidth + pad - chips.clientWidth });
+};
+
+const chipDrag = { chips: null, startX: 0, startScroll: 0, moved: false };
+document.addEventListener('pointerdown', event => {
+    const chips = event.target.closest?.('.pm-chips');
+    if (!chips || event.pointerType !== 'mouse' || event.button !== 0) return;
+    Object.assign(chipDrag, { chips, startX: event.clientX, startScroll: chips.scrollLeft, moved: false });
+});
+document.addEventListener('pointermove', event => {
+    const { chips } = chipDrag;
+    if (!chips) return;
+    const distance = event.clientX - chipDrag.startX;
+    if (!chipDrag.moved && Math.abs(distance) < 6) return;
+    chipDrag.moved = true;
+    chips.classList.add('is-dragging');
+    chips.scrollLeft = chipDrag.startScroll - distance;
+});
+const endChipDrag = () => {
+    if (!chipDrag.chips) return;
+    chipDrag.chips.classList.remove('is-dragging');
+    chipDrag.chips = null;
+};
+document.addEventListener('pointerup', endChipDrag);
+document.addEventListener('pointercancel', endChipDrag);
+// A drag should only scroll, never also pick the chip it started on.
+document.addEventListener('click', event => {
+    if (!chipDrag.moved || !event.target.closest?.('.pm-chips')) return;
+    chipDrag.moved = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}, true);
+document.addEventListener('scroll', event => {
+    if (event.target.matches?.('.pm-chips')) syncChipRail(event.target.closest('[data-pm-chip-rail]'));
+}, true);
+document.addEventListener('wheel', event => {
+    const chips = event.target.closest?.('.pm-chips');
+    if (!chips || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+    const max = chips.scrollWidth - chips.clientWidth;
+    if (max <= 0 || (event.deltaY < 0 && chips.scrollLeft <= 0) || (event.deltaY > 0 && chips.scrollLeft >= max)) return;
+    event.preventDefault();
+    chips.scrollBy({ left: event.deltaY, behavior: 'auto' });
+}, { passive: false });
+window.addEventListener('resize', () => document.querySelectorAll('[data-pm-chip-rail]').forEach(syncChipRail));
 
 const applyProductFilters = () => {
     const catalog = document.querySelector('[data-pm-catalog]');
@@ -1531,6 +1625,12 @@ document.addEventListener('click', event => {
         runBulkVisibility(bulkButton);
         return;
     }
+    const chipScroll = event.target.closest('[data-pm-chip-scroll]');
+    if (chipScroll) {
+        const chips = chipScroll.closest('[data-pm-chip-rail]')?.querySelector('.pm-chips');
+        chips?.scrollBy({ left: Number(chipScroll.dataset.pmChipScroll) * chips.clientWidth * 0.75 });
+        return;
+    }
     const chip = event.target.closest('[data-pm-category]');
     const tile = event.target.closest('[data-pm-status]');
     const viewButton = event.target.closest('[data-pm-view]');
@@ -1541,6 +1641,7 @@ document.addEventListener('click', event => {
         try { localStorage.setItem('products.view', productView.view); } catch (error) {}
     }
     if (chip || tile || viewButton) applyProductFilters();
+    if (chip) revealActiveChip(chip.closest('[data-pm-chip-rail]'));
 });
 
 document.addEventListener('keydown', event => {
@@ -1558,6 +1659,10 @@ const initializeProductPage = () => {
     initializeProductCreateToggle();
     initializeCategoryPickers();
     applyProductFilters();
+    document.querySelectorAll('[data-pm-chip-rail]').forEach(rail => {
+        revealActiveChip(rail);
+        syncChipRail(rail);
+    });
     document.body.classList.toggle('pm-drawer-open', Boolean(document.querySelector('[data-pm-drawer]:not([hidden])')));
     document.body.classList.toggle('pm-cropper-open', Boolean(document.querySelector('[data-pm-cropper]:not([hidden]), [data-pm-categories]:not([hidden])')));
 };
@@ -1683,6 +1788,7 @@ document.addEventListener('submit', async event => {
 
         const serverError = nextDashboard.querySelector('.error')?.textContent.trim();
         const status = nextDashboard.querySelector('.notice')?.textContent.trim();
+        if (form.hasAttribute('data-pm-bulk-move') && !serverError) productView.selected.clear();
         const workspace = document.querySelector('.admin-workspace');
         const workspaceScroll = workspace?.scrollTop ?? 0;
         const windowScroll = window.scrollY;

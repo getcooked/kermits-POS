@@ -103,7 +103,7 @@
                             <span>{{ match($reservation->payment_method) { 'cash' => 'Walk In Pay', 'paymongo' => 'PayMongo online', default => 'GCash' } }}@if($reservation->payment_reference) &middot; {{ $reservation->payment_reference }}@endif</span>
                             <div>
                                 <a class="secondary-action" href="{{ route('reservations.show', $reservation) }}">View reservation</a>
-                                <a href="{{ route('reservations.receipt', $reservation) }}">Print receipt</a>
+                                <a href="{{ route('reservations.receipt', $reservation) }}">Download receipt</a>
                             </div>
                         </div>
                     </article>

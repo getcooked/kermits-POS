@@ -27,7 +27,7 @@
 
     let closeActiveAlert = null;
 
-    const showAlert = ({ message, isError = false, title = '', confirm = false }) => new Promise(resolve => {
+    const showAlert = ({ message, isError = false, title = '', confirm = false, confirmLabel = 'Confirm' }) => new Promise(resolve => {
         closeActiveAlert?.(false, true);
 
         const previousFocus = document.activeElement;
@@ -69,7 +69,7 @@
         const primary = document.createElement('button');
         primary.className = 'app-alert-button is-primary';
         primary.type = 'button';
-        primary.textContent = confirm ? 'Confirm' : 'OK';
+        primary.textContent = confirm ? confirmLabel : 'OK';
 
         let cancel = null;
         if (confirm) {
@@ -146,7 +146,7 @@
         show: (message, title = 'Notice') => showAlert({ message: String(message), title }),
         success: (message, title = 'Success') => showAlert({ message: String(message), title }),
         error: (message, title = 'Something went wrong') => showAlert({ message: String(message), title, isError: true }),
-        confirm: (message, title = 'Please confirm') => showAlert({ message: String(message), title, confirm: true }),
+        confirm: (message, title = 'Please confirm', confirmLabel = 'Confirm') => showAlert({ message: String(message), title, confirm: true, confirmLabel: String(confirmLabel) }),
     });
     window.alert = message => { window.KermitsAlert.show(message); };
 
@@ -161,7 +161,7 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         const submitter = event.submitter;
-        window.KermitsAlert.confirm(form.dataset.confirm, form.dataset.confirmTitle || 'Please confirm').then(confirmed => {
+        window.KermitsAlert.confirm(form.dataset.confirm, form.dataset.confirmTitle || 'Please confirm', form.dataset.confirmLabel || 'Confirm').then(confirmed => {
             if (!confirmed) return;
             confirmedForms.add(form);
             form.requestSubmit(submitter || undefined);

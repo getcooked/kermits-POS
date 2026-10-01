@@ -28,7 +28,7 @@
                 </div>
                 <div class="header-actions">
                     <a class="button-secondary" href="{{ $isStaff ? route('reservations.index') : route('customer.history') }}">Back</a>
-                    <a class="button-primary" href="{{ route('reservations.receipt', $reservation) }}">Print receipt</a>
+                    <a class="button-primary" href="{{ route('reservations.receipt', $reservation) }}">{{ $isStaff ? 'Print receipt' : 'Download receipt' }}</a>
                 </div>
             </header>
 

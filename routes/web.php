@@ -135,6 +135,7 @@ Route::middleware('auth')->group(function (): void {
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('/products/categories', [ProductController::class, 'destroyCategory'])->name('products.categories.destroy');
         Route::patch('/products/visibility', [ProductController::class, 'bulkVisibility'])->name('products.visibility.bulk');
+        Route::patch('/products/category', [ProductController::class, 'bulkCategory'])->name('products.category.bulk');
         Route::patch('/products/{product}/visibility', [ProductController::class, 'updateVisibility'])->name('products.visibility');
     });
 

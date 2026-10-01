@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -283,17 +284,20 @@ internal fun EmptyState(icon: ImageVector, title: String, message: String, modif
 }
 
 @Composable
-internal fun ProductImage(product: Product, modifier: Modifier, widthPx: Int = 480, heightPx: Int = 360) {
+internal fun ProductImage(product: Product, modifier: Modifier) {
     val context = LocalContext.current
+    // Product pictures are framed as squares in admin Products, so they are shown whole in a square here too.
+    // No fixed decode size: Coil sizes the picture to this frame's real pixels, which keeps it sharp on dense screens.
+    val square = modifier.aspectRatio(1f)
     if (product.image_url != null) {
         AsyncImage(
-            model = remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).size(widthPx, heightPx).crossfade(true).build() },
+            model = remember(product.image_url) { ImageRequest.Builder(context).data(product.image_url).crossfade(true).build() },
             contentDescription = product.name,
-            modifier = modifier.background(KColors.LimeSoft),
+            modifier = square.background(Color.White),
             contentScale = ContentScale.Crop,
         )
     } else {
-        Box(modifier.background(KColors.LimeSoft), contentAlignment = Alignment.Center) {
+        Box(square.background(KColors.LimeSoft), contentAlignment = Alignment.Center) {
             Text(product.name.take(1), color = KColors.Olive, fontSize = 34.sp, fontWeight = FontWeight.Bold)
         }
     }

@@ -49,7 +49,7 @@
         </article>
 
         <div class="receipt-actions">
-            <button type="button" id="print-reservation">Print receipt</button>
+            <button type="button" id="print-reservation">{{ $isCustomer ? 'Download receipt' : 'Print receipt' }}</button>
             <a href="{{ route('reservations.show', $reservation) }}">View reservation</a>
         </div>
     </div>

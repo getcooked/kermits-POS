@@ -68,6 +68,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -90,6 +91,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -220,6 +223,8 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
     var readOrderNotificationKeys by mutableStateOf<Set<String>>(emptySet()); private set
     var busy by mutableStateOf(false); private set
     var refreshing by mutableStateOf(false); private set
+    /** Bumped after every successful reload so screens holding their own server data (such as time slots) fetch it again. */
+    var refreshCount by mutableIntStateOf(0); private set
     var error by mutableStateOf<String?>(null); private set
     var registrationMessage by mutableStateOf<String?>(null); private set
     var registrationNeedsVerification by mutableStateOf(false); private set
@@ -346,14 +351,13 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
         readOrderNotificationKeys = emptySet()
         signedIn = false
     }
-    /** [pulled] refreshes from a pull-down gesture, which shows its own spinner instead of blocking the screen. */
+    /**
+     * [pulled] refreshes from a pull-down gesture, which shows its own spinner instead of blocking the screen.
+     * A pull is never ignored while another request is busy: the indicator would snap back with nothing reloaded.
+     */
     fun refresh(pulled: Boolean = false) = viewModelScope.launch {
-        if (pulled) {
-            if (refreshing || busy) return@launch
-            refreshing = true
-        } else {
-            busy = true
-        }
+        if (refreshing) return@launch
+        if (pulled) refreshing = true else busy = true
         error = null
         try {
             // Validate a persisted token first. Previously an expired token kept the
@@ -362,6 +366,9 @@ class AppViewModel(private val api: KermitsApi, private val store: SessionStore)
             store.userId = user?.id
             readOrderNotificationKeys = user?.id?.let(store::orderNotificationReadKeys).orEmpty()
             load()
+            refreshCount++
+        } catch (exception: CancellationException) {
+            throw exception
         } catch (exception: HttpException) {
             if (exception.code() == 401) {
                 store.clear()
@@ -1052,7 +1059,24 @@ private fun AccountScreen(vm: AppViewModel) {
                 AccountOption(Icons.Default.Lock, "Change password", "Verify your email, then choose a new password") { vm.clearError(); section = "password" }
             }
             Spacer(Modifier.height(22.dp))
-            SecondaryButton("Log out", onClick = { vm.logout() }, contentColor = KColors.Danger)
+            var confirmingLogout by rememberSaveable { mutableStateOf(false) }
+            SecondaryButton("Log out", onClick = { confirmingLogout = true }, contentColor = KColors.Danger)
+            if (confirmingLogout) {
+                AlertDialog(
+                    onDismissRequest = { confirmingLogout = false },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = KColors.Danger) },
+                    title = { Text("Log out of Kermit's?") },
+                    text = { Text("You will need to sign in again to order or reserve.") },
+                    confirmButton = {
+                        Button(
+                            onClick = { confirmingLogout = false; vm.logout() },
+                            colors = ButtonDefaults.buttonColors(containerColor = KColors.Danger, contentColor = Color.White),
+                        ) { Text("Log out", fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmingLogout = false }) { Text("Cancel", color = KColors.Ink) } },
+                    containerColor = KColors.Surface,
+                )
+            }
             Text("Kermit's app ${BuildConfig.VERSION_NAME}", color = KColors.Faint, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
         }
     }
@@ -2173,7 +2197,7 @@ private fun MenuProductCard(product: Product, quantity: Int, onQuantity: (Int) -
         contentPadding = 0.dp,
         border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) KColors.Lime else KColors.Line),
     ) {
-        ProductImage(product, Modifier.fillMaxWidth().height(116.dp), widthPx = 480, heightPx = 348)
+        ProductImage(product, Modifier.fillMaxWidth())
         Column(Modifier.padding(12.dp)) {
             Text(product.name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
             Text(product.description.orEmpty(), color = KColors.Muted, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
@@ -2681,8 +2705,26 @@ private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
         !canPay -> "Enter the 13-digit GCash reference and attach your payment proof."
         else -> null
     }
+    // null shows every dish; the food picker is one sliding row instead of one row per category.
+    var foodCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(foodCategories.keys) { if (foodCategory != null && foodCategory !in foodCategories) foodCategory = null }
+    val shownFoods = foodCategory?.let { foodCategories[it].orEmpty() } ?: vm.products
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    var paymentTop by remember { mutableIntStateOf(0) }
+    val submit = {
+        vm.placeReservation(context, "exclusive", phone, date, "", guests.toString(), notes, foodRequest, menuItems, payment, reference, proofUri, paymentPlan = paymentPlan) { ok ->
+            if (ok) {
+                menuItems = emptyMap()
+                reference = ""
+                proofUri = null
+                setMessage(if (payment == "paymongo") "Reservation request submitted. Complete your payment on PayMongo." else "Reservation request submitted.")
+            }
+        }
+    }
 
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(top = 18.dp, bottom = 28.dp)) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState).padding(top = 18.dp, bottom = 20.dp)) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             ScreenHeader("Book a reservation", "Reserve")
             Spacer(Modifier.height(16.dp))
@@ -2722,7 +2764,7 @@ private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
                 }
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Text("Food", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
-                    Text("Optional. Swipe left or right through each category.", color = KColors.Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                    Text("Optional. Swipe through the dishes or pick a category.", color = KColors.Muted, fontSize = 12.sp, lineHeight = 17.sp)
                 }
                 if (selectedFoodCount > 0) {
                     Column(horizontalAlignment = Alignment.End) {
@@ -2734,23 +2776,25 @@ private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
         }
         if (vm.products.isEmpty()) {
             Text("No foods are available right now. Pull down to refresh.", color = KColors.Muted, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
-        }
-        foodCategories.forEach { (category, products) ->
-            val chosenInCategory = products.sumOf { menuItems[it.id] ?: 0 }
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
-                Text(category, fontSize = 16.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                Text(if (chosenInCategory > 0) "$chosenInCategory selected" else "${products.size} ${if (products.size == 1) "dish" else "dishes"}", color = if (chosenInCategory > 0) KColors.Olive else KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        } else {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 8.dp, top = 12.dp)) {
+                KChip(foodCategory == null, if (selectedFoodCount > 0) "All · $selectedFoodCount" else "All", onClick = { foodCategory = null })
+                foodCategories.forEach { (category, products) ->
+                    val chosenInCategory = products.sumOf { menuItems[it.id] ?: 0 }
+                    KChip(foodCategory == category, if (chosenInCategory > 0) "$category · $chosenInCategory" else category, onClick = { foodCategory = category })
+                }
             }
             val rowState = rememberLazyListState()
+            LaunchedEffect(foodCategory) { rowState.scrollToItem(0) }
             LazyRow(
                 state = rowState,
                 flingBehavior = rememberSnapFlingBehavior(rowState),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             ) {
-                items(products, key = { "reserve-food-${it.id}" }) { product ->
-                    ReservationFoodCard(product, menuItems[product.id] ?: 0, Modifier.width(158.dp)) { quantity ->
+                items(shownFoods, key = { "reserve-food-${it.id}" }) { product ->
+                    ReservationFoodCard(product, menuItems[product.id] ?: 0, Modifier.width(138.dp)) { quantity ->
                         menuItems = if (quantity <= 0) menuItems - product.id else menuItems + (product.id to quantity.coerceAtMost(RESERVATION_FOOD_MAX))
                     }
                 }
@@ -2761,6 +2805,8 @@ private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
             OutlinedTextField(foodRequest, { foodRequest = it.take(2000) }, label = { Text("Food instructions (optional)") }, placeholder = { Text("Allergies, spice level, serving time…") }, minLines = 2, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(notes, { notes = it.take(2000) }, label = { Text("Additional notes (optional)") }, minLines = 2, colors = loginFieldColors(), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+        }
+        Column(Modifier.padding(horizontal = 16.dp).onGloballyPositioned { paymentTop = it.positionInParent().y.toInt() }) {
             Spacer(Modifier.height(22.dp))
             SectionCard("Payment", step = 4, subtitle = "Pay at least ${vm.exclusiveDownpaymentPercent}% online now to secure the date.") {
                 Text("How much to pay now", color = KColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -2790,24 +2836,41 @@ private fun ReservationScreen(vm: AppViewModel, setMessage: (String) -> Unit) {
                 ReceiptLine("Estimated total", money(bookingTotal), emphasized = true)
                 ReceiptLine("Pay now", money(payNow))
                 ReceiptLine("Balance on the event day", money(bookingTotal - payNow))
-                Spacer(Modifier.height(14.dp))
-                PrimaryButton(
-                    if (vm.busy) "Submitting..." else if (payment == "paymongo") "Request & pay ${money(payNow)}" else "Request reservation",
-                    onClick = {
-                        vm.placeReservation(context, "exclusive", phone, date, "", guests.toString(), notes, foodRequest, menuItems, payment, reference, proofUri, paymentPlan = paymentPlan) { ok ->
-                            if (ok) {
-                                menuItems = emptyMap()
-                                reference = ""
-                                proofUri = null
-                                setMessage(if (payment == "paymongo") "Reservation request submitted. Complete your payment on PayMongo." else "Reservation request submitted.")
-                            }
-                        }
-                    },
-                    enabled = !vm.busy && missing == null && guests in EXCLUSIVE_MIN_GUESTS..EXCLUSIVE_MAX_GUESTS,
-                )
-                missing?.let { Text(it, color = KColors.Muted, fontSize = 12.sp, lineHeight = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) }
             }
         }
+    }
+    // Always on screen, so the customer can pay without scrolling past the menu. Until the form is complete
+    // the button takes them to the first section that still needs something.
+    Surface(color = KColors.Surface, shadowElevation = 12.dp, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(if (paymentPlan == "full") "Pay in full now" else "${vm.exclusiveDownpaymentPercent}% downpayment now", color = KColors.Muted, fontSize = 11.sp, maxLines = 1)
+                Text(money(payNow), color = KColors.Ink, fontSize = 19.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                Text(
+                    missing ?: "Total ${money(bookingTotal)}${if (selectedFoodCount > 0) " · $selectedFoodCount food" else ""}",
+                    color = if (missing != null) KColors.Warning else KColors.Muted,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            PrimaryButton(
+                when {
+                    vm.busy -> "Submitting..."
+                    missing != null -> "Continue"
+                    payment == "paymongo" -> "Request & pay"
+                    else -> "Request reservation"
+                },
+                onClick = {
+                    if (missing == null) submit()
+                    else scope.launch { scrollState.animateScrollTo(if (phone.matches(Regex("09\\d{9}")) && date.isNotBlank()) paymentTop else 0) }
+                },
+                enabled = !vm.busy && guests in EXCLUSIVE_MIN_GUESTS..EXCLUSIVE_MAX_GUESTS,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
     }
 }
 
@@ -2828,16 +2891,16 @@ private fun ReservationFoodCard(product: Product, quantity: Int, modifier: Modif
         border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) KColors.Lime else KColors.Line),
     ) {
         Box {
-            ProductImage(product, Modifier.fillMaxWidth().height(108.dp))
+            ProductImage(product, Modifier.fillMaxWidth())
             if (selected) {
                 Surface(shape = RoundedCornerShape(50), color = KColors.Ink, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                     Text("× $quantity", color = KColors.Lime, fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp))
                 }
             }
         }
-        Column(Modifier.padding(10.dp)) {
-            Text(product.name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(money(product.price), color = KColors.Olive, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(product.name, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(money(product.price), color = KColors.Olive, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
             QuantityStepper(product.name, quantity, canIncrease = quantity < RESERVATION_FOOD_MAX, onChange = onQuantity, modifier = Modifier.fillMaxWidth())
         }
     }
@@ -2952,7 +3015,7 @@ private fun reservationScheduleLabel(reservation: Reservation): String =
 private fun ReservationSlotChoices(vm: AppViewModel, date: String, type: String, guests: Int, tableId: Int? = null, onSelect: (String) -> Unit) {
     var slots by remember { mutableStateOf<List<ReservationSlot>>(emptyList()) }
     var message by remember { mutableStateOf("") }
-    LaunchedEffect(date.take(10), type, guests, tableId) {
+    LaunchedEffect(date.take(10), type, guests, tableId, vm.refreshCount) {
         slots = emptyList()
         if (date.isNotBlank()) {
             message = "Checking availability..."

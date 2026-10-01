@@ -33,6 +33,20 @@ class PaymentSettingsTest extends TestCase
         Storage::disk('public')->assertExists(SystemSetting::get('gcash_qr_path'));
     }
 
+    public function test_payment_settings_page_uses_the_product_picture_cropper(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        $this->actingAs($superAdmin)->get('/settings/payment')
+            ->assertOk()
+            ->assertSee('<title>Payment Settings', false)
+            ->assertSee('<h1>Payment Settings</h1>', false)
+            ->assertSee('data-pm-image-input', false)
+            ->assertSee('data-pm-cropper', false)
+            ->assertSee('data-pm-crop-default="fit"', false)
+            ->assertSee('Choose Picture');
+    }
+
     public function test_only_super_admin_can_manage_payment_settings(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

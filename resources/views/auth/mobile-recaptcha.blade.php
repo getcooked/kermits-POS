@@ -3,38 +3,73 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Security verification</title>
+    <title>Security check</title>
+    {{-- The Android app draws the title and close button; this page only hosts the checkbox. --}}
     <style>
-        :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f7f7f1;color:#202124;font-family:Arial,sans-serif}.wrap{min-height:100vh;display:grid;place-items:center;padding:24px 12px}.card{width:min(100%,360px);background:#fff;border:1px solid #e1e3da;border-radius:18px;padding:22px 16px;text-align:center;box-shadow:0 12px 30px rgba(23,24,23,.08)}h1{font-size:21px;margin:0 0 8px}p{color:#687286;font-size:14px;line-height:1.45;margin:0 0 18px}.widget{display:flex;justify-content:center;min-height:78px}.status{margin:14px 0 0;color:#a12828;font-size:13px}.done{color:#626b00}@media(max-width:350px){.widget{transform:scale(.88);transform-origin:top center;margin-bottom:-9px}}
+        :root{color-scheme:light}*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#171817;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent}.wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0}.slot{position:relative;width:304px;min-height:78px}.skeleton{position:absolute;inset:0;border:1px solid #e2e4da;border-radius:4px;background:linear-gradient(90deg,#f6f7f2 25%,#eceee6 50%,#f6f7f2 75%);background-size:200% 100%;animation:shimmer 1.2s linear infinite}#mobile-recaptcha{position:relative;z-index:1}.status{margin:10px 16px 0;color:#b72c2c;font-size:13px;line-height:1.4;text-align:center}.status:empty{display:none}@keyframes shimmer{to{background-position:-200% 0}}@media(max-width:319px){.slot{transform:scale(.9);transform-origin:top center}}
     </style>
 </head>
 <body>
 <main class="wrap">
-    <section class="card">
-        <h1>Security verification</h1>
-        <p>Complete the checkbox to continue in the Kermit's app.</p>
-        <div id="mobile-recaptcha" class="widget"></div>
-        <p id="status" class="status" role="status" aria-live="polite"></p>
-    </section>
+    <div class="slot"><span class="skeleton" aria-hidden="true"></span><div id="mobile-recaptcha"></div></div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
 </main>
 <script nonce="{{ Vite::cspNonce() }}">
-    window.mobileRecaptchaReady = function () {
-        grecaptcha.render('mobile-recaptcha', {
-            sitekey: @json(config('services.recaptcha.site_key')),
-            callback: function (token) {
-                const status = document.getElementById('status');
-                status.className = 'status done';
-                status.textContent = 'Verified. Returning to the app...';
-                window.location.href = 'kermits-recaptcha://success?token=' + encodeURIComponent(token);
-            },
-            'expired-callback': function () {
-                document.getElementById('status').textContent = 'Verification expired. Please complete it again.';
-            },
-            'error-callback': function () {
-                document.getElementById('status').textContent = 'Unable to load reCAPTCHA. Check your connection and try again.';
-            }
+    (function () {
+        var status = document.getElementById('status');
+        var expanded = false;
+        var challengeSeen = false;
+
+        // The app grows the popup while Google's picture challenge is open and shrinks it afterwards.
+        function layout(challenge) {
+            if (challenge === expanded) return;
+            expanded = challenge;
+            window.location.href = 'kermits-recaptcha://layout?challenge=' + (challenge ? '1' : '0');
+        }
+
+        function challengeVisible() {
+            var frame = document.querySelector('iframe[src*="/bframe"]');
+            if (!frame) return false;
+            var holder = frame;
+            while (holder.parentElement && holder.parentElement !== document.body) holder = holder.parentElement;
+
+            return window.getComputedStyle(holder).visibility !== 'hidden' && frame.getBoundingClientRect().height > 0;
+        }
+
+        // Tapping the checkbox moves focus into Google's frame, so the popup grows before a challenge is drawn.
+        window.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (document.activeElement && document.activeElement.tagName === 'IFRAME') layout(true);
+            }, 0);
         });
-    };
+        new MutationObserver(function () {
+            if (challengeVisible()) {
+                challengeSeen = true;
+                layout(true);
+            } else if (challengeSeen) {
+                challengeSeen = false;
+                layout(false);
+            }
+        }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+
+        window.mobileRecaptchaReady = function () {
+            grecaptcha.render('mobile-recaptcha', {
+                sitekey: @json(config('services.recaptcha.site_key')),
+                callback: function (token) {
+                    status.textContent = '';
+                    window.location.href = 'kermits-recaptcha://success?token=' + encodeURIComponent(token);
+                },
+                'expired-callback': function () {
+                    layout(false);
+                    status.textContent = 'The check expired. Please tick the box again.';
+                },
+                'error-callback': function () {
+                    layout(false);
+                    status.textContent = 'reCAPTCHA could not load. Check your connection and try again.';
+                }
+            });
+        };
+    })();
 </script>
 <script nonce="{{ Vite::cspNonce() }}" src="https://www.google.com/recaptcha/api.js?onload=mobileRecaptchaReady&render=explicit" async defer></script>
 </body>

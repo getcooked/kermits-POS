@@ -47,7 +47,7 @@
                         @if($product->description)<p class="pos-item-desc">{{ $product->description }}</p>@endif
                         <div class="pos-item-meta">
                             <strong>₱{{ number_format($product->price, 2) }}</strong>
-                            <span data-pos-stock @class(['low-stock' => $product->stock < $lowStockBelow])>{{ $stockLabel($product->stock) }}</span>
+                            <span data-pos-stock @class(['low-stock' => $product->stock < $lowStockBelow, 'is-out' => $product->stock < 1])>{{ $stockLabel($product->stock) }}</span>
                         </div>
                         @if($canSell)
                         <input class="cart-quantity" name="quantities[{{ $product->id }}]" type="hidden" value="{{ old('quantities.'.$product->id, 0) }}">
@@ -130,23 +130,24 @@
 .pos-category-tabs button:hover{border-color:#aeb39f}
 .pos-category-tabs button.active{background:var(--pos-ink);border-color:var(--pos-ink);color:#fff}
 
-/* Product tiles: one square picture frame, name, price and stock; the whole tile adds to the order. */
-.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px}
-.pos-item{position:relative;display:flex;flex-direction:column;min-width:0;padding:10px;border:1px solid var(--pos-line);border-radius:16px;background:var(--pos-surface);transition:border-color .15s,box-shadow .15s}
+/* Product tiles match the admin Products cards: full-width square picture, name, description, price and a stock pill; the whole tile adds to the order. */
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:16px}
+.pos-item{position:relative;display:flex;flex-direction:column;min-width:0;border:1px solid #d8d9cf;border-radius:16px;background:var(--pos-surface);overflow:hidden;transition:border-color .15s,box-shadow .15s}
 .pos-item[hidden]{display:none}
-.pos-item-media{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:#fff;border:1px solid #eef0e8}
-.pos-item-media img{display:block;width:100%;height:100%}
-.pos-item-placeholder{width:100%;height:100%;display:grid;place-items:center;background:#f3f4ec;color:#8d960f;font-size:44px;font-weight:800}
-.pos-item-count{position:absolute;top:8px;right:8px;min-width:30px;height:30px;display:grid;place-items:center;padding:0 8px;border-radius:999px;background:var(--pos-ink);color:#fff;font-size:14px;font-weight:800;box-shadow:0 4px 12px rgba(23,24,23,.25)}
+.pos-item-media{position:relative;aspect-ratio:1;background:#fff;border-bottom:1px solid #eceee6}
+.pos-item-media img{display:block;width:100%;height:100%;object-fit:cover}
+.pos-item-placeholder{width:100%;height:100%;display:grid;place-items:center;background:#eff1df;color:#747d00;font-size:34px;font-weight:800}
+.pos-item-count{position:absolute;top:10px;right:10px;min-width:30px;height:30px;display:grid;place-items:center;padding:0 8px;border-radius:999px;background:var(--pos-ink);color:#fff;font-size:14px;font-weight:800;box-shadow:0 4px 12px rgba(23,24,23,.25)}
 .pos-item-count[hidden]{display:none}
-.pos-item-body{flex:1;display:flex;flex-direction:column;padding:10px 4px 2px;min-width:0}
-.pos-item-body h3{margin:0;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.pos-item-desc{margin:4px 0 0;color:var(--pos-muted);font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
-.pos-item-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+.pos-item-body{flex:1;display:flex;flex-direction:column;padding:14px 16px 16px;min-width:0}
+.pos-item-body h3{margin:0;font-size:15px;line-height:1.3;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pos-item-desc{margin:5px 0 0;color:#6c7068;font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pos-item-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:12px}
 .pos-item-meta strong{font-size:17px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.pos-item-meta span{color:var(--pos-muted);font-size:12px;font-weight:600}
-.pos-item-meta span.low-stock{color:#c62828;font-weight:800}
-.add-cart{height:38px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;background:var(--pos-ink);color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
+.pos-item-meta span{padding:4px 9px;border-radius:999px;background:#e7f4eb;color:#23683c;font-size:12px;font-weight:700;white-space:nowrap}
+.pos-item-meta span.low-stock{background:#fff1d6;color:#8a5200}
+.pos-item-meta span.is-out{background:#fde9e7;color:#b42318}
+.add-cart{height:38px;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;background:var(--pos-ink);color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
 .add-cart::after{content:"";position:absolute;inset:0;border-radius:16px}
 .add-cart svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
 .add-cart:focus-visible{outline:3px solid rgba(174,187,25,.5);outline-offset:2px}
@@ -154,9 +155,8 @@
 .pos-item:has(.add-cart:not(:disabled)):hover{border-color:#aeb39f;box-shadow:0 10px 26px rgba(24,25,22,.08)}
 .pos-item:has(.add-cart:not(:disabled)):active{transform:scale(.99)}
 .pos-item.is-in-order{border-color:var(--pos-ink);box-shadow:inset 0 0 0 1px var(--pos-ink)}
-.pos-item.is-sold-out .pos-item-media{opacity:.45;filter:grayscale(.8)}
+.pos-item.is-sold-out .pos-item-media img,.pos-item.is-sold-out .pos-item-placeholder{opacity:.55;filter:grayscale(.7)}
 .pos-item.is-sold-out h3,.pos-item.is-sold-out .pos-item-meta strong{color:#8a8d85}
-.is-view-only .pos-item{padding-bottom:12px}
 .pos-no-results{display:grid;justify-items:center;gap:8px;padding:48px 16px;color:var(--pos-muted);text-align:center}
 .pos-no-results[hidden]{display:none}
 .pos-no-results svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
@@ -247,10 +247,13 @@
     .pos-catalog-head h1{font-size:26px}
     .pos-search{width:100%!important}
     .pos-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .pos-item{padding:8px;border-radius:14px}
+    .pos-item{border-radius:14px}
+    .pos-item-body{padding:10px 12px 12px}
+    .pos-item-body h3{font-size:14px}
     .pos-item-desc{display:none}
+    .pos-item-meta{gap:6px;padding-top:8px}
     .pos-item-meta strong{font-size:15px}
-    .pos-item-meta span{font-size:11px}
+    .pos-item-meta span{padding:3px 7px;font-size:11px}
     .add-cart{height:36px}
     .pos-category-row{grid-template-columns:minmax(0,1fr)}
     .pos-category-arrow{display:none}
@@ -418,6 +421,7 @@
                 : remaining < LOW_STOCK_BELOW ? `Low stock · ${remaining} in stock`
                 : `${remaining} in stock`;
             product.stockLabel.classList.toggle('low-stock', remaining < LOW_STOCK_BELOW);
+            product.stockLabel.classList.toggle('is-out', remaining === 0);
             product.add.disabled = remaining === 0;
             product.card.classList.toggle('is-in-order', inOrder > 0);
             product.badge.hidden = inOrder === 0;

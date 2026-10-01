@@ -41,8 +41,7 @@ class ActivityLogTest extends TestCase
             ->assertSee(route('activity-logs.index'), false)
             ->assertSee('Activity Logs')
             ->assertSee(route('settings.payment.edit'), false)
-            ->assertSee('Settings')
-            ->assertDontSee('Payment Settings');
+            ->assertSee('Payment Settings');
 
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
 

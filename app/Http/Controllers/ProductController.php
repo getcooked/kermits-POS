@@ -133,6 +133,29 @@ class ProductController extends Controller
         return $this->visibilityResponse($request, $message, $ids, $active);
     }
 
+    public function bulkCategory(Request $request): RedirectResponse
+    {
+        $request->merge(['category' => Str::title(Str::squish((string) $request->input('category')))]);
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer', 'distinct', 'exists:products,id'],
+            'category' => ['required', 'string', 'max:80'],
+        ], [
+            'ids.required' => 'Select at least one product to move.',
+            'category.required' => 'Choose the category to move the products to.',
+        ]);
+
+        $category = $validated['category'];
+        $moved = Product::query()
+            ->whereKey(array_map('intval', $validated['ids']))
+            ->update(['category' => $category, 'category_order' => $this->categoryOrder($category)]);
+
+        return redirect()->route('products.index')->with(
+            'status',
+            "Moved {$moved} ".Str::plural('product', $moved)." to {$category}.",
+        );
+    }
+
     private function visibilityResponse(Request $request, string $message, array $ids, bool $active): JsonResponse|RedirectResponse
     {
         if (! $request->expectsJson()) {

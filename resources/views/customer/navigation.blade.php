@@ -13,7 +13,7 @@
             <a class="history-app-link disabled" aria-disabled="true">@include('partials.nav-icon', ['name' => 'app'])<span>App coming soon</span><b>App</b></a>
         @endif
         <span class="customer-user"><strong>Hi, {{ auth()->user()->name }}</strong><small>Customer</small></span>
-        <form method="POST" action="{{ route('logout') }}">
+        <form method="POST" action="{{ route('logout') }}" data-confirm="You will need to sign in again to continue." data-confirm-title="Log out of Kermit's?" data-confirm-label="Log out">
             @csrf
             <button class="logout-icon" type="submit" title="Log out" aria-label="Log out">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9"/></svg>
