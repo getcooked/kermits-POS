@@ -27,7 +27,25 @@ class ProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:120'],
+            'name' => [
+                'bail',
+                'required',
+                'string',
+                'max:120',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $query = Product::query()
+                        ->whereRaw('LOWER(name) = ?', [Str::lower((string) $value)]);
+                    $product = $this->route('product');
+
+                    if ($product instanceof Product) {
+                        $query->whereKeyNot($product->getKey());
+                    }
+
+                    if ($query->exists()) {
+                        $fail('A product with this name already exists.');
+                    }
+                },
+            ],
             'category' => ['nullable', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:500'],
             'price' => ['required', 'decimal:0,2', 'min:0.01', 'max:999999.99'],

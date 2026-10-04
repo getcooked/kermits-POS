@@ -109,6 +109,50 @@ class InventoryAndProductsTest extends TestCase
         $this->assertDatabaseHas('products', ['name' => 'Super Admin Product']);
     }
 
+    public function test_duplicate_product_names_are_rejected_when_creating_or_renaming(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $existing = Product::query()->create([
+            'name' => 'Iced Spanish Latte',
+            'category' => 'Drinks',
+            'price' => 120,
+            'stock' => 10,
+            'active' => true,
+        ]);
+        $other = Product::query()->create([
+            'name' => 'Cafe Mocha',
+            'category' => 'Drinks',
+            'price' => 130,
+            'stock' => 8,
+            'active' => true,
+        ]);
+
+        $this->actingAs($superAdmin)->post('/products', [
+            'name' => '  iced   spanish latte  ',
+            'category' => 'Coffee',
+            'price' => 125,
+            'stock' => 5,
+            'active' => 1,
+        ])->assertSessionHasErrors(['name' => 'A product with this name already exists.']);
+
+        $this->actingAs($superAdmin)->put('/products/'.$other->id, [
+            'name' => 'ICED SPANISH LATTE',
+            'category' => $other->category,
+            'price' => $other->price,
+            'active' => 1,
+        ])->assertSessionHasErrors(['name' => 'A product with this name already exists.']);
+
+        $this->actingAs($superAdmin)->put('/products/'.$existing->id, [
+            'name' => 'Iced Spanish Latte',
+            'category' => $existing->category,
+            'price' => $existing->price,
+            'active' => 1,
+        ])->assertRedirect('/products');
+
+        $this->assertDatabaseCount('products', 2);
+        $this->assertSame('Cafe Mocha', $other->fresh()->name);
+    }
+
     public function test_admin_cannot_access_super_admin_product_or_inventory_routes(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

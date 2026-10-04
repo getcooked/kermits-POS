@@ -10,6 +10,4 @@
 .k-search-clear[hidden]{display:none}
 .k-search-clear:hover{background:#e2e4db;color:#171817}
 .k-search-clear svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
-.k-search-key{min-width:24px;height:24px;display:grid;place-items:center;padding:0 6px;border:1px solid #dcded5;border-radius:6px;background:#f7f7f3;color:#6c7068;font-family:inherit;font-size:12px;font-weight:600;line-height:1}
-.k-search.has-value .k-search-key,.k-search:focus-within .k-search-key{display:none}
-@media(hover:none),(max-width:640px){.k-search-key{display:none}.k-search>input{font-size:16px}}
+@media(hover:none),(max-width:640px){.k-search>input{font-size:16px}}

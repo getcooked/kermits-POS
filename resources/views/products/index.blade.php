@@ -12,12 +12,13 @@
     $editingProduct = str_starts_with($formContext, 'edit-')
         ? $products->firstWhere('id', (int) substr($formContext, 5))
         : null;
+    $enabledProducts = $products->where('active', true);
     $stats = [
-        'all' => ['label' => 'All Products', 'count' => $products->count()],
-        'enabled' => ['label' => 'Enabled', 'count' => $products->where('active', true)->count()],
+        'all' => ['label' => 'All Products', 'count' => $enabledProducts->count()],
+        'enabled' => ['label' => 'Enabled', 'count' => $enabledProducts->count()],
         'disabled' => ['label' => 'Disabled', 'count' => $products->where('active', false)->count()],
-        'low' => ['label' => 'Low Stock', 'count' => $products->filter(fn ($product) => $product->stock <= $lowThreshold)->count()],
-        'noimage' => ['label' => 'No Picture', 'count' => $imageUrls->filter(fn ($url) => ! $url)->count()],
+        'low' => ['label' => 'Low Stock', 'count' => $enabledProducts->filter(fn ($product) => $product->stock <= $lowThreshold)->count()],
+        'noimage' => ['label' => 'No Picture', 'count' => $enabledProducts->filter(fn ($product) => ! $imageUrls[$product->getKey()])->count()],
     ];
     $sortOptions = [
         'menu' => 'Menu order',
@@ -809,11 +810,17 @@ const productView = {
 };
 try { productView.view = localStorage.getItem('products.view') === 'list' ? 'list' : 'grid'; } catch (error) {}
 
-const productMatchesStatus = (item, status) => status === 'all'
-    || (status === 'enabled' && item.dataset.active === '1')
-    || (status === 'disabled' && item.dataset.active === '0')
-    || (status === 'low' && item.dataset.low === '1')
-    || (status === 'noimage' && item.dataset.image === '0');
+const productMatchesStatus = (item, status) => {
+    const enabled = item.dataset.active === '1';
+
+    if (status === 'disabled') return !enabled;
+    if (!enabled) return false;
+
+    return status === 'all'
+        || status === 'enabled'
+        || (status === 'low' && item.dataset.low === '1')
+        || (status === 'noimage' && item.dataset.image === '0');
+};
 
 const arrangeProductCards = catalog => {
     const grids = [...catalog.querySelectorAll('[data-pm-group] .pm-grid')];
@@ -1018,9 +1025,10 @@ const applyVisibilityPayload = payload => {
     });
     refreshProductCounts();
     updateLowStockBadge(payload.low_stock_count);
+    applyProductFilters();
 };
 
-// A single switch updates the card in place and stays put, so a mis-click can be undone right away.
+// A visibility change immediately moves the card into the matching Enabled or Disabled view.
 const toggleProductVisibility = async toggle => {
     const card = toggle.closest('[data-pm-item]');
     if (!card || toggle.getAttribute('aria-busy') === 'true') return;

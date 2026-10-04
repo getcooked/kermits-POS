@@ -22,6 +22,5 @@
         'spellcheck' => 'false',
     ]) }}>
     <button type="button" class="k-search-clear" data-k-search-clear aria-label="Clear search" @unless(filled($value)) hidden @endunless><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"></path></svg></button>
-    <kbd class="k-search-key" aria-hidden="true" title="Press / to search">/</kbd>
     {{ $slot }}
 </div>
