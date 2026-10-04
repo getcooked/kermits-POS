@@ -228,7 +228,7 @@
                         <div class="field pm-span"><label for="name-edit">Name</label><input class="control" id="name-edit" name="name" value="{{ $value('name', $editingProduct?->name) }}" required></div>
                         <div class="field pm-span"><label for="category-edit">Category</label>@include('products.partials.category-picker', ['id' => 'category-edit', 'value' => $value('category', $editingProduct?->category), 'placeholder' => 'Select or type a category'])</div>
                         <div class="field"><label for="price-edit">Price (₱)</label><input class="control" id="price-edit" name="price" type="number" min="0.01" step="0.01" value="{{ $value('price', $editingProduct?->price) }}" required></div>
-                        <div class="field"><span class="pm-field-label">Stock</span><div class="pm-stock-readonly"><strong data-pm-editor-stock>{{ $editingProduct?->stock ?? 0 }} units</strong><a href="{{ route('inventory.index', $editing ? ['search' => $editingProduct->name] : []) }}" data-pm-inventory-link data-base-url="{{ route('inventory.index') }}">Adjust in Inventory</a></div><small class="pm-hint">Stock changes are made in Inventory so each one is recorded.</small></div>
+                        <div class="field"><span class="pm-field-label">Stock</span><div class="pm-stock-readonly"><strong data-pm-editor-stock>{{ $editingProduct?->stock ?? 0 }} units</strong></div></div>
                         <div class="field pm-span"><label for="description-edit">Description</label><textarea class="control" id="description-edit" name="description" rows="3" maxlength="500">{{ $value('description', $editingProduct?->description) }}</textarea></div>
                     </div>
                     <label class="pm-switch"><input name="active" type="checkbox" value="1" {{ $editing && old('active') ? 'checked' : '' }}><span class="pm-switch-track" aria-hidden="true"></span><span class="pm-switch-copy"><strong>Enabled</strong><small>Disabled products can't be sold on the POS, shop, mobile app or reservations. Their sales history is kept.</small></span></label>
@@ -354,8 +354,6 @@
 .pm-field-label{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:#3b3f38}
 .pm-stock-readonly{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px dashed #cfd2c8;border-radius:11px;background:#f7f7f2}
 .pm-stock-readonly strong{font-size:15px;font-variant-numeric:tabular-nums}
-.pm-stock-readonly a{color:#4e5700;font-size:13px;font-weight:800;text-decoration:none}
-.pm-stock-readonly a:hover{text-decoration:underline}
 .pm-hint{display:block;margin-top:5px;color:#80857c;font-size:12px}
 .pm-form-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:4px}
 .pm-primary{width:auto;padding-inline:26px}
@@ -1081,8 +1079,6 @@ const fillProductEditor = (drawer, card) => {
     field('category').value = data.category;
     field('price').value = data.price;
     drawer.querySelector('[data-pm-editor-stock]').textContent = `${data.stock} ${Number(data.stock) === 1 ? 'unit' : 'units'}`;
-    const inventoryLink = drawer.querySelector('[data-pm-inventory-link]');
-    inventoryLink.href = `${inventoryLink.dataset.baseUrl}?search=${encodeURIComponent(data.name)}`;
     field('description').value = data.description ?? '';
     field('active').checked = data.active === '1';
     field('remove_image').checked = false;
