@@ -29,7 +29,7 @@ class MobileApiTest extends TestCase
         $admin = User::factory()->create(['password' => 'MobilePassword123!', 'role' => User::ROLE_ADMIN]);
 
         $response = $this->postJson('/api/v1/login', [
-            'login' => 'MOBILE@gmail.com','password' => 'MobilePassword123!', 'device_name' => 'Test phone',
+            'login' => 'MOBILE@gmail.com', 'password' => 'MobilePassword123!', 'device_name' => 'Test phone',
         ])->assertOk()->assertJsonPath('data.user.id', $customer->id);
         $plainToken = $response->json('data.token');
 

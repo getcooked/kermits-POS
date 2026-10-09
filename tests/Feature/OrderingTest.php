@@ -149,6 +149,23 @@ class OrderingTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
+    public function test_gcash_sale_rejects_a_reference_that_was_already_used(): void
+    {
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $product = Product::query()->create(['name' => 'Duplicate Reference Product', 'price' => 125, 'stock' => 5, 'active' => true]);
+        $checkout = [
+            'quantities' => [$product->id => 1],
+            'payment_method' => 'gcash',
+            'payment_reference' => '1234567890123',
+        ];
+
+        $this->actingAs($cashier)->post('/cashier/checkout', $checkout)->assertRedirect('/receipts/1');
+        $this->actingAs($cashier)->post('/cashier/checkout', $checkout)->assertSessionHasErrors('payment_reference');
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertSame(4, $product->fresh()->stock);
+    }
+
     public function test_unavailable_product_rejects_the_whole_order_without_changing_stock(): void
     {
         $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);

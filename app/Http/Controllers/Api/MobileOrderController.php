@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Rules\ReservationHours;
+use App\Rules\UniqueGcashReference;
 use App\Services\OrderService;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
-use Illuminate\Http\JsonResponse;
+use AppRulesNIQUEGCASHREFERENCE;
+USE ILLUMINATE\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -36,7 +38,7 @@ class MobileOrderController extends Controller
             'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', 'distinct'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999'],
             'payment_method' => ['required', 'in:cash,gcash,paymongo'],
-            'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
+            'payment_reference' => ['bail', 'nullable', 'required_if:payment_method,gcash', 'digits:13', new UniqueGcashReference],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'table_size' => ['nullable', 'required_with:phone,reservation_at', 'integer', Rule::in($pricing->tableSizes())],
             'dining_table_id' => $tables->requestRules(),
@@ -57,7 +59,7 @@ class MobileOrderController extends Controller
                     : 'Add table reservation details before paying with PayMongo.',
             ]);
         }
-        if ($needsReservation &&! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'], $tableId)) {
+        if ($needsReservation && ! $schedules->isAvailable($validated['reservation_at'], 'table', (int) $validated['table_size'], $tableId)) {
             throw ValidationException::withMessages([
                 'reservation_at' => 'This reservation time is no longer available. Please choose another schedule.',
             ]);

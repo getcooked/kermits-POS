@@ -4,11 +4,13 @@ namespace App\Http\Requests;
 
 use App\Models\User;
 use App\Rules\ReservationHours;
-use App\Services\ReservationSchedule;
+use App\Rules\UniqueGcashReference;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
+use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
-use Illuminate\Foundation\Http\FormRequest;
+use AppRulesNIQUEGCASHREFERENCE;
+USE ILLUMINATE\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -36,7 +38,7 @@ class StoreReservationRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'payment_method' => self::paymentMethodRules($this->input('type')),
             'payment_plan' => ['exclude_unless:type,exclusive', 'nullable', 'in:downpayment,full'],
-            'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
+            'payment_reference' => ['bail', 'nullable', 'required_if:payment_method,gcash', 'digits:13', new UniqueGcashReference],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }

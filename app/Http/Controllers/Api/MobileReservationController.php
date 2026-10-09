@@ -3,15 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreReservationRequest;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
-use App\Http\Requests\StoreReservationRequest;
+use App\Rules\UniqueGcashReference;
 use App\Services\PayMongoCheckout;
 use App\Services\ReservationPricing;
 use App\Services\ReservationSchedule;
 use App\Services\TableLayout;
-use Illuminate\Http\JsonResponse;
+use AppRulesNIQUEGCASHREFERENCE;
+USE ILLUMINATE\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -42,7 +44,7 @@ class MobileReservationController extends Controller
             'menu_items.*' => ['nullable', 'integer', 'min:0', 'max:22'], 'notes' => ['nullable', 'string', 'max:2000'],
             'payment_method' => StoreReservationRequest::paymentMethodRules($request->input('type')),
             'payment_plan' => ['exclude_unless:type,exclusive', 'nullable', 'in:downpayment,full'],
-            'payment_reference' => ['nullable', 'required_if:payment_method,gcash', 'digits:13'],
+            'payment_reference' => ['bail', 'nullable', 'required_if:payment_method,gcash', 'digits:13', new UniqueGcashReference],
             'payment_proof' => ['nullable', 'required_if:payment_method,gcash', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], StoreReservationRequest::paymentMethodMessages());
         if ($validated['payment_method'] === 'paymongo' && ! PayMongoCheckout::enabled()) {

@@ -939,7 +939,7 @@
                             <p class="eyebrow">TIME-HONORED RECIPES SINCE 2000</p>
                             <h1>Good food.<br>Good company.</h1>
                             <p class="hero-text">Come together over familiar favorites, prepared with care and served with the warm hospitality Kermit’s is known for.</p>
-                            <div class="hero-actions"><a class="primary" href="{{ route('reservations.create') }}">Reserve your visit</a><a class="secondary" href="#menu">Explore the menu</a>@if($appDownloadAvailable)<a class="secondary app-hero-action" href="{{ $appDownloadUrl }}" download>Download Android app</a>@else<span class="secondary app-hero-action disabled">Android app coming soon</span>@endif</div>
+                            <div class="hero-actions"><a class="primary" href="{{ route('reservations.create') }}">Reserve your visit</a><a class="secondary" href="#menu">Explore the menu</a>@if($appDownloadAvailable)<a class="secondary app-hero-action" href="{{ $appDownloadUrl }}" download>Download app</a>@else<span class="secondary app-hero-action disabled">App coming soon</span>@endif</div>
                      </div>
                      <div class="hero-visual">
                             <div class="plate">@if($heroImageUrl = $products->first()?->imageUrl())<img src="{{ $heroImageUrl }}" alt="{{ $products->first()->name }}">@else<div class="plate-placeholder">K</div>@endif</div>

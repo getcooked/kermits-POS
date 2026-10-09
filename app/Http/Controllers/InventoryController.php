@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\InventoryAdjustmentRequest;
 use App\Models\Product;
-use App\Models\StockMovement;
 use App\Services\InventoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;

@@ -2,15 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Product;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ReservationsTest extends TestCase
@@ -243,6 +243,23 @@ class ReservationsTest extends TestCase
         $this->actingAs($superAdmin)->get('/reservations/'.$reservation->id.'/payment-proof')->assertOk();
         $this->actingAs($admin)->get('/reservations/'.$reservation->id.'/payment-proof')->assertForbidden();
         $this->actingAs($other)->get('/reservations/'.$reservation->id.'/payment-proof')->assertForbidden();
+    }
+
+    public function test_gcash_reservation_rejects_a_reference_that_was_already_used(): void
+    {
+        Storage::fake('local');
+        $customer = User::factory()->create(['role' => User::ROLE_CUSTOMER]);
+        $booking = fn (int $hour): array => [
+            'type' => 'table', 'table_size' => 2, 'customer_name' => $customer->name,
+            'email' => $customer->email, 'phone' => '09171234567',
+            'reservation_at' => now()->addDay()->setTime($hour, 0)->format('Y-m-d H:i:s'),
+            'payment_method' => 'gcash', 'payment_reference' => '1234567890123', 'payment_proof' => $this->fakePng('payment.png'),
+        ];
+
+        $this->actingAs($customer)->post('/book', $booking(12))->assertSessionHasNoErrors();
+        $this->actingAs($customer)->post('/book', $booking(15))->assertSessionHasErrors('payment_reference');
+
+        $this->assertDatabaseCount('reservations', 1);
     }
 
     public function test_phone_number_must_be_eleven_digits_and_start_with_zero_nine(): void

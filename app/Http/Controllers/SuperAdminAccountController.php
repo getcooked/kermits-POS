@@ -151,7 +151,6 @@ class SuperAdminAccountController extends Controller
     /**
      * Signs the admin out everywhere, except the current browser when they changed their own password.
      */
-
     private function safeInput(Request $request): array
     {
         return $request->except(['password', 'password_confirmation', 'verification_code', '_token']);

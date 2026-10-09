@@ -16,8 +16,8 @@ class OrderReceiptPdf
         $reservation = $order->reservation;
         $customer = $order->customer ?? $order->user;
 
-        $commands[] = "0.09 0.10 0.09 rg 0 ".($height - 100)." 595 100 re f";
-        $commands[] = "0.68 0.73 0.08 rg 0 ".($height - 104)." 595 4 re f";
+        $commands[] = '0.09 0.10 0.09 rg 0 '.($height - 100).' 595 100 re f';
+        $commands[] = '0.68 0.73 0.08 rg 0 '.($height - 104).' 595 4 re f';
         $this->text($commands, 44, $height - 48, 22, "KERMIT'S", true, '1 1 1');
         $this->text($commands, 44, $height - 74, 11, 'ORDER RECEIPT', false, '0.86 0.88 0.82');
         $this->rightText($commands, 551, $height - 51, 12, '#'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT), true, '1 1 1');

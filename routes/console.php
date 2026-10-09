@@ -69,7 +69,7 @@ Artisan::command('products:optimize-images
     foreach ($paths as $path) {
         if (! $disk->exists($path)) {
             $counts['missing']++;
-            $this->warn($this->option('clear-missing') ? "Missing, link ".($dryRun ? 'would be ' : '')."removed: {$path}" : "Missing: {$path} (use --clear-missing to remove the link)");
+            $this->warn($this->option('clear-missing') ? 'Missing, link '.($dryRun ? 'would be ' : '')."removed: {$path}" : "Missing: {$path} (use --clear-missing to remove the link)");
 
             if ($this->option('clear-missing')) {
                 $replace($path, null, 'missing');
@@ -82,7 +82,7 @@ Artisan::command('products:optimize-images
 
         if ($images->isBrandLogo($contents)) {
             $counts['logo']++;
-            $this->warn($this->option('clear-logos') ? "Logo stand-in ".($dryRun ? 'would be ' : '')."removed: {$path}" : "Logo stand-in: {$path} (use --clear-logos to remove it)");
+            $this->warn($this->option('clear-logos') ? 'Logo stand-in '.($dryRun ? 'would be ' : '')."removed: {$path}" : "Logo stand-in: {$path} (use --clear-logos to remove it)");
 
             if ($this->option('clear-logos')) {
                 $replace($path, null, 'logo');
